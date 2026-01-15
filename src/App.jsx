@@ -10,60 +10,397 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
 
-// Composant Header avec profil
-function Header({ user, onLogin, onLogout }) {
+// Landing Page Header
+function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage }) {
   const [showDropdown, setShowDropdown] = useState(false);
   
   return (
-    <div className="fixed top-0 right-0 left-64 h-14 bg-white border-b border-slate-200 flex items-center justify-end px-6 z-10">
-      <div className="relative">
-        <button 
-          onClick={() => setShowDropdown(!showDropdown)}
-          className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
-        >
-          {user ? (
-            <img src={user.picture} alt="" className="w-9 h-9 rounded-full" />
-          ) : (
-            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          )}
+    <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900/80 backdrop-blur-lg border-b border-white/10 z-50">
+      <div className="max-w-6xl mx-auto h-full px-6 flex items-center justify-between">
+        {/* Logo */}
+        <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">S</span>
+          </div>
+          <span className="text-white font-bold text-xl">Salarize</span>
         </button>
-        {showDropdown && (
-          <div className="absolute right-0 top-12 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48">
-            {user ? (
-              <>
-                <div className="px-4 py-2 border-b border-slate-100">
-                  <p className="font-medium text-slate-800 text-sm">{user.name}</p>
-                  <p className="text-slate-400 text-xs">{user.email}</p>
-                </div>
-                <button 
-                  onClick={() => { onLogout(); setShowDropdown(false); }}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  Se déconnecter
-                </button>
-              </>
-            ) : (
+        
+        {/* Nav */}
+        <nav className="hidden md:flex items-center gap-8">
+          <button 
+            onClick={() => setCurrentPage('home')}
+            className={`text-sm font-medium transition-colors ${currentPage === 'home' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            Accueil
+          </button>
+          <button 
+            onClick={() => setCurrentPage('features')}
+            className={`text-sm font-medium transition-colors ${currentPage === 'features' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            Fonctionnalités
+          </button>
+          {user && (
+            <button 
+              onClick={() => setCurrentPage('dashboard')}
+              className={`text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+            >
+              Dashboard
+            </button>
+          )}
+        </nav>
+        
+        {/* Auth */}
+        <div className="relative">
+          {user ? (
+            <>
               <button 
-                onClick={() => { onLogin(); setShowDropdown(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <img src={user.picture} alt="" className="w-7 h-7 rounded-full" />
+                <span className="text-white text-sm font-medium hidden sm:block">{user.name?.split(' ')[0]}</span>
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showDropdown && (
+                <>
+                  <div className="fixed inset-0" onClick={() => setShowDropdown(false)} />
+                  <div className="absolute right-0 top-12 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-2 w-56 z-50">
+                    <div className="px-4 py-3 border-b border-slate-700">
+                      <p className="font-medium text-white text-sm">{user.name}</p>
+                      <p className="text-slate-400 text-xs mt-0.5">{user.email}</p>
+                    </div>
+                    <button 
+                      onClick={() => { setCurrentPage('profile'); setShowDropdown(false); }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/50 flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Mon profil
+                    </button>
+                    <button 
+                      onClick={() => { setCurrentPage('dashboard'); setShowDropdown(false); }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/50 flex items-center gap-3"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                      Dashboard
+                    </button>
+                    <div className="border-t border-slate-700 mt-2 pt-2">
+                      <button 
+                        onClick={() => { onLogout(); setShowDropdown(false); }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-3"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Se déconnecter
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <button 
+              onClick={onLogin}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-violet-500/25"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Connexion
+            </button>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+// Landing Page Component
+function LandingPage({ onLogin }) {
+  return (
+    <div className="min-h-screen bg-slate-950">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden">
+        {/* Background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-fuchsia-600/20" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-violet-500/30 to-transparent rounded-full blur-3xl" />
+        
+        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-20">
+          <div className="text-center">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full mb-8">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-slate-300 text-sm">Nouvelle version disponible</span>
+            </div>
+            
+            {/* Title */}
+            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+              Analysez vos coûts
+              <br />
+              <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-violet-400 bg-clip-text text-transparent">
+                salariaux
+              </span>
+            </h1>
+            
+            {/* Subtitle */}
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
+              Importez vos fichiers Acerta, visualisez vos données par département, 
+              et exportez des rapports professionnels en quelques clics.
+            </p>
+            
+            {/* CTA */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button 
+                onClick={onLogin}
+                className="px-8 py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/25 flex items-center gap-2"
+              >
+                Commencer gratuitement
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
+              <button className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/10 transition-all">
+                Voir la démo
+              </button>
+            </div>
+          </div>
+          
+          {/* Preview Image Placeholder */}
+          <div className="mt-20 relative">
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent z-10" />
+            <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 p-4 shadow-2xl">
+              <div className="bg-slate-900 rounded-xl p-8 min-h-[300px] flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-violet-500/20">
+                    <svg className="w-8 h-8 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <p className="text-slate-500 text-sm">Aperçu du dashboard</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Features Section */}
+      <div className="max-w-6xl mx-auto px-6 py-20">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Tout ce dont vous avez besoin
+          </h2>
+          <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+            Une solution complète pour gérer et analyser vos coûts salariaux
+          </p>
+        </div>
+        
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Feature 1 */}
+          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
+            <div className="w-14 h-14 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-3">Import intelligent</h3>
+            <p className="text-slate-400">
+              Importez vos fichiers Acerta et Excel. Détection automatique des colonnes et des périodes.
+            </p>
+          </div>
+          
+          {/* Feature 2 */}
+          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
+            <div className="w-14 h-14 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-3">Visualisation claire</h3>
+            <p className="text-slate-400">
+              Graphiques interactifs, répartition par département, évolution mensuelle de vos coûts.
+            </p>
+          </div>
+          
+          {/* Feature 3 */}
+          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
+            <div className="w-14 h-14 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-3">Export professionnel</h3>
+            <p className="text-slate-400">
+              Générez des rapports PDF et Excel prêts à présenter à vos clients ou à la direction.
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      {/* CTA Section */}
+      <div className="max-w-6xl mx-auto px-6 py-20">
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 rounded-3xl p-12 border border-violet-500/20 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Prêt à simplifier votre gestion ?
+          </h2>
+          <p className="text-slate-300 text-lg mb-8 max-w-xl mx-auto">
+            Rejoignez les consultants qui utilisent Salarize pour leurs analyses salariales.
+          </p>
+          <button 
+            onClick={onLogin}
+            className="px-8 py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/25"
+          >
+            Commencer maintenant
+          </button>
+        </div>
+      </div>
+      
+      {/* Footer */}
+      <footer className="border-t border-slate-800 py-12">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">S</span>
+              </div>
+              <span className="text-white font-bold">Salarize</span>
+            </div>
+            <p className="text-slate-500 text-sm">
+              © 2025 Salarize. Tous droits réservés.
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Profile Page
+function ProfilePage({ user, onLogout }) {
+  return (
+    <div className="min-h-screen bg-slate-950 pt-24 pb-12">
+      <div className="max-w-2xl mx-auto px-6">
+        <h1 className="text-3xl font-bold text-white mb-8">Mon profil</h1>
+        
+        <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+          {/* Profile Header */}
+          <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-8">
+            <div className="flex items-center gap-6">
+              <img src={user.picture} alt="" className="w-20 h-20 rounded-2xl" />
+              <div>
+                <h2 className="text-2xl font-bold text-white">{user.name}</h2>
+                <p className="text-slate-400">{user.email}</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Profile Details */}
+          <div className="p-8 space-y-6">
+            <div>
+              <label className="text-sm text-slate-500 block mb-2">Nom complet</label>
+              <div className="px-4 py-3 bg-slate-800 rounded-xl text-white">{user.name}</div>
+            </div>
+            <div>
+              <label className="text-sm text-slate-500 block mb-2">Email</label>
+              <div className="px-4 py-3 bg-slate-800 rounded-xl text-white">{user.email}</div>
+            </div>
+            <div>
+              <label className="text-sm text-slate-500 block mb-2">Connexion</label>
+              <div className="px-4 py-3 bg-slate-800 rounded-xl text-white flex items-center gap-2">
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                   <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                Connexion Google
-              </button>
-            )}
+                Google
+              </div>
+            </div>
           </div>
+          
+          {/* Actions */}
+          <div className="p-8 border-t border-slate-800">
+            <button 
+              onClick={onLogout}
+              className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium rounded-xl transition-colors"
+            >
+              Se déconnecter
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Dashboard Header (for when in dashboard view)
+function DashboardHeader({ user, onLogout, setCurrentPage }) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  
+  return (
+    <div className="fixed top-0 right-0 left-64 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10">
+      <div></div>
+      <div className="relative">
+        <button 
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors"
+        >
+          <img src={user?.picture} alt="" className="w-8 h-8 rounded-full" />
+          <span className="text-slate-700 text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
+          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {showDropdown && (
+          <>
+            <div className="fixed inset-0" onClick={() => setShowDropdown(false)} />
+            <div className="absolute right-0 top-12 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-50">
+              <button 
+                onClick={() => { setCurrentPage('home'); setShowDropdown(false); }}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Accueil
+              </button>
+              <button 
+                onClick={() => { setCurrentPage('profile'); setShowDropdown(false); }}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Mon profil
+              </button>
+              <div className="border-t border-slate-100 my-1" />
+              <button 
+                onClick={() => { onLogout(); setShowDropdown(false); }}
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Se déconnecter
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
   );
 }
+
+// Old Header removed - we use LandingHeader and DashboardHeader now
 
 // Modal component OUTSIDE of App to prevent re-renders
 function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel }) {
@@ -311,7 +648,7 @@ export default function App() {
   const [showMergeDept, setShowMergeDept] = useState(false);
   const [mergeDeptFrom, setMergeDeptFrom] = useState('');
   const [mergeDeptTo, setMergeDeptTo] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   
   // Employee detail section states
@@ -1575,19 +1912,95 @@ export default function App() {
   // Loading screen
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900">
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-white text-lg font-medium">Chargement...</p>
         </div>
       </div>
     );
   }
 
-  // Upload screen (no companies yet)
+  // Landing page (non connecté ou page home)
+  if (!user || currentPage === 'home' || currentPage === 'features') {
+    return (
+      <>
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <LandingPage onLogin={handleLogin} />
+      </>
+    );
+  }
+
+  // Profile page
+  if (currentPage === 'profile') {
+    return (
+      <>
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <ProfilePage user={user} onLogout={handleLogout} />
+      </>
+    );
+  }
+
+  // Upload screen (connected but no companies yet)
   if (Object.keys(companies).length === 0 && view === 'upload') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 p-4">
+      <div className="min-h-screen bg-slate-950">
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <div className="pt-24 pb-12 px-6">
+          <div className="max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-white mb-2">Bienvenue, {user?.name?.split(' ')[0]} 👋</h1>
+              <p className="text-slate-400">Commencez par importer votre premier fichier</p>
+            </div>
+            
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8">
+              <label className="block cursor-pointer">
+                <div className="border-2 border-dashed border-slate-700 hover:border-violet-500 rounded-xl p-12 text-center transition-colors group">
+                  <div className="w-16 h-16 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                    <svg className="w-8 h-8 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <p className="text-white font-semibold mb-2">Importer un fichier Excel</p>
+                  <p className="text-slate-500 text-sm">Glissez-déposez ou cliquez pour sélectionner</p>
+                </div>
+                <input 
+                  type="file" 
+                  accept=".xlsx,.xls" 
+                  onChange={handleFileChange}
+                  className="hidden" 
+                />
+              </label>
+              
+              {debugMsg && (
+                <p className="mt-4 text-sm text-slate-400 text-center">{debugMsg}</p>
+              )}
+            </div>
+            
+            <p className="text-center text-slate-600 text-sm mt-6">
+              Compatible : Export Acerta, fichiers d'analyse internes
+            </p>
+          </div>
+        </div>
+        
         {showModal && (
           <SelectCompanyModal 
             companies={companies}
@@ -1612,16 +2025,16 @@ export default function App() {
                 </button>
               </div>
               
-              <div className="mb-5 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+              <div className="mb-5 p-4 bg-violet-50 border border-violet-200 rounded-xl">
                 <div className="flex gap-3">
-                  <div className="text-emerald-500 mt-0.5">
+                  <div className="text-violet-500 mt-0.5">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div className="text-sm">
-                    <p className="font-semibold text-emerald-800 mb-1">Fichier prêt à importer</p>
-                    <p className="text-emerald-700">
+                    <p className="font-semibold text-violet-800 mb-1">Fichier prêt à importer</p>
+                    <p className="text-violet-700">
                       <strong>{pendingPeriodSelection.employees.length} employés</strong> trouvés dans ce fichier.
                     </p>
                   </div>
@@ -1635,7 +2048,7 @@ export default function App() {
                 <div className="flex gap-2">
                   <select 
                     id="period-year-upload"
-                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none text-lg"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none text-lg"
                     defaultValue={new Date().getFullYear()}
                   >
                     {[2023, 2024, 2025, 2026].map(y => (
@@ -1644,7 +2057,7 @@ export default function App() {
                   </select>
                   <select 
                     id="period-month-upload"
-                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                     defaultValue={String(new Date().getMonth() + 1).padStart(2, '0')}
                   >
                     {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
@@ -1684,7 +2097,7 @@ export default function App() {
                     setPendingData(result);
                     setShowModal(true);
                   }}
-                  className="flex-1 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium"
+                  className="flex-1 py-2.5 bg-violet-500 text-white rounded-lg hover:bg-violet-600 font-medium"
                 >
                   Importer
                 </button>
@@ -1692,28 +2105,6 @@ export default function App() {
             </div>
           </div>
         )}
-        <div className="bg-white rounded-3xl p-10 text-center max-w-md shadow-2xl">
-          <h1 className="text-4xl font-black bg-gradient-to-r from-emerald-500 to-cyan-500 bg-clip-text text-transparent mb-1">Salarize</h1>
-          <p className="text-slate-400 text-sm mb-8">Salary & Analyze</p>
-          
-          <label className="inline-block bg-gradient-to-r from-emerald-500 to-cyan-500 text-white px-8 py-4 rounded-xl cursor-pointer font-semibold hover:scale-105 transition-transform shadow-lg">
-            📁 Importer un fichier Excel
-            <input 
-              type="file" 
-              accept=".xlsx,.xls" 
-              onChange={handleFileChange}
-              className="hidden" 
-            />
-          </label>
-          
-          {debugMsg && (
-            <p className="mt-4 text-sm text-slate-500">{debugMsg}</p>
-          )}
-          
-          <p className="mt-8 text-slate-400 text-xs">
-            Compatible : Export Acerta, fichiers d'analyse internes
-          </p>
-        </div>
       </div>
     );
   }
@@ -1728,7 +2119,7 @@ export default function App() {
           onSelectCompany={loadCompany}
           onImportClick={() => setShowImportModal(true)}
           onAddCompany={() => setShowNewCompanyModal(true)}
-          onManageData={() => setShowDataManager(true)}
+          onManageData={() => setShowDataManager(true)}}
           onManageDepts={() => setShowDeptManager(true)}
           debugMsg={debugMsg}
         />
@@ -1781,7 +2172,7 @@ export default function App() {
         onManageDepts={() => setShowDeptManager(true)}
         debugMsg={debugMsg}
       />
-      <Header user={user} onLogin={handleLogin} onLogout={handleLogout} />
+      <DashboardHeader user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       {showModal && pendingData && (
         <SelectCompanyModal 
           companies={companies}
