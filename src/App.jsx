@@ -696,17 +696,6 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     setUploadingAvatar(true);
     
     try {
-      // Vérifier qu'on a une session active
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-          setUploadingAvatar(false);
-          return;
-        }
-      }
-      
       // Convertir en base64 pour stockage simple
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -753,19 +742,6 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     
     setSaving(true);
     try {
-      // Vérifier qu'on a une session active
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        // Essayer de rafraîchir la session
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshData.session) {
-          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-          setSaving(false);
-          return;
-        }
-      }
-      
       // Mise à jour via Supabase
       const updateData = {
         data: { full_name: editName, name: editName }
@@ -796,7 +772,11 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
       setIsEditing(false);
     } catch (err) {
       console.error('Update error:', err);
-      setMessage({ type: 'error', text: err.message || 'Erreur lors de la mise à jour' });
+      if (err.message?.includes('session') || err.message?.includes('JWT')) {
+        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+      } else {
+        setMessage({ type: 'error', text: err.message || 'Erreur lors de la mise à jour' });
+      }
     }
     setSaving(false);
   };
@@ -813,17 +793,6 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     
     setSaving(true);
     try {
-      // Vérifier qu'on a une session active
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-          setSaving(false);
-          return;
-        }
-      }
-      
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
@@ -836,7 +805,11 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Erreur lors du changement de mot de passe' });
+      if (err.message?.includes('session') || err.message?.includes('JWT')) {
+        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+      } else {
+        setMessage({ type: 'error', text: err.message || 'Erreur lors du changement de mot de passe' });
+      }
     }
     setSaving(false);
   };
