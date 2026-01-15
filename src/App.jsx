@@ -1957,7 +1957,40 @@ export default function App() {
 
   // Obtenir la couleur de la société active
   const getBrandColor = () => {
-    return companies[activeCompany]?.brandColor || '16, 185, 129';
+    return companies[activeCompany]?.brandColor || '139, 92, 246';
+  };
+
+  // Convertir RGB string en HEX
+  const rgbToHex = (rgbString) => {
+    const [r, g, b] = rgbString.split(',').map(s => parseInt(s.trim()));
+    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+  };
+
+  // Générer des variantes de couleur (plus clair/foncé)
+  const getColorVariants = (rgbString) => {
+    const [r, g, b] = rgbString.split(',').map(s => parseInt(s.trim()));
+    const hex = rgbToHex(rgbString);
+    
+    // Version plus claire (pour backgrounds)
+    const lighterR = Math.min(255, r + 100);
+    const lighterG = Math.min(255, g + 100);
+    const lighterB = Math.min(255, b + 100);
+    const lighter = `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
+    
+    // Version très claire (pour backgrounds subtils)
+    const lightestR = Math.min(255, Math.round(r + (255 - r) * 0.85));
+    const lightestG = Math.min(255, Math.round(g + (255 - g) * 0.85));
+    const lightestB = Math.min(255, Math.round(b + (255 - b) * 0.85));
+    const lightest = `rgb(${lightestR}, ${lightestG}, ${lightestB})`;
+    
+    // Version foncée
+    const darkerR = Math.max(0, r - 30);
+    const darkerG = Math.max(0, g - 30);
+    const darkerB = Math.max(0, b - 30);
+    const darker = `rgb(${darkerR}, ${darkerG}, ${darkerB})`;
+    const darkerHex = '#' + [darkerR, darkerG, darkerB].map(x => x.toString(16).padStart(2, '0')).join('');
+    
+    return { hex, rgb: `rgb(${r}, ${g}, ${b})`, lighter, lightest, darker, darkerHex, r, g, b };
   };
 
   const handleLogoDelete = () => {
@@ -1971,6 +2004,10 @@ export default function App() {
   };
 
   const handleExportPDF = () => {
+    // Récupérer la couleur de la société
+    const brandColor = getBrandColor();
+    const colors = getColorVariants(brandColor);
+    
     // Calculer les données par mois
     const monthlyData = periods.map(period => {
       const periodEmps = employees.filter(e => e.period === period);
@@ -1999,7 +2036,7 @@ export default function App() {
 
     const logoHtml = companies[activeCompany]?.logo 
       ? `<img src="${companies[activeCompany].logo}" style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover;" />`
-      : `<div style="width: 60px; height: 60px; border-radius: 12px; background: linear-gradient(135deg, #8B5CF6, #D946EF); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 28px;">${activeCompany?.charAt(0) || 'S'}</div>`;
+      : `<div style="width: 60px; height: 60px; border-radius: 12px; background: ${colors.hex}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 28px;">${activeCompany?.charAt(0) || 'S'}</div>`;
 
     // Générer les barres de répartition
     const maxDeptCost = Math.max(...sortedDepts.map(([_, d]) => d.total));
@@ -2029,7 +2066,7 @@ export default function App() {
             justify-content: space-between;
             margin-bottom: 28px;
             padding-bottom: 20px;
-            border-bottom: 3px solid #8B5CF6;
+            border-bottom: 3px solid ${colors.hex};
           }
           .header-left {
             display: flex;
@@ -2052,10 +2089,7 @@ export default function App() {
           .brand-name {
             font-size: 22px;
             font-weight: 800;
-            background: linear-gradient(90deg, #8B5CF6, #D946EF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: ${colors.hex};
           }
           .brand-date {
             font-size: 11px;
@@ -2071,14 +2105,14 @@ export default function App() {
             margin-bottom: 28px;
           }
           .stat-card {
-            background: linear-gradient(135deg, #F5F3FF, #EDE9FE);
-            border: 1px solid #DDD6FE;
+            background: ${colors.lightest};
+            border: 1px solid ${colors.lighter};
             border-radius: 12px;
             padding: 16px;
             text-align: center;
           }
           .stat-card.highlight {
-            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            background: ${colors.hex};
             border: none;
           }
           .stat-card.highlight .stat-value,
@@ -2088,11 +2122,11 @@ export default function App() {
           .stat-value {
             font-size: 24px;
             font-weight: 700;
-            color: #5B21B6;
+            color: ${colors.darkerHex};
           }
           .stat-label {
             font-size: 10px;
-            color: #7C3AED;
+            color: ${colors.hex};
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-top: 4px;
@@ -2116,7 +2150,7 @@ export default function App() {
             content: '';
             width: 4px;
             height: 20px;
-            background: linear-gradient(180deg, #8B5CF6, #D946EF);
+            background: ${colors.hex};
             border-radius: 2px;
           }
           
@@ -2148,12 +2182,12 @@ export default function App() {
             background: #FAFAFA;
           }
           .total-row {
-            background: linear-gradient(90deg, #F5F3FF, #EDE9FE) !important;
+            background: ${colors.lightest} !important;
             font-weight: 600;
           }
           .total-row td {
             border-bottom: none;
-            color: #5B21B6;
+            color: ${colors.darkerHex};
           }
           .positive { color: #DC2626; }
           .negative { color: #16A34A; }
@@ -2180,7 +2214,7 @@ export default function App() {
           }
           .dept-bar {
             height: 100%;
-            background: linear-gradient(90deg, #8B5CF6, #A78BFA);
+            background: ${colors.hex};
             border-radius: 4px;
             display: flex;
             align-items: center;
@@ -2223,7 +2257,7 @@ export default function App() {
           .footer-logo {
             width: 16px;
             height: 16px;
-            background: linear-gradient(135deg, #8B5CF6, #D946EF);
+            background: ${colors.hex};
             border-radius: 4px;
           }
           
@@ -2232,7 +2266,7 @@ export default function App() {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: linear-gradient(90deg, #8B5CF6, #D946EF);
+            background: ${colors.hex};
             color: white;
             border: none;
             padding: 14px 28px;
@@ -2240,14 +2274,14 @@ export default function App() {
             font-weight: 600;
             cursor: pointer;
             font-size: 14px;
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+            box-shadow: 0 4px 15px rgba(${colors.r}, ${colors.g}, ${colors.b}, 0.3);
             display: flex;
             align-items: center;
             gap: 8px;
           }
           .print-btn:hover { 
             transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+            box-shadow: 0 6px 20px rgba(${colors.r}, ${colors.g}, ${colors.b}, 0.4);
           }
           @media print {
             .print-btn { display: none; }
