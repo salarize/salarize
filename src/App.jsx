@@ -3761,27 +3761,28 @@ function AppContent() {
     if (!shareEmail || !activeCompany) return;
     
     // Valider l'email
-    if (!shareEmail.includes('@')) {
-      toast.error('Email invalide');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(shareEmail)) {
+      toast.error('Adresse email invalide');
       return;
     }
     
     setShareSending(true);
     
     try {
+      // Calculer les stats pour l'email
+      const totalCostValue = filtered.reduce((s, e) => s + e.totalCost, 0);
+      const uniqueEmps = new Set(filtered.map(e => e.name)).size;
+      const periodsCount = periods.length;
+      const avgCost = uniqueEmps > 0 ? totalCostValue / uniqueEmps : 0;
+      
       // Générer un token unique pour le partage
       const shareToken = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36);
       
-      // Calculer les stats pour l'email
-      const totalCost = filtered.reduce((s, e) => s + e.totalCost, 0);
-      const uniqueEmps = new Set(filtered.map(e => e.name)).size;
-      const periodsCount = periods.length;
-      
-      // Sauvegarder le partage dans Supabase
+      // Sauvegarder le partage dans Supabase (si connecté)
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       
       if (currentUser) {
-        // Chercher l'ID de la company dans Supabase
         const { data: companyData } = await supabase
           .from('companies')
           .select('id')
@@ -3790,8 +3791,7 @@ function AppContent() {
           .single();
         
         if (companyData) {
-          // Créer le partage
-          const { error: shareError } = await supabase
+          await supabase
             .from('shares')
             .insert({
               company_id: companyData.id,
@@ -3799,40 +3799,88 @@ function AppContent() {
               shared_with_email: shareEmail,
               token: shareToken,
               message: shareMessage,
-              expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 jours
+              expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
             });
-          
-          if (shareError) {
-            console.error('Share error:', shareError);
-            // Continuer quand même pour envoyer l'email
-          }
         }
       }
       
-      // Envoyer l'email via Supabase Edge Function ou afficher les instructions
-      // Pour l'instant, on simule l'envoi et on affiche un message
-      const shareUrl = `${window.location.origin}/shared/${shareToken}`;
+      // Préparer le contenu de l'email
+      const senderName = user?.name || 'Un utilisateur Salarize';
+      const emailSubject = `📊 Rapport salarial ${activeCompany}`;
       
-      // Créer le contenu de l'email
-      const emailSubject = `Rapport salarial ${activeCompany} - Salarize`;
-      const emailBody = `
-${user?.name || 'Un utilisateur'} vous partage un rapport salarial.
-
-📊 Société: ${activeCompany}
-💰 Coût total: €${totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
-👥 Employés: ${uniqueEmps}
-📅 Périodes: ${periodsCount}
-
-${shareMessage ? `Message: "${shareMessage}"` : ''}
-
-Consultez le rapport complet sur Salarize.
-      `.trim();
+      // Top 5 départements par coût
+      const deptCosts = {};
+      filtered.forEach(e => {
+        const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+        deptCosts[dept] = (deptCosts[dept] || 0) + e.totalCost;
+      });
+      const topDepts = Object.entries(deptCosts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([dept, cost]) => `  • ${dept}: €${cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}`)
+        .join('\n');
       
-      // Ouvrir le client mail
-      const mailtoLink = `mailto:${shareEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-      window.open(mailtoLink, '_blank');
+      const emailBody = `Bonjour,
+
+${senderName} vous partage un rapport salarial via Salarize.
+
+═══════════════════════════════════
+📊 RÉSUMÉ - ${activeCompany}
+═══════════════════════════════════
+
+💰 Coût total: €${totalCostValue.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+👥 Nombre d'employés: ${uniqueEmps}
+📅 Périodes analysées: ${periodsCount}
+📈 Coût moyen/employé: €${avgCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+
+───────────────────────────────────
+🏢 TOP DÉPARTEMENTS PAR COÛT
+───────────────────────────────────
+${topDepts}
+
+${shareMessage ? `───────────────────────────────────\n💬 MESSAGE\n───────────────────────────────────\n"${shareMessage}"\n` : ''}
+═══════════════════════════════════
+
+Ce rapport a été généré automatiquement par Salarize.
+Pour plus de détails, contactez ${senderName}.
+
+Cordialement,
+L'équipe Salarize`;
+
+      // Essayer d'envoyer via Edge Function (si configurée)
+      let emailSent = false;
       
-      toast.success(`Invitation envoyée à ${shareEmail}`);
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`
+          },
+          body: JSON.stringify({
+            to: shareEmail,
+            subject: emailSubject,
+            text: emailBody,
+            from_name: senderName
+          })
+        });
+        
+        if (response.ok) {
+          emailSent = true;
+          toast.success(`Email envoyé à ${shareEmail}`);
+        }
+      } catch (edgeFnError) {
+        // Edge Function non configurée, fallback vers mailto
+        console.log('Edge Function non disponible, utilisation de mailto');
+      }
+      
+      // Fallback: ouvrir le client mail
+      if (!emailSent) {
+        const mailtoLink = `mailto:${shareEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+        window.location.href = mailtoLink;
+        toast.success(`Client email ouvert pour ${shareEmail}`);
+      }
+      
       setShowShareModal(false);
       setShareEmail('');
       setShareMessage('');
