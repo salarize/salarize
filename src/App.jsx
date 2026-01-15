@@ -1407,9 +1407,8 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] overflow-y-auto">
-      <div className="min-h-full flex items-center justify-center p-4">
-        <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Header - compact */}
         <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-4 text-center relative">
           <button 
@@ -1576,7 +1575,6 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
             </button>
           </form>
         </div>
-      </div>
       </div>
     </div>
   );
