@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase configuration
+const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P9GYtRaIr5DOIqIP_fh-BYR9Jo';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
 
@@ -305,6 +311,8 @@ export default function App() {
   const [showMergeDept, setShowMergeDept] = useState(false);
   const [mergeDeptFrom, setMergeDeptFrom] = useState('');
   const [mergeDeptTo, setMergeDeptTo] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
@@ -317,8 +325,48 @@ export default function App() {
     setEmpCurrentPage(1);
   }, [empSearchTerm, empDeptFilter, empSortBy]);
 
-  // Load
+  // Check auth state on load
   useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.email,
+          email: session.user.email,
+          picture: session.user.user_metadata?.avatar_url
+        });
+        loadFromSupabase(session.user.id);
+      } else {
+        // Not logged in, load from localStorage
+        loadFromLocalStorage();
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.email,
+          email: session.user.email,
+          picture: session.user.user_metadata?.avatar_url
+        });
+        loadFromSupabase(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setCompanies({});
+        setActiveCompany(null);
+        setEmployees([]);
+        setView('upload');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load data from localStorage (for non-logged-in users)
+  const loadFromLocalStorage = () => {
     try {
       const saved = localStorage.getItem('salarize_data_v4');
       if (saved) {
@@ -329,15 +377,192 @@ export default function App() {
         }
       }
     } catch (e) { console.error(e); }
-  }, []);
+    setIsLoading(false);
+  };
 
-  const saveAll = (newCompanies, active) => {
+  // Load data from Supabase
+  const loadFromSupabase = async (userId) => {
+    setIsLoading(true);
+    try {
+      // Load companies
+      const { data: companiesData, error: companiesError } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (companiesError) throw companiesError;
+
+      const loadedCompanies = {};
+      
+      for (const company of companiesData || []) {
+        // Load employees for this company
+        const { data: employeesData } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('company_id', company.id);
+
+        // Load mappings for this company
+        const { data: mappingsData } = await supabase
+          .from('department_mappings')
+          .select('*')
+          .eq('company_id', company.id);
+
+        const mapping = {};
+        (mappingsData || []).forEach(m => {
+          mapping[m.employee_name] = m.department;
+        });
+
+        const emps = (employeesData || []).map(e => ({
+          name: e.name,
+          department: e.department,
+          function: e.function,
+          totalCost: parseFloat(e.total_cost) || 0,
+          period: e.period
+        }));
+
+        const periods = [...new Set(emps.map(e => e.period).filter(Boolean))].sort();
+
+        loadedCompanies[company.name] = {
+          id: company.id,
+          employees: emps,
+          mapping,
+          periods,
+          logo: company.logo,
+          brandColor: company.brand_color,
+          website: company.website
+        };
+      }
+
+      setCompanies(loadedCompanies);
+      
+      // Load first company if exists
+      const companyNames = Object.keys(loadedCompanies);
+      if (companyNames.length > 0) {
+        loadCompany(companyNames[0], loadedCompanies);
+      }
+    } catch (e) {
+      console.error('Error loading from Supabase:', e);
+    }
+    setIsLoading(false);
+  };
+
+  // Save to Supabase
+  const saveToSupabase = async (newCompanies, activeCompanyName) => {
+    if (!user?.id) {
+      // Not logged in, save to localStorage
+      saveToLocalStorage(newCompanies, activeCompanyName);
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      for (const [companyName, companyData] of Object.entries(newCompanies)) {
+        let companyId = companyData.id;
+
+        // Create or update company
+        if (!companyId) {
+          const { data: newCompany, error } = await supabase
+            .from('companies')
+            .insert({
+              user_id: user.id,
+              name: companyName,
+              logo: companyData.logo || null,
+              brand_color: companyData.brandColor || null,
+              website: companyData.website || null
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          companyId = newCompany.id;
+          newCompanies[companyName].id = companyId;
+        } else {
+          await supabase
+            .from('companies')
+            .update({
+              logo: companyData.logo || null,
+              brand_color: companyData.brandColor || null,
+              website: companyData.website || null
+            })
+            .eq('id', companyId);
+        }
+
+        // Delete existing employees and mappings for this company
+        await supabase.from('employees').delete().eq('company_id', companyId);
+        await supabase.from('department_mappings').delete().eq('company_id', companyId);
+
+        // Insert employees
+        if (companyData.employees?.length > 0) {
+          const employeesToInsert = companyData.employees.map(e => ({
+            company_id: companyId,
+            name: e.name,
+            department: e.department || null,
+            function: e.function || null,
+            total_cost: e.totalCost,
+            period: e.period
+          }));
+
+          await supabase.from('employees').insert(employeesToInsert);
+        }
+
+        // Insert mappings
+        const mappingEntries = Object.entries(companyData.mapping || {});
+        if (mappingEntries.length > 0) {
+          const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
+            company_id: companyId,
+            employee_name: empName,
+            department: dept
+          }));
+
+          await supabase.from('department_mappings').insert(mappingsToInsert);
+        }
+      }
+
+      setCompanies(newCompanies);
+    } catch (e) {
+      console.error('Error saving to Supabase:', e);
+    }
+    setIsSyncing(false);
+  };
+
+  // Save to localStorage (for non-logged-in users)
+  const saveToLocalStorage = (newCompanies, active) => {
     try {
       localStorage.setItem('salarize_data_v4', JSON.stringify({
         companies: newCompanies,
         activeCompany: active
       }));
     } catch (e) { console.error(e); }
+  };
+
+  // Unified save function
+  const saveAll = (newCompanies, active) => {
+    if (user?.id) {
+      saveToSupabase(newCompanies, active);
+    } else {
+      saveToLocalStorage(newCompanies, active);
+    }
+  };
+
+  // Google Login
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) console.error('Login error:', error);
+  };
+
+  // Logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setCompanies({});
+    setActiveCompany(null);
+    setEmployees([]);
+    setView('upload');
   };
 
   const loadCompany = (name, comps = companies) => {
@@ -757,26 +982,6 @@ export default function App() {
     setView('dashboard');
   };
 
-  const handleGoogleLogin = () => {
-    // Simuler une connexion Google (en vrai il faudrait l'API Google)
-    const mockUser = {
-      name: 'Mo',
-      email: 'mo@example.com',
-      picture: 'https://ui-avatars.com/api/?name=Mo&background=10b981&color=fff'
-    };
-    setUser(mockUser);
-    try {
-      localStorage.setItem('salarize_user', JSON.stringify(mockUser));
-    } catch (e) {}
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    try {
-      localStorage.removeItem('salarize_user');
-    } catch (e) {}
-  };
-
   const handleLogoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file || !activeCompany) return;
@@ -869,6 +1074,110 @@ export default function App() {
     };
     setCompanies(newCompanies);
     saveAll(newCompanies, activeCompany);
+  };
+
+  // Export period data to Excel
+  const exportPeriodToExcel = (period) => {
+    const periodEmps = employees.filter(e => e.period === period);
+    if (periodEmps.length === 0) return;
+    
+    // Create worksheet data
+    const wsData = [
+      ['Nom', 'Département', 'Fonction', 'Coût Total', 'Période']
+    ];
+    
+    periodEmps.forEach(emp => {
+      const dept = emp.department || departmentMapping[emp.name] || 'Non assigné';
+      wsData.push([
+        emp.name,
+        dept,
+        emp.function || '',
+        emp.totalCost,
+        period
+      ]);
+    });
+    
+    // Add total row
+    const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
+    wsData.push([]);
+    wsData.push(['TOTAL', '', '', total, '']);
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 30 }, // Nom
+      { wch: 20 }, // Département
+      { wch: 20 }, // Fonction
+      { wch: 15 }, // Coût
+      { wch: 12 }  // Période
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, 'Données');
+    
+    // Generate filename
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const year = period.substring(0, 4);
+    const month = monthNames[parseInt(period.substring(5), 10) - 1];
+    const filename = `${activeCompany}_${month}_${year}.xlsx`;
+    
+    // Download
+    XLSX.writeFile(wb, filename);
+  };
+
+  // Export all data for a year to Excel
+  const exportYearToExcel = (year) => {
+    const yearPeriods = periods.filter(p => p.startsWith(year)).sort();
+    if (yearPeriods.length === 0) return;
+    
+    const wb = XLSX.utils.book_new();
+    
+    // Create summary sheet
+    const summaryData = [
+      ['Période', 'Employés', 'Coût Total']
+    ];
+    
+    let grandTotal = 0;
+    yearPeriods.forEach(period => {
+      const periodEmps = employees.filter(e => e.period === period);
+      const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
+      grandTotal += total;
+      const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+      const month = monthNames[parseInt(period.substring(5), 10) - 1];
+      summaryData.push([month, periodEmps.length, total]);
+    });
+    summaryData.push([]);
+    summaryData.push(['TOTAL ANNÉE', '', grandTotal]);
+    
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+    summaryWs['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Résumé');
+    
+    // Create sheet for each month
+    yearPeriods.forEach(period => {
+      const periodEmps = employees.filter(e => e.period === period);
+      const wsData = [['Nom', 'Département', 'Fonction', 'Coût Total']];
+      
+      periodEmps.forEach(emp => {
+        const dept = emp.department || departmentMapping[emp.name] || 'Non assigné';
+        wsData.push([emp.name, dept, emp.function || '', emp.totalCost]);
+      });
+      
+      const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
+      wsData.push([]);
+      wsData.push(['TOTAL', '', '', total]);
+      
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 15 }];
+      
+      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+      const monthName = monthNames[parseInt(period.substring(5), 10) - 1];
+      XLSX.utils.book_append_sheet(wb, ws, monthName);
+    });
+    
+    XLSX.writeFile(wb, `${activeCompany}_${year}.xlsx`);
   };
 
   const handleBrandColorChange = (color) => {
@@ -1263,6 +1572,18 @@ export default function App() {
   });
   const empList = Object.values(empAgg).sort((a, b) => b.cost - a.cost);
 
+  // Loading screen
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-lg font-medium">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Upload screen (no companies yet)
   if (Object.keys(companies).length === 0 && view === 'upload') {
     return (
@@ -1460,7 +1781,7 @@ export default function App() {
         onManageDepts={() => setShowDeptManager(true)}
         debugMsg={debugMsg}
       />
-      <Header user={user} onLogin={handleGoogleLogin} onLogout={handleLogout} />
+      <Header user={user} onLogin={handleLogin} onLogout={handleLogout} />
       {showModal && pendingData && (
         <SelectCompanyModal 
           companies={companies}
@@ -2407,7 +2728,7 @@ export default function App() {
                 {periods.length === 0 ? (
                   <p className="text-slate-400 text-sm">Aucune donnée importée</p>
                 ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     {/* Grouper par année */}
                     {Object.entries(
                       periods.reduce((acc, period) => {
@@ -2425,7 +2746,7 @@ export default function App() {
                       }, 0);
                       
                       return (
-                        <details key={year} className="bg-slate-50 rounded-lg">
+                        <details key={year} className="bg-slate-50 rounded-lg" open>
                           <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100 rounded-lg">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-slate-800">{year}</span>
@@ -2433,24 +2754,44 @@ export default function App() {
                                 {yearPeriods.length} mois
                               </span>
                             </div>
-                            <span className="text-sm font-medium text-slate-600">
-                              €{yearTotal.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-600">
+                                €{yearTotal.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </span>
+                              <button
+                                onClick={(e) => { e.preventDefault(); exportYearToExcel(year); }}
+                                className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
+                                title={`Télécharger ${year}`}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                              </button>
+                            </div>
                           </summary>
                           <div className="px-3 pb-2 space-y-1">
                             {yearPeriods.sort().map(period => {
                               const periodEmps = employees.filter(e => e.period === period);
                               const periodTotal = periodEmps.reduce((s, e) => s + e.totalCost, 0);
                               return (
-                                <div key={period} className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-100 rounded text-sm">
+                                <div key={period} className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-100 rounded text-sm group">
                                   <span className="text-slate-600">{['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'][parseInt(period.substring(5), 10) - 1]}</span>
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-2">
                                     <span className="text-slate-500">
                                       €{periodTotal.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                     </span>
                                     <button
+                                      onClick={() => exportPeriodToExcel(period)}
+                                      className="p-1 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                      title="Télécharger ce mois"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                      </svg>
+                                    </button>
+                                    <button
                                       onClick={() => setConfirmAction({ type: 'deletePeriod', period })}
-                                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                                       title="Supprimer"
                                     >
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
