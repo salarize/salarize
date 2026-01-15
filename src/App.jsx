@@ -6,29 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase configuration
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P9GYtRaIr5DOIqIP_fh-BYR9Jo';
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    detectSessionInUrl: true,
-    persistSession: true,
-    autoRefreshToken: true,
-    flowType: 'implicit'
-  }
-});
-
-// Traiter le hash IMMÉDIATEMENT au chargement du module (avant React)
-(async () => {
-  if (window.location.hash && window.location.hash.includes('access_token')) {
-    console.log('Hash detected, waiting for Supabase to process...');
-    // Attendre que Supabase traite le hash
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Nettoyer l'URL
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      console.log('Session created from hash:', session.user?.email);
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-  }
-})();
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
 
@@ -891,13 +869,41 @@ export default function App() {
     let mounted = true;
     
     const initAuth = async () => {
-      // Attendre un peu au cas où le hash est en cours de traitement
+      // 1. Vérifier si on a un hash avec access_token (retour OAuth)
       if (window.location.hash && window.location.hash.includes('access_token')) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+          // Forcer la création de session avec les tokens
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          
+          if (!error && data.session) {
+            // Nettoyer l'URL
+            window.history.replaceState(null, '', window.location.pathname);
+            
+            if (!mounted) return;
+            
+            setUser({
+              id: data.session.user.id,
+              name: data.session.user.user_metadata?.full_name || data.session.user.email,
+              email: data.session.user.email,
+              picture: data.session.user.user_metadata?.avatar_url
+            });
+            setCurrentPage('dashboard');
+            loadFromSupabase(data.session.user.id);
+            setIsLoading(false);
+            return; // On a réussi, on sort
+          }
+        }
       }
       
-      // Récupérer la session
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // 2. Sinon, vérifier s'il y a une session existante
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (!mounted) return;
       
@@ -910,10 +916,6 @@ export default function App() {
         });
         setCurrentPage('dashboard');
         loadFromSupabase(session.user.id);
-        // Nettoyer l'URL
-        if (window.location.hash) {
-          window.history.replaceState(null, '', window.location.pathname);
-        }
       } else {
         loadFromLocalStorage();
       }
