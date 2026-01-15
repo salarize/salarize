@@ -41,6 +41,48 @@ const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OP
 // Couleurs pour les graphiques
 const CHART_COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#7C3AED', '#6D28D9', '#5B21B6', '#4C1D95', '#DDD6FE', '#EDE9FE', '#F5F3FF'];
 
+// Page transition wrapper
+function PageTransition({ children, className = '' }) {
+  return (
+    <div className={`animate-fadeIn ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// Inject CSS for animations (only once)
+if (typeof document !== 'undefined' && !document.getElementById('salarize-animations')) {
+  const style = document.createElement('style');
+  style.id = 'salarize-animations';
+  style.textContent = `
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+    .animate-slideIn {
+      animation: slideIn 0.3s ease-out forwards;
+    }
+    .animate-stagger > * {
+      opacity: 0;
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+    .animate-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+    .animate-stagger > *:nth-child(2) { animation-delay: 0.1s; }
+    .animate-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+    .animate-stagger > *:nth-child(4) { animation-delay: 0.2s; }
+    .animate-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+    .animate-stagger > *:nth-child(6) { animation-delay: 0.3s; }
+  `;
+  document.head.appendChild(style);
+}
+
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -2800,7 +2842,7 @@ function AppContent() {
   // Landing page (home)
   if (currentPage === 'home') {
     return (
-      <>
+      <PageTransition key="home">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -2813,14 +2855,14 @@ function AppContent() {
           user={user} 
           onGoToDashboard={() => setCurrentPage('dashboard')} 
         />
-      </>
+      </PageTransition>
     );
   }
 
   // Features page
   if (currentPage === 'features') {
     return (
-      <>
+      <PageTransition key="features">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -2833,7 +2875,7 @@ function AppContent() {
           user={user} 
           onGoToDashboard={() => setCurrentPage('dashboard')} 
         />
-      </>
+      </PageTransition>
     );
   }
 
@@ -2846,7 +2888,7 @@ function AppContent() {
   // Profile page (connecté uniquement)
   if (currentPage === 'profile') {
     return (
-      <>
+      <PageTransition key="profile">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -2855,27 +2897,28 @@ function AppContent() {
           setCurrentPage={setCurrentPage}
         />
         <ProfilePage user={user} onLogout={handleLogout} />
-      </>
+      </PageTransition>
     );
   }
 
   // Upload screen (connected but no companies yet)
   if (Object.keys(companies).length === 0 && view === 'upload') {
     return (
-      <div className="min-h-screen bg-slate-950">
-        <LandingHeader 
-          user={user} 
-          onLogin={handleLogin} 
-          onLogout={handleLogout}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-        />
-        <div className="pt-24 pb-12 px-6">
-          <div className="max-w-md mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-white mb-2">Bienvenue, {user?.name?.split(' ')[0]} 👋</h1>
-              <p className="text-slate-400">Commencez par importer votre premier fichier</p>
-            </div>
+      <PageTransition key="upload">
+        <div className="min-h-screen bg-slate-950">
+          <LandingHeader 
+            user={user} 
+            onLogin={handleLogin} 
+            onLogout={handleLogout}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+          />
+          <div className="pt-24 pb-12 px-6">
+            <div className="max-w-md mx-auto">
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold text-white mb-2">Bienvenue, {user?.name?.split(' ')[0]} 👋</h1>
+                <p className="text-slate-400">Commencez par importer votre premier fichier</p>
+              </div>
             
             <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8">
               <label className="block cursor-pointer">
@@ -3012,13 +3055,67 @@ function AppContent() {
           </div>
         )}
       </div>
+      </PageTransition>
     );
   }
 
   // Assignment screen
   if (view === 'assign' && currentAssignment) {
     return (
-      <div className="min-h-screen flex">
+      <PageTransition key="assign">
+        <div className="min-h-screen flex">
+          <Sidebar 
+            companies={companies}
+            activeCompany={activeCompany}
+            onSelectCompany={loadCompany}
+            onImportClick={() => setShowImportModal(true)}
+            onAddCompany={() => setShowNewCompanyModal(true)}
+            onManageData={() => setShowDataManager(true)}
+            onManageDepts={() => setShowDeptManager(true)}
+            debugMsg={debugMsg}
+            setCurrentPage={setCurrentPage}
+          />
+          {showModal && (
+            <SelectCompanyModal 
+              companies={companies}
+              newName={newCompanyName}
+              setNewName={setNewCompanyName}
+              onSelect={handleModalSelect}
+              onCancel={handleModalCancel}
+            />
+          )}
+          <div className="ml-64 flex-1 flex items-center justify-center bg-slate-100 p-4">
+            <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center shadow-xl">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                <p className="font-semibold text-amber-800">🏷️ {pendingAssignments.length} employé(s) sans département</p>
+              </div>
+              <h3 className="text-2xl font-bold mb-2">{currentAssignment.name}</h3>
+              <p className="text-slate-500 mb-6">€{currentAssignment.totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {DEFAULT_DEPARTMENTS.map(d => (
+                  <button 
+                    key={d} 
+                    onClick={() => assignDept(d)} 
+                    className="p-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 font-medium transition-all"
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => assignDept('Non assigné')} className="text-slate-400 hover:text-slate-600">
+                Passer →
+              </button>
+            </div>
+          </div>
+        </div>
+      </PageTransition>
+    );
+  }
+
+  // Dashboard
+  return (
+    <PageTransition key="dashboard">
+      <div className="min-h-screen flex bg-slate-50">
         <Sidebar 
           companies={companies}
           activeCompany={activeCompany}
@@ -3026,56 +3123,6 @@ function AppContent() {
           onImportClick={() => setShowImportModal(true)}
           onAddCompany={() => setShowNewCompanyModal(true)}
           onManageData={() => setShowDataManager(true)}
-          onManageDepts={() => setShowDeptManager(true)}
-          debugMsg={debugMsg}
-          setCurrentPage={setCurrentPage}
-        />
-        {showModal && (
-          <SelectCompanyModal 
-            companies={companies}
-            newName={newCompanyName}
-            setNewName={setNewCompanyName}
-            onSelect={handleModalSelect}
-            onCancel={handleModalCancel}
-          />
-        )}
-        <div className="ml-64 flex-1 flex items-center justify-center bg-slate-100 p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center shadow-xl">
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-              <p className="font-semibold text-amber-800">🏷️ {pendingAssignments.length} employé(s) sans département</p>
-            </div>
-            <h3 className="text-2xl font-bold mb-2">{currentAssignment.name}</h3>
-            <p className="text-slate-500 mb-6">€{currentAssignment.totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {DEFAULT_DEPARTMENTS.map(d => (
-                <button 
-                  key={d} 
-                  onClick={() => assignDept(d)} 
-                  className="p-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 font-medium transition-all"
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => assignDept('Non assigné')} className="text-slate-400 hover:text-slate-600">
-              Passer →
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Dashboard
-  return (
-    <div className="min-h-screen flex bg-slate-50">
-      <Sidebar 
-        companies={companies}
-        activeCompany={activeCompany}
-        onSelectCompany={loadCompany}
-        onImportClick={() => setShowImportModal(true)}
-        onAddCompany={() => setShowNewCompanyModal(true)}
-        onManageData={() => setShowDataManager(true)}
         onManageDepts={() => setShowDeptManager(true)}
         debugMsg={debugMsg}
         setCurrentPage={setCurrentPage}
@@ -4766,6 +4813,7 @@ function AppContent() {
         )}
       </main>
     </div>
+    </PageTransition>
   );
 }
 
