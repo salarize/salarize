@@ -382,6 +382,7 @@ export default function App() {
         }
         
         console.log('Parsed successfully:', result.employees.length, 'employees');
+        setDebugMsg(`✓ ${result.employees.length} entrées trouvées`);
         
         // Stocker les données et demander la période (sans importer encore)
         setPendingPeriodSelection({
