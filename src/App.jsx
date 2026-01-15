@@ -2119,7 +2119,7 @@ export default function App() {
           onSelectCompany={loadCompany}
           onImportClick={() => setShowImportModal(true)}
           onAddCompany={() => setShowNewCompanyModal(true)}
-          onManageData={() => setShowDataManager(true)}}
+          onManageData={() => setShowDataManager(true)}
           onManageDepts={() => setShowDeptManager(true)}
           debugMsg={debugMsg}
         />
