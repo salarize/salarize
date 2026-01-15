@@ -58,7 +58,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
             <>
               <button 
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/10 hover:bg-slate-800/20 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <img src={user.picture} alt="" className="w-7 h-7 rounded-full" />
                 <span className="text-white text-sm font-medium hidden sm:block">{user.name?.split(' ')[0]}</span>
@@ -140,7 +140,7 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
         <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-20">
           <div className="text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800/5 border border-white/10 rounded-full mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full mb-8">
               <span className="w-2 h-2 bg-violet-500 rounded-full animate-pulse" />
               <span className="text-slate-300 text-sm">Nouvelle version disponible</span>
             </div>
@@ -172,7 +172,7 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
                 </svg>
               </button>
               {!user && (
-                <button className="px-8 py-4 bg-slate-800/5 hover:bg-slate-800/10 text-white font-semibold rounded-xl border border-white/10 transition-all">
+                <button className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/10 transition-all">
                   Voir la démo
                 </button>
               )}
@@ -190,7 +190,7 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </div>
-                  <p className="text-slate-400 text-sm">Aperçu du dashboard</p>
+                  <p className="text-slate-500 text-sm">Aperçu du dashboard</p>
                 </div>
               </div>
             </div>
@@ -279,7 +279,7 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
               </div>
               <span className="text-white font-bold">Salarize</span>
             </div>
-            <p className="text-slate-400 text-sm">
+            <p className="text-slate-500 text-sm">
               © 2025 Salarize. Tous droits réservés.
             </p>
           </div>
@@ -388,7 +388,7 @@ function FeaturesPage({ onLogin, user, onGoToDashboard }) {
               <p className="text-slate-400 mb-4">{feature.description}</p>
               <ul className="space-y-2">
                 {feature.details.map((detail, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-slate-400">
+                  <li key={i} className="flex items-center gap-2 text-sm text-slate-500">
                     <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
@@ -429,7 +429,7 @@ function FeaturesPage({ onLogin, user, onGoToDashboard }) {
               </div>
               <span className="text-white font-bold">Salarize</span>
             </div>
-            <p className="text-slate-400 text-sm">
+            <p className="text-slate-500 text-sm">
               © 2025 Salarize. Tous droits réservés.
             </p>
           </div>
@@ -461,15 +461,15 @@ function ProfilePage({ user, onLogout }) {
           {/* Profile Details */}
           <div className="p-8 space-y-6">
             <div>
-              <label className="text-sm text-slate-400 block mb-2">Nom complet</label>
+              <label className="text-sm text-slate-500 block mb-2">Nom complet</label>
               <div className="px-4 py-3 bg-slate-800 rounded-xl text-white">{user.name}</div>
             </div>
             <div>
-              <label className="text-sm text-slate-400 block mb-2">Email</label>
+              <label className="text-sm text-slate-500 block mb-2">Email</label>
               <div className="px-4 py-3 bg-slate-800 rounded-xl text-white">{user.email}</div>
             </div>
             <div>
-              <label className="text-sm text-slate-400 block mb-2">Connexion</label>
+              <label className="text-sm text-slate-500 block mb-2">Connexion</label>
               <div className="px-4 py-3 bg-slate-800 rounded-xl text-white flex items-center gap-2">
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -502,11 +502,11 @@ function DashboardHeader({ user, onLogout, setCurrentPage }) {
   const [showDropdown, setShowDropdown] = useState(false);
   
   return (
-    <div className="fixed top-0 right-0 left-64 h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6 z-10">
+    <div className="fixed top-0 right-0 left-64 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10">
       {/* Left side - Home link */}
       <button 
         onClick={() => setCurrentPage('home')}
-        className="flex items-center gap-2 text-slate-400 hover:text-violet-600 transition-colors"
+        className="flex items-center gap-2 text-slate-500 hover:text-violet-600 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -518,10 +518,10 @@ function DashboardHeader({ user, onLogout, setCurrentPage }) {
       <div className="relative">
         <button 
           onClick={() => setShowDropdown(!showDropdown)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-slate-700 transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors"
         >
           <img src={user?.picture} alt="" className="w-8 h-8 rounded-full" />
-          <span className="text-slate-200 text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
+          <span className="text-slate-700 text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
           <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -529,10 +529,10 @@ function DashboardHeader({ user, onLogout, setCurrentPage }) {
         {showDropdown && (
           <>
             <div className="fixed inset-0" onClick={() => setShowDropdown(false)} />
-            <div className="absolute right-0 top-12 bg-slate-800 border border-slate-700 rounded-xl shadow-lg py-2 w-48 z-50">
+            <div className="absolute right-0 top-12 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-50">
               <button 
                 onClick={() => { setCurrentPage('home'); setShowDropdown(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/50 flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
               >
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -541,14 +541,14 @@ function DashboardHeader({ user, onLogout, setCurrentPage }) {
               </button>
               <button 
                 onClick={() => { setCurrentPage('profile'); setShowDropdown(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/50 flex items-center gap-2"
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
               >
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 Mon profil
               </button>
-              <div className="border-t border-slate-700 my-1" />
+              <div className="border-t border-slate-100 my-1" />
               <button 
                 onClick={() => { onLogout(); setShowDropdown(false); }}
                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -574,18 +574,18 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
   
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full">
         <h2 className="text-xl font-bold mb-4">📊 Importer vers quelle société ?</h2>
         
         {companyNames.length > 0 && (
           <>
-            <p className="text-slate-400 text-sm mb-3">Société existante :</p>
+            <p className="text-slate-500 text-sm mb-3">Société existante :</p>
             <div className="space-y-2 mb-4">
               {companyNames.map(name => (
                 <button
                   key={name}
                   onClick={() => onSelect(name)}
-                  className="w-full text-left px-4 py-3 border-2 border-slate-700 rounded-xl hover:border-violet-500 hover:bg-violet-50 transition-all"
+                  className="w-full text-left px-4 py-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 transition-all"
                 >
                   <span className="font-semibold">{name}</span>
                   <span className="text-slate-400 text-sm ml-2">({companies[name]?.employees?.length || 0} entrées)</span>
@@ -600,7 +600,7 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
           </>
         )}
         
-        <p className="text-slate-400 text-sm mb-2">Nouvelle société :</p>
+        <p className="text-slate-500 text-sm mb-2">Nouvelle société :</p>
         <input
           type="text"
           placeholder="Nom (ex: Mamy Home, Fresheo...)"
@@ -611,14 +611,14 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
               onSelect(newName.trim());
             }
           }}
-          className="w-full px-4 py-3 border-2 border-slate-700 rounded-xl mb-4 focus:border-violet-500 outline-none"
+          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl mb-4 focus:border-violet-500 outline-none"
           autoFocus
         />
         
         <div className="flex gap-3">
           <button 
             onClick={onCancel} 
-            className="flex-1 py-2 border border-slate-700 rounded-lg hover:bg-slate-800/50"
+            className="flex-1 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
           >
             Annuler
           </button>
@@ -639,6 +639,15 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
 function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage }) {
   const [showActions, setShowActions] = useState(false);
   
+  // Calculer employés non assignés
+  const unassignedCount = activeCompany && companies[activeCompany] 
+    ? new Set(
+        (companies[activeCompany].employees || [])
+          .filter(e => !e.department && !companies[activeCompany].mapping?.[e.name])
+          .map(e => e.name)
+      ).size
+    : 0;
+  
   return (
     <div className="w-64 bg-slate-900 text-white fixed h-screen flex flex-col">
       <button 
@@ -650,10 +659,29 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         </div>
         <span className="text-xl font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Salarize</span>
       </button>
+      
+      {/* Alerte employés non assignés */}
+      {unassignedCount > 0 && (
+        <button
+          onClick={onManageDepts}
+          className="mx-4 mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 hover:bg-amber-500/20 transition-colors"
+        >
+          <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="text-left">
+            <p className="text-amber-400 text-xs font-semibold">{unassignedCount} sans département</p>
+            <p className="text-amber-400/60 text-[10px]">Cliquer pour assigner</p>
+          </div>
+        </button>
+      )}
+      
       <div className="flex-1 p-4 overflow-y-auto">
-        <p className="text-slate-400 text-xs uppercase mb-2">Sociétés</p>
+        <p className="text-slate-500 text-xs uppercase mb-2">Sociétés</p>
         {Object.keys(companies).length === 0 ? (
-          <p className="text-slate-300 text-sm">Aucune société</p>
+          <p className="text-slate-600 text-sm">Aucune société</p>
         ) : (
           Object.keys(companies).map(name => (
             <button
@@ -823,6 +851,7 @@ export default function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [comparePeriod, setComparePeriod] = useState(null);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
@@ -2562,7 +2591,7 @@ export default function App() {
                     </svg>
                   </div>
                   <p className="text-white font-semibold mb-2">Importer un fichier Excel</p>
-                  <p className="text-slate-400 text-sm">Glissez-déposez ou cliquez pour sélectionner</p>
+                  <p className="text-slate-500 text-sm">Glissez-déposez ou cliquez pour sélectionner</p>
                 </div>
                 <input 
                   type="file" 
@@ -2577,7 +2606,7 @@ export default function App() {
               )}
             </div>
             
-            <p className="text-center text-slate-300 text-sm mt-6">
+            <p className="text-center text-slate-600 text-sm mt-6">
               Compatible : Export Acerta, fichiers d'analyse internes
             </p>
           </div>
@@ -2594,12 +2623,12 @@ export default function App() {
         )}
         {pendingPeriodSelection && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold">📅 Quelle période importez-vous ?</h2>
                 <button 
                   onClick={() => setPendingPeriodSelection(null)}
-                  className="p-1 hover:bg-slate-700 rounded"
+                  className="p-1 hover:bg-slate-100 rounded"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2624,13 +2653,13 @@ export default function App() {
               </div>
               
               <div className="mb-5">
-                <label className="block text-sm font-medium text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   Sélectionnez la période de ce fichier
                 </label>
                 <div className="flex gap-2">
                   <select 
                     id="period-year-upload"
-                    className="flex-1 px-3 py-2.5 border border-slate-700 rounded-lg focus:border-violet-500 outline-none text-lg"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none text-lg"
                     defaultValue={new Date().getFullYear()}
                   >
                     {[2023, 2024, 2025, 2026].map(y => (
@@ -2639,7 +2668,7 @@ export default function App() {
                   </select>
                   <select 
                     id="period-month-upload"
-                    className="flex-1 px-3 py-2.5 border border-slate-700 rounded-lg focus:border-violet-500 outline-none"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                     defaultValue={String(new Date().getMonth() + 1).padStart(2, '0')}
                   >
                     {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
@@ -2654,7 +2683,7 @@ export default function App() {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setPendingPeriodSelection(null)}
-                  className="flex-1 py-2.5 border border-slate-700 rounded-lg hover:bg-slate-800/50"
+                  className="flex-1 py-2.5 border border-slate-200 rounded-lg hover:bg-slate-50"
                 >
                   Annuler
                 </button>
@@ -2715,25 +2744,25 @@ export default function App() {
             onCancel={handleModalCancel}
           />
         )}
-        <div className="ml-64 flex-1 flex items-center justify-center bg-slate-700 p-4">
-          <div className="bg-slate-800 rounded-2xl p-8 max-w-lg w-full text-center shadow-xl">
+        <div className="ml-64 flex-1 flex items-center justify-center bg-slate-100 p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center shadow-xl">
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
               <p className="font-semibold text-amber-800">🏷️ {pendingAssignments.length} employé(s) sans département</p>
             </div>
             <h3 className="text-2xl font-bold mb-2">{currentAssignment.name}</h3>
-            <p className="text-slate-400 mb-6">€{currentAssignment.totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
+            <p className="text-slate-500 mb-6">€{currentAssignment.totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
             <div className="grid grid-cols-2 gap-2 mb-4">
               {DEFAULT_DEPARTMENTS.map(d => (
                 <button 
                   key={d} 
                   onClick={() => assignDept(d)} 
-                  className="p-3 border-2 border-slate-700 rounded-xl hover:border-violet-500 hover:bg-violet-50 font-medium transition-all"
+                  className="p-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 font-medium transition-all"
                 >
                   {d}
                 </button>
               ))}
             </div>
-            <button onClick={() => assignDept('Non assigné')} className="text-slate-400 hover:text-slate-300">
+            <button onClick={() => assignDept('Non assigné')} className="text-slate-400 hover:text-slate-600">
               Passer →
             </button>
           </div>
@@ -2744,7 +2773,7 @@ export default function App() {
 
   // Dashboard
   return (
-    <div className="min-h-screen flex bg-slate-900">
+    <div className="min-h-screen flex bg-slate-50">
       <Sidebar 
         companies={companies}
         activeCompany={activeCompany}
@@ -2768,22 +2797,22 @@ export default function App() {
       )}
       {showNewCompanyModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">🏢 Nouvelle société</h2>
-            <p className="text-slate-400 text-sm mb-4">Créez une société vide pour commencer à importer des données</p>
+            <p className="text-slate-500 text-sm mb-4">Créez une société vide pour commencer à importer des données</p>
             <input
               type="text"
               placeholder="Nom de la société"
               value={newCompanyName}
               onChange={e => setNewCompanyName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreateEmptyCompany()}
-              className="w-full px-4 py-3 border-2 border-slate-700 rounded-xl mb-4 focus:border-violet-500 outline-none"
+              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl mb-4 focus:border-violet-500 outline-none"
               autoFocus
             />
             <div className="flex gap-3">
               <button 
                 onClick={() => { setShowNewCompanyModal(false); setNewCompanyName(''); }}
-                className="flex-1 py-2 border border-slate-700 rounded-lg hover:bg-slate-800/50"
+                className="flex-1 py-2 border border-slate-200 rounded-lg hover:bg-slate-50"
               >
                 Annuler
               </button>
@@ -2802,12 +2831,12 @@ export default function App() {
       {/* Company Settings Modal */}
       {showCompanySettings && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">🎨 Paramètres de {activeCompany}</h2>
               <button 
                 onClick={() => setShowCompanySettings(false)}
-                className="p-1 hover:bg-slate-700 rounded"
+                className="p-1 hover:bg-slate-100 rounded"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2818,13 +2847,13 @@ export default function App() {
             <div className="space-y-4">
               {/* Company Name */}
               <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Nom de la société</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Nom de la société</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     id="company-name-input"
                     defaultValue={activeCompany}
-                    className="flex-1 px-4 py-2 border border-slate-700 rounded-lg focus:border-violet-500 outline-none"
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                   />
                   <button
                     onClick={() => {
@@ -2847,7 +2876,7 @@ export default function App() {
                       localStorage.setItem('salarize_companies', JSON.stringify(newCompanies));
                       localStorage.setItem('salarize_active', newName);
                     }}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors"
                   >
                     Renommer
                   </button>
@@ -2856,26 +2885,26 @@ export default function App() {
               
               {/* Website */}
               <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Site web</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Site web</label>
                 <input
                   type="text"
                   placeholder="www.example.com"
                   value={companies[activeCompany]?.website || ''}
                   onChange={e => handleWebsiteChange(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-700 rounded-lg focus:border-violet-500 outline-none"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                 />
               </div>
               
               {/* Brand Color */}
               <div>
-                <label className="block text-sm font-medium text-slate-200 mb-2">Couleur de marque</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Couleur de marque</label>
                 <div className="flex items-center gap-3">
                   <div 
-                    className="w-12 h-12 rounded-lg border-2 border-slate-700"
+                    className="w-12 h-12 rounded-lg border-2 border-slate-200"
                     style={{ backgroundColor: `rgb(${getBrandColor()})` }}
                   />
                   <div className="flex-1">
-                    <p className="text-sm text-slate-400 mb-2">Choisir une couleur prédéfinie :</p>
+                    <p className="text-sm text-slate-500 mb-2">Choisir une couleur prédéfinie :</p>
                     <div className="flex gap-2 flex-wrap">
                       {[
                         { name: 'Vert', value: '16, 185, 129' },
@@ -2906,7 +2935,7 @@ export default function App() {
               </div>
             </div>
             
-            <div className="mt-6 pt-4 border-t border-slate-700">
+            <div className="mt-6 pt-4 border-t border-slate-200">
               <button
                 onClick={() => setShowCompanySettings(false)}
                 className="w-full py-2 text-white rounded-lg font-medium"
@@ -2922,12 +2951,12 @@ export default function App() {
       {/* Import Modal with Drag & Drop */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">📁 Importer des données</h2>
               <button 
                 onClick={() => { setShowImportModal(false); setIsDragging(false); }}
-                className="p-1 hover:bg-slate-700 rounded"
+                className="p-1 hover:bg-slate-100 rounded"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2981,18 +3010,18 @@ export default function App() {
               className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
                 isDragging 
                   ? 'border-violet-500 bg-violet-50' 
-                  : 'border-slate-700 hover:border-slate-300'
+                  : 'border-slate-200 hover:border-slate-300'
               }`}
             >
               <div className={`w-14 h-14 mx-auto mb-3 rounded-full flex items-center justify-center transition-colors ${
-                isDragging ? 'bg-violet-100' : 'bg-slate-700'
+                isDragging ? 'bg-violet-100' : 'bg-slate-100'
               }`}>
                 <svg className={`w-7 h-7 transition-colors ${isDragging ? 'text-violet-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
               
-              <p className={`font-medium mb-1 ${isDragging ? 'text-violet-700' : 'text-slate-200'}`}>
+              <p className={`font-medium mb-1 ${isDragging ? 'text-violet-700' : 'text-slate-700'}`}>
                 {isDragging ? 'Déposez le fichier ici' : 'Glissez-déposez votre fichier Excel'}
               </p>
               <p className="text-slate-400 text-sm mb-3">ou</p>
@@ -3020,18 +3049,18 @@ export default function App() {
             
             {/* Périodes existantes */}
             {activeCompany && periods.length > 0 && (
-              <div className="mt-5 pt-5 border-t border-slate-700">
-                <p className="text-sm font-medium text-slate-200 mb-2">
+              <div className="mt-5 pt-5 border-t border-slate-200">
+                <p className="text-sm font-medium text-slate-700 mb-2">
                   📅 Périodes déjà importées pour {activeCompany} :
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {periods.slice(0, 12).map(p => (
-                    <span key={p} className="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs font-medium">
+                    <span key={p} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
                       {formatPeriod(p)}
                     </span>
                   ))}
                   {periods.length > 12 && (
-                    <span className="px-2 py-1 bg-slate-700 text-slate-300 rounded text-xs font-medium">
+                    <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
                       +{periods.length - 12} autres
                     </span>
                   )}
@@ -3048,12 +3077,12 @@ export default function App() {
       {/* Period Selection Modal */}
       {pendingPeriodSelection && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">📅 Quelle période importez-vous ?</h2>
               <button 
                 onClick={() => setPendingPeriodSelection(null)}
-                className="p-1 hover:bg-slate-700 rounded"
+                className="p-1 hover:bg-slate-100 rounded"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -3078,13 +3107,13 @@ export default function App() {
             </div>
             
             <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-200 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Sélectionnez la période de ce fichier
               </label>
               <div className="flex gap-2">
                 <select 
                   id="period-year"
-                  className="flex-1 px-3 py-2.5 border border-slate-700 rounded-lg focus:border-violet-500 outline-none text-lg"
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none text-lg"
                   defaultValue={new Date().getFullYear()}
                 >
                   {[2023, 2024, 2025, 2026].map(y => (
@@ -3093,7 +3122,7 @@ export default function App() {
                 </select>
                 <select 
                   id="period-month"
-                  className="flex-1 px-3 py-2.5 border border-slate-700 rounded-lg focus:border-violet-500 outline-none"
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                   defaultValue={String(new Date().getMonth() + 1).padStart(2, '0')}
                 >
                   {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
@@ -3108,7 +3137,7 @@ export default function App() {
             <div className="flex gap-3">
               <button 
                 onClick={() => setPendingPeriodSelection(null)}
-                className="flex-1 py-2.5 border border-slate-700 rounded-lg hover:bg-slate-800/50"
+                className="flex-1 py-2.5 border border-slate-200 rounded-lg hover:bg-slate-50"
               >
                 Annuler
               </button>
@@ -3156,7 +3185,7 @@ export default function App() {
           onClick={(e) => { if (e.target === e.currentTarget) { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}}
         >
           <div className="min-h-full flex items-start justify-center p-4 pt-8 pb-8">
-            <div className="bg-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden">
+            <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden">
               {/* Header gradient */}
               <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 p-6 text-white">
                 <div className="flex items-center justify-between">
@@ -3166,7 +3195,7 @@ export default function App() {
                   </div>
                   <button 
                     onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}
-                    className="p-2 hover:bg-slate-800/10 rounded-xl transition-colors"
+                    className="p-2 hover:bg-white/10 rounded-xl transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -3184,11 +3213,11 @@ export default function App() {
                     
                     return (
                       <>
-                        <div className="bg-slate-800/10 backdrop-blur rounded-xl px-4 py-2">
+                        <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
                           <p className="text-2xl font-bold">{uniqueEmps.length}</p>
                           <p className="text-xs text-slate-400">Employés</p>
                         </div>
-                        <div className="bg-slate-800/10 backdrop-blur rounded-xl px-4 py-2">
+                        <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
                           <p className="text-2xl font-bold">{deptCount}</p>
                           <p className="text-xs text-slate-400">Départements</p>
                         </div>
@@ -3205,16 +3234,16 @@ export default function App() {
               </div>
               
               {/* Actions & Search */}
-              <div className="p-4 bg-slate-800/50 border-b border-slate-700">
+              <div className="p-4 bg-slate-50 border-b border-slate-200">
                 {/* Rename department UI */}
                 {showRenameDept && (
-                  <div className="mb-3 p-3 bg-slate-800 border border-slate-700 rounded-xl">
-                    <p className="text-sm font-medium text-slate-200 mb-2">✏️ Renommer un département</p>
+                  <div className="mb-3 p-3 bg-white border border-slate-200 rounded-xl">
+                    <p className="text-sm font-medium text-slate-700 mb-2">✏️ Renommer un département</p>
                     <div className="flex gap-2 mb-2">
                       <select
                         value={renameDeptOld}
                         onChange={e => setRenameDeptOld(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-700 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
                       >
                         <option value="">Choisir...</option>
                         {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().map(dept => (
@@ -3227,13 +3256,13 @@ export default function App() {
                         placeholder="Nouveau nom..."
                         value={renameDeptNew}
                         onChange={e => setRenameDeptNew(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-700 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowRenameDept(false); setRenameDeptOld(''); setRenameDeptNew(''); }}
-                        className="flex-1 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg"
+                        className="flex-1 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
                       >
                         Annuler
                       </button>
@@ -3278,14 +3307,14 @@ export default function App() {
                 
                 {/* Merge department UI */}
                 {showMergeDept && (
-                  <div className="mb-3 p-3 bg-slate-800 border border-purple-200 rounded-xl">
-                    <p className="text-sm font-medium text-slate-200 mb-2">🔀 Fusionner des départements</p>
-                    <p className="text-xs text-slate-400 mb-3">Tous les employés du premier département seront déplacés vers le second.</p>
+                  <div className="mb-3 p-3 bg-white border border-purple-200 rounded-xl">
+                    <p className="text-sm font-medium text-slate-700 mb-2">🔀 Fusionner des départements</p>
+                    <p className="text-xs text-slate-500 mb-3">Tous les employés du premier département seront déplacés vers le second.</p>
                     <div className="flex gap-2 mb-2">
                       <select
                         value={mergeDeptFrom}
                         onChange={e => setMergeDeptFrom(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-700 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
                       >
                         <option value="">Fusionner...</option>
                         {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().map(dept => (
@@ -3296,7 +3325,7 @@ export default function App() {
                       <select
                         value={mergeDeptTo}
                         onChange={e => setMergeDeptTo(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-700 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
                       >
                         <option value="">...vers</option>
                         {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().filter(d => d !== mergeDeptFrom).map(dept => (
@@ -3307,7 +3336,7 @@ export default function App() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowMergeDept(false); setMergeDeptFrom(''); setMergeDeptTo(''); }}
-                        className="flex-1 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-lg"
+                        className="flex-1 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
                       >
                         Annuler
                       </button>
@@ -3356,14 +3385,14 @@ export default function App() {
                   <div className="flex gap-2 mb-3">
                     <button
                       onClick={() => setShowRenameDept(true)}
-                      className="flex-1 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm font-medium hover:bg-slate-800/50 hover:border-slate-300 transition-all shadow-sm"
+                      className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                     >
                       ✏️ Renommer
                     </button>
                     
                     <button
                       onClick={() => setShowMergeDept(true)}
-                      className="flex-1 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm font-medium hover:bg-slate-800/50 hover:border-slate-300 transition-all shadow-sm"
+                      className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                     >
                       🔀 Fusionner
                     </button>
@@ -3380,7 +3409,7 @@ export default function App() {
                       placeholder="Rechercher un employé..."
                       value={deptSearchTerm}
                       onChange={e => setDeptSearchTerm(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl focus:border-slate-400 focus:ring-2 focus:ring-slate-100 outline-none transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:ring-2 focus:ring-slate-100 outline-none transition-all"
                     />
                   </div>
                   
@@ -3389,8 +3418,8 @@ export default function App() {
                     onChange={e => setDeptFilter(e.target.value)}
                     className={`w-44 px-3 py-3 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
                       deptFilter !== 'all' 
-                        ? 'border-slate-400 bg-slate-700' 
-                        : 'border-slate-700 bg-slate-800 hover:border-slate-300'
+                        ? 'border-slate-400 bg-slate-100' 
+                        : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
                     <option value="all">Tous les dép.</option>
@@ -3427,30 +3456,30 @@ export default function App() {
                   if (uniqueEmps.length === 0) {
                     return (
                       <div className="p-12 text-center">
-                        <div className="w-16 h-16 bg-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                           <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
                         </div>
-                        <p className="text-slate-400 font-medium">Aucun employé trouvé</p>
+                        <p className="text-slate-500 font-medium">Aucun employé trouvé</p>
                         <p className="text-slate-400 text-sm mt-1">Essayez de modifier vos filtres</p>
                       </div>
                     );
                   }
                   
                   return uniqueEmps.map((emp, idx) => (
-                    <div key={emp.name} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors">
+                    <div key={emp.name} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
                       {/* Avatar */}
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
                         emp.currentDept 
-                          ? 'bg-slate-700 text-slate-300' 
+                          ? 'bg-slate-100 text-slate-600' 
                           : 'bg-amber-100 text-amber-600'
                       }`}>
                         {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-white truncate">{emp.name}</p>
+                        <p className="font-medium text-slate-800 truncate">{emp.name}</p>
                       </div>
                       
                       <select
@@ -3481,7 +3510,7 @@ export default function App() {
                         }}
                         className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
                           emp.currentDept 
-                            ? 'border-slate-700 bg-slate-800 hover:border-slate-300' 
+                            ? 'border-slate-200 bg-white hover:border-slate-300' 
                             : 'border-amber-300 bg-amber-50 text-amber-700'
                         }`}
                       >
@@ -3496,7 +3525,7 @@ export default function App() {
               </div>
               
               {/* Footer */}
-              <div className="p-4 bg-slate-800/50 border-t border-slate-700">
+              <div className="p-4 bg-slate-50 border-t border-slate-200">
                 <button
                   onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}
                   className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors"
@@ -3534,8 +3563,8 @@ export default function App() {
               {showLogoMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowLogoMenu(false)} />
-                  <div className="absolute top-full left-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-lg py-2 w-48 z-20">
-                    <label className="w-full text-left px-4 py-2 text-sm text-slate-200 hover:bg-slate-800/50 flex items-center gap-2 cursor-pointer">
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-20">
+                    <label className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
                       <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -3564,10 +3593,10 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-white">{activeCompany}</h1>
+                <h1 className="text-2xl font-bold text-slate-800">{activeCompany}</h1>
                 <button
                   onClick={() => setShowCompanySettings(true)}
-                  className="p-1 text-slate-400 hover:text-slate-300 rounded transition-colors"
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
                   title="Paramètres société"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3594,7 +3623,7 @@ export default function App() {
           
           <button
             onClick={handleExportPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors text-sm font-medium text-slate-200"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm font-medium text-slate-700"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -3606,7 +3635,7 @@ export default function App() {
             <select 
               value={selectedPeriod} 
               onChange={e => setSelectedPeriod(e.target.value)} 
-              className="px-3 py-2 border border-slate-700 rounded-lg bg-slate-800"
+              className="px-3 py-2 border border-slate-200 rounded-lg bg-white"
             >
               <option value="all">Toutes périodes</option>
               {(() => {
@@ -3632,11 +3661,11 @@ export default function App() {
         {/* Data Manager Modal */}
         {showDataManager && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-800 rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <div className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
               
               {/* Confirmation overlay */}
               {confirmAction && (
-                <div className="absolute inset-0 bg-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center z-10">
+                <div className="absolute inset-0 bg-white rounded-2xl p-6 flex flex-col items-center justify-center z-10">
                   <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
                     confirmAction.type === 'delete' ? 'bg-red-100' : 'bg-amber-100'
                   }`}>
@@ -3645,13 +3674,13 @@ export default function App() {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-bold text-white mb-2">
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">
                     {confirmAction.type === 'delete' && 'Supprimer la société ?'}
                     {confirmAction.type === 'clear' && 'Réinitialiser les données ?'}
                     {confirmAction.type === 'deletePeriod' && `Supprimer ${formatPeriod(confirmAction.period)} ?`}
                   </h3>
                   
-                  <p className="text-slate-400 text-center mb-6">
+                  <p className="text-slate-500 text-center mb-6">
                     {confirmAction.type === 'delete' && `"${activeCompany}" et toutes ses données seront supprimés définitivement.`}
                     {confirmAction.type === 'clear' && `Toutes les données de "${activeCompany}" seront supprimées. La société sera conservée.`}
                     {confirmAction.type === 'deletePeriod' && `Les données de la période ${formatPeriod(confirmAction.period)} seront supprimées.`}
@@ -3660,7 +3689,7 @@ export default function App() {
                   <div className="flex gap-3 w-full max-w-xs">
                     <button
                       onClick={() => setConfirmAction(null)}
-                      className="flex-1 py-2 border border-slate-700 rounded-lg hover:bg-slate-800/50 font-medium"
+                      className="flex-1 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium"
                     >
                       Annuler
                     </button>
@@ -3690,7 +3719,7 @@ export default function App() {
                 <h2 className="text-xl font-bold">⚙️ Gestion des données</h2>
                 <button 
                   onClick={() => { setShowDataManager(false); setConfirmAction(null); }}
-                  className="p-1 hover:bg-slate-700 rounded"
+                  className="p-1 hover:bg-slate-100 rounded"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -3699,7 +3728,7 @@ export default function App() {
               </div>
               
               <div className="mb-6">
-                <h3 className="font-semibold text-slate-200 mb-3">📅 Périodes importées</h3>
+                <h3 className="font-semibold text-slate-700 mb-3">📅 Périodes importées</h3>
                 {periods.length === 0 ? (
                   <p className="text-slate-400 text-sm">Aucune donnée importée</p>
                 ) : (
@@ -3721,16 +3750,16 @@ export default function App() {
                       }, 0);
                       
                       return (
-                        <details key={year} className="bg-slate-800/50 rounded-lg" open>
-                          <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-700 rounded-lg">
+                        <details key={year} className="bg-slate-50 rounded-lg" open>
+                          <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100 rounded-lg">
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-white">{year}</span>
-                              <span className="text-xs bg-slate-200 text-slate-300 px-2 py-0.5 rounded-full">
+                              <span className="font-semibold text-slate-800">{year}</span>
+                              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">
                                 {yearPeriods.length} mois
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-slate-300">
+                              <span className="text-sm font-medium text-slate-600">
                                 €{yearTotal.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                               </span>
                               <button
@@ -3749,10 +3778,10 @@ export default function App() {
                               const periodEmps = employees.filter(e => e.period === period);
                               const periodTotal = periodEmps.reduce((s, e) => s + e.totalCost, 0);
                               return (
-                                <div key={period} className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-700 rounded text-sm group">
-                                  <span className="text-slate-300">{['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'][parseInt(period.substring(5), 10) - 1]}</span>
+                                <div key={period} className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-100 rounded text-sm group">
+                                  <span className="text-slate-600">{['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'][parseInt(period.substring(5), 10) - 1]}</span>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-slate-400">
+                                    <span className="text-slate-500">
                                       €{periodTotal.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                     </span>
                                     <button
@@ -3785,17 +3814,17 @@ export default function App() {
                 )}
               </div>
               
-              <div className="border-t border-slate-700 pt-6 space-y-3">
-                <h3 className="font-semibold text-slate-200 mb-3">🔧 Actions</h3>
+              <div className="border-t border-slate-200 pt-6 space-y-3">
+                <h3 className="font-semibold text-slate-700 mb-3">🔧 Actions</h3>
                 
-                <label className="flex items-center gap-3 p-3 border-2 border-dashed border-slate-700 rounded-lg cursor-pointer hover:border-violet-500 hover:bg-violet-50 transition-colors">
+                <label className="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:border-violet-500 hover:bg-violet-50 transition-colors">
                   <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
                     <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-200">Importer de nouvelles données</p>
+                    <p className="font-medium text-slate-700">Importer de nouvelles données</p>
                     <p className="text-slate-400 text-sm">Ajouter un fichier Excel</p>
                   </div>
                   <input 
@@ -3842,34 +3871,34 @@ export default function App() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-700">
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
             <p className="text-slate-400 text-sm">Coût Total</p>
-            <p className="text-2xl font-bold text-white">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
+            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
           </div>
-          <div className="bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-700">
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
             <p className="text-slate-400 text-sm">Employés</p>
-            <p className="text-2xl font-bold text-white">{uniqueNames}</p>
+            <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
           </div>
-          <div className="bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-700">
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
             <p className="text-slate-400 text-sm">Départements</p>
-            <p className="text-2xl font-bold text-white">{Object.keys(deptStats).length}</p>
+            <p className="text-2xl font-bold text-slate-800">{Object.keys(deptStats).length}</p>
           </div>
-          <div className="bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-700">
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
             <p className="text-slate-400 text-sm">Coût Moyen</p>
-            <p className="text-2xl font-bold text-white">€{(totalCost / (uniqueNames || 1)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="text-2xl font-bold text-slate-800">€{(totalCost / (uniqueNames || 1)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         </div>
 
         {/* Evolution Chart */}
         {chartData.length >= 1 && (
-          <div className="bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-700 mb-6">
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-white">📊 Évolution des coûts salariaux</h2>
+              <h2 className="font-bold text-slate-800">📊 Évolution des coûts salariaux</h2>
               {years.length > 1 && (
                 <select
                   value={selectedYear}
                   onChange={e => setSelectedYear(e.target.value)}
-                  className="px-3 py-1 border border-slate-700 rounded-lg bg-slate-800 text-sm"
+                  className="px-3 py-1 border border-slate-200 rounded-lg bg-white text-sm"
                 >
                   <option value="all">Toutes les années</option>
                   {years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -3918,20 +3947,20 @@ export default function App() {
             
             {chartData.length >= 2 && (
               <div className="mt-4 flex gap-4 justify-center text-sm flex-wrap">
-                <div className="bg-slate-800/50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-400">Mois précédent: </span>
-                  <span className="font-bold text-white">
+                <div className="bg-slate-50 px-4 py-2 rounded-lg">
+                  <span className="text-slate-500">Mois précédent: </span>
+                  <span className="font-bold text-slate-800">
                     €{chartData[chartData.length - 2].total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="bg-slate-800/50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-400">Mois actuel: </span>
-                  <span className="font-bold text-white">
+                <div className="bg-slate-50 px-4 py-2 rounded-lg">
+                  <span className="text-slate-500">Mois actuel: </span>
+                  <span className="font-bold text-slate-800">
                     €{chartData[chartData.length - 1].total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="bg-slate-800/50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-400">Variation: </span>
+                <div className="bg-slate-50 px-4 py-2 rounded-lg">
+                  <span className="text-slate-500">Variation: </span>
                   <span className={`font-bold ${
                     chartData[chartData.length - 1].total >= chartData[chartData.length - 2].total 
                       ? 'text-red-500' 
@@ -3965,9 +3994,9 @@ export default function App() {
                     const label = yearDiff === 1 ? 'Année préc. (même mois)' : `${prev.period.substring(0, 4)} (même mois)`;
                     
                     return (
-                      <div key={prev.period} className="bg-slate-800/50 px-4 py-2 rounded-lg">
-                        <span className="text-slate-400">{label}: </span>
-                        <span className="font-bold text-white">
+                      <div key={prev.period} className="bg-slate-50 px-4 py-2 rounded-lg">
+                        <span className="text-slate-500">{label}: </span>
+                        <span className="font-bold text-slate-800">
                           €{prev.total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <span className={`ml-2 text-xs font-medium ${variation >= 0 ? 'text-red-500' : 'text-violet-500'}`}>
@@ -3983,13 +4012,13 @@ export default function App() {
         )}
 
         {/* Departments */}
-        <div className="bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-700 mb-6">
-          <h2 className="font-bold text-white mb-4">Répartition par Département</h2>
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
+          <h2 className="font-bold text-slate-800 mb-4">Répartition par Département</h2>
           <div className="space-y-3">
             {sortedDepts.map(([dept, data]) => (
               <div key={dept} className="flex items-center gap-4">
-                <span className="w-28 font-medium text-sm truncate text-slate-200">{dept}</span>
-                <div className="flex-1 h-6 bg-slate-700 rounded-full overflow-hidden">
+                <span className="w-28 font-medium text-sm truncate text-slate-700">{dept}</span>
+                <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
                   <div 
                     className="h-full rounded-full transition-all duration-500" 
                     style={{ 
@@ -3998,17 +4027,17 @@ export default function App() {
                     }} 
                   />
                 </div>
-                <span className="w-32 text-right font-bold text-white">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                <span className="w-32 text-right font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Employee Detail Section */}
-        <div className="bg-slate-800 rounded-xl shadow-sm border border-slate-700">
-          <div className="p-6 border-b border-slate-700">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+          <div className="p-6 border-b border-slate-100">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <h2 className="font-bold text-white">👥 Détail par Employé</h2>
+              <h2 className="font-bold text-slate-800">👥 Détail par Employé</h2>
               
               <div className="flex flex-col sm:flex-row gap-3">
                 {/* Search */}
@@ -4021,7 +4050,7 @@ export default function App() {
                     placeholder="Rechercher..."
                     value={empSearchTerm || ''}
                     onChange={e => setEmpSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-slate-700 rounded-lg w-full sm:w-48 focus:border-violet-500 outline-none text-sm"
+                    className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg w-full sm:w-48 focus:border-violet-500 outline-none text-sm"
                   />
                 </div>
                 
@@ -4029,7 +4058,7 @@ export default function App() {
                 <select
                   value={empDeptFilter || 'all'}
                   onChange={e => setEmpDeptFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-800"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
                 >
                   <option value="all">Tous les départements</option>
                   {Object.keys(deptStats).sort().map(dept => (
@@ -4041,7 +4070,7 @@ export default function App() {
                 <select
                   value={empSortBy || 'cost-desc'}
                   onChange={e => setEmpSortBy(e.target.value)}
-                  className="px-3 py-2 border border-slate-700 rounded-lg text-sm bg-slate-800"
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
                 >
                   <option value="cost-desc">Coût ↓</option>
                   <option value="cost-asc">Coût ↑</option>
@@ -4083,12 +4112,12 @@ export default function App() {
               if (filtered.length === 0) {
                 return (
                   <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                     </div>
-                    <p className="text-slate-400 font-medium">Aucun employé trouvé</p>
+                    <p className="text-slate-500 font-medium">Aucun employé trouvé</p>
                     <p className="text-slate-400 text-sm mt-1">Essayez de modifier vos filtres</p>
                   </div>
                 );
@@ -4097,7 +4126,7 @@ export default function App() {
               return (
                 <>
                   {/* Results count */}
-                  <p className="text-sm text-slate-400 mb-4">
+                  <p className="text-sm text-slate-500 mb-4">
                     {filtered.length} employé{filtered.length > 1 ? 's' : ''} 
                     {empSearchTerm || (empDeptFilter && empDeptFilter !== 'all') ? ' trouvé' + (filtered.length > 1 ? 's' : '') : ''}
                   </p>
@@ -4105,7 +4134,7 @@ export default function App() {
                   {/* Cards Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                     {paginatedEmps.map((e, i) => (
-                      <div key={i} className="bg-slate-800/50 rounded-xl p-4 hover:bg-slate-700 transition-colors border border-slate-700 hover:border-slate-700">
+                      <div key={i} className="bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors border border-slate-100 hover:border-slate-200">
                         <div className="flex items-start gap-3">
                           {/* Avatar */}
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
@@ -4117,19 +4146,19 @@ export default function App() {
                           </div>
                           
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-white truncate">{e.name}</p>
+                            <p className="font-semibold text-slate-800 truncate">{e.name}</p>
                             <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${
                               e.dept === 'Non assigné' 
                                 ? 'bg-amber-100 text-amber-700' 
-                                : 'bg-slate-200 text-slate-300'
+                                : 'bg-slate-200 text-slate-600'
                             }`}>
                               {e.dept}
                             </span>
                           </div>
                         </div>
                         
-                        <div className="mt-3 pt-3 border-t border-slate-700">
-                          <p className="text-lg font-bold text-white">
+                        <div className="mt-3 pt-3 border-t border-slate-200">
+                          <p className="text-lg font-bold text-slate-800">
                             €{e.cost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
@@ -4143,7 +4172,7 @@ export default function App() {
                       <button
                         onClick={() => setEmpCurrentPage(Math.max(1, currentPage - 1))}
                         disabled={currentPage === 1}
-                        className="px-3 py-2 border border-slate-700 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800/50"
+                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
                       >
                         ← Préc.
                       </button>
@@ -4168,7 +4197,7 @@ export default function App() {
                               className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                                 currentPage === pageNum
                                   ? 'bg-violet-500 text-white'
-                                  : 'border border-slate-700 hover:bg-slate-800/50'
+                                  : 'border border-slate-200 hover:bg-slate-50'
                               }`}
                             >
                               {pageNum}
@@ -4180,7 +4209,7 @@ export default function App() {
                       <button
                         onClick={() => setEmpCurrentPage(Math.min(totalPages, currentPage + 1))}
                         disabled={currentPage === totalPages}
-                        className="px-3 py-2 border border-slate-700 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800/50"
+                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
                       >
                         Suiv. →
                       </button>
@@ -4188,8 +4217,8 @@ export default function App() {
                   )}
                   
                   {/* Total */}
-                  <div className="mt-6 pt-4 border-t border-slate-700 flex justify-between items-center">
-                    <span className="font-bold text-slate-200">Total ({filtered.length} employés)</span>
+                  <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
+                    <span className="font-bold text-slate-700">Total ({filtered.length} employés)</span>
                     <span className="text-xl font-bold text-violet-600">
                       €{filtered.reduce((sum, e) => sum + e.cost, 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
                     </span>
@@ -4199,6 +4228,139 @@ export default function App() {
             })()}
           </div>
         </div>
+        
+        {/* Bouton de comparaison flottant */}
+        {periods.length >= 2 && (
+          <button
+            onClick={() => setShowCompareModal(true)}
+            className="fixed bottom-6 right-6 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white px-5 py-3 rounded-xl shadow-lg shadow-violet-500/30 hover:shadow-violet-500/50 transition-all flex items-center gap-2 font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Comparer périodes
+          </button>
+        )}
+        
+        {/* Modal de comparaison */}
+        {showCompareModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                <h2 className="text-xl font-bold">📊 Comparer deux périodes</h2>
+                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="p-2 hover:bg-slate-100 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Période 1</label>
+                    <select 
+                      value={selectedPeriod === 'all' ? (periods[periods.length - 2] || '') : selectedPeriod}
+                      onChange={(e) => setSelectedPeriod(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none"
+                    >
+                      {periods.sort().map(p => (
+                        <option key={p} value={p}>{formatPeriod(p)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Période 2</label>
+                    <select 
+                      value={comparePeriod || periods[periods.length - 1] || ''}
+                      onChange={(e) => setComparePeriod(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none"
+                    >
+                      {periods.sort().map(p => (
+                        <option key={p} value={p}>{formatPeriod(p)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                {(() => {
+                  const period1 = selectedPeriod === 'all' ? periods[periods.length - 2] : selectedPeriod;
+                  const period2 = comparePeriod || periods[periods.length - 1];
+                  
+                  if (!period1 || !period2 || period1 === period2) {
+                    return <div className="text-center py-12 text-slate-400">Sélectionnez deux périodes différentes</div>;
+                  }
+                  
+                  const emps1 = employees.filter(e => e.period === period1);
+                  const emps2 = employees.filter(e => e.period === period2);
+                  const total1 = emps1.reduce((s, e) => s + e.totalCost, 0);
+                  const total2 = emps2.reduce((s, e) => s + e.totalCost, 0);
+                  const names1 = new Set(emps1.map(e => e.name));
+                  const names2 = new Set(emps2.map(e => e.name));
+                  const nouveaux = [...names2].filter(n => !names1.has(n));
+                  const partis = [...names1].filter(n => !names2.has(n));
+                  const variation = total1 > 0 ? ((total2 - total1) / total1 * 100) : 0;
+                  
+                  return (
+                    <>
+                      <div className="grid grid-cols-4 gap-4 mb-6">
+                        <div className="bg-slate-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-slate-800">€{total1.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                          <div className="text-xs text-slate-500 mt-1">{formatPeriod(period1)}</div>
+                        </div>
+                        <div className="bg-slate-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-slate-800">€{total2.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                          <div className="text-xs text-slate-500 mt-1">{formatPeriod(period2)}</div>
+                        </div>
+                        <div className={`rounded-xl p-4 text-center ${variation >= 0 ? 'bg-red-50' : 'bg-green-50'}`}>
+                          <div className={`text-2xl font-bold ${variation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {variation >= 0 ? '+' : ''}{variation.toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">Variation</div>
+                        </div>
+                        <div className="bg-violet-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-violet-600">€{Math.abs(total2 - total1).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                          <div className="text-xs text-slate-500 mt-1">{total2 >= total1 ? 'Hausse' : 'Baisse'}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                          <h4 className="font-semibold text-green-800 mb-2">✅ Nouveaux ({nouveaux.length})</h4>
+                          {nouveaux.length === 0 ? (
+                            <p className="text-sm text-green-600">Aucun</p>
+                          ) : (
+                            <ul className="text-sm text-green-700 space-y-1 max-h-32 overflow-y-auto">
+                              {nouveaux.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
+                              {nouveaux.length > 10 && <li className="text-green-500">... +{nouveaux.length - 10} autres</li>}
+                            </ul>
+                          )}
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                          <h4 className="font-semibold text-red-800 mb-2">❌ Départs ({partis.length})</h4>
+                          {partis.length === 0 ? (
+                            <p className="text-sm text-red-600">Aucun</p>
+                          ) : (
+                            <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
+                              {partis.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
+                              {partis.length > 10 && <li className="text-red-500">... +{partis.length - 10} autres</li>}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+              
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800">
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
