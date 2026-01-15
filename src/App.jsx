@@ -13,41 +13,18 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     storageKey: 'salarize-auth',
     autoRefreshToken: true,
-    storage: {
-      getItem: (key) => {
-        try {
-          const value = localStorage.getItem(key);
-          return value;
-        } catch {
-          return null;
-        }
-      },
-      setItem: (key, value) => {
-        try {
-          localStorage.setItem(key, value);
-        } catch {}
-      },
-      removeItem: (key) => {
-        try {
-          localStorage.removeItem(key);
-        } catch {}
-      }
-    }
   }
 });
 
-// Helper pour obtenir une session valide (avec refresh automatique si nécessaire)
+// Helper pour obtenir une session valide
 const getValidSession = async () => {
   let { data: { session } } = await supabase.auth.getSession();
-  
   if (!session) {
-    // Essayer de rafraîchir la session
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-    if (!refreshError && refreshData.session) {
+    const { data: refreshData } = await supabase.auth.refreshSession();
+    if (refreshData?.session) {
       session = refreshData.session;
     }
   }
-  
   return session;
 };
 
@@ -720,11 +697,14 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     
     try {
       // Vérifier qu'on a une session active
-      const session = await getValidSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-        setUploadingAvatar(false);
-        return;
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+          setUploadingAvatar(false);
+          return;
+        }
       }
       
       // Convertir en base64 pour stockage simple
@@ -774,11 +754,16 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     setSaving(true);
     try {
       // Vérifier qu'on a une session active
-      const session = await getValidSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session) {
-        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-        setSaving(false);
-        return;
+        // Essayer de rafraîchir la session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+          setSaving(false);
+          return;
+        }
       }
       
       // Mise à jour via Supabase
@@ -829,11 +814,14 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     setSaving(true);
     try {
       // Vérifier qu'on a une session active
-      const session = await getValidSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-        setSaving(false);
-        return;
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+          setSaving(false);
+          return;
+        }
       }
       
       const { error } = await supabase.auth.updateUser({
@@ -1409,30 +1397,26 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden max-h-[90vh] overflow-y-auto">
-        {/* Header - compact */}
-        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-4 text-center relative">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-6 text-center relative">
           <button 
             onClick={onClose}
-            className="absolute right-3 top-3 p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="absolute right-4 top-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
           
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">S</span>
-            </div>
-            <div className="text-left">
-              <h2 className="text-xl font-bold text-white">
-                {tab === 'login' ? 'Connexion' : 'Créer un compte'}
-              </h2>
-              <p className="text-slate-400 text-xs">
-                {tab === 'login' ? 'Accédez à votre espace' : 'Rejoignez Salarize'}
-              </p>
-            </div>
+          <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <span className="text-white font-bold text-2xl">S</span>
           </div>
+          <h2 className="text-2xl font-bold text-white">
+            {tab === 'login' ? 'Connexion' : 'Créer un compte'}
+          </h2>
+          <p className="text-slate-400 text-sm mt-1">
+            {tab === 'login' ? 'Accédez à votre espace Salarize' : 'Rejoignez Salarize gratuitement'}
+          </p>
         </div>
         
         {/* Tabs */}
@@ -1460,7 +1444,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
         </div>
         
         {/* Content */}
-        <div className="p-5">
+        <div className="p-6">
           {/* Messages */}
           {error && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm flex items-center gap-2">
@@ -1480,10 +1464,10 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
             </div>
           )}
           
-          {/* Google Button - en premier, bien visible */}
+          {/* Google Button */}
           <button
             onClick={handleGoogleLogin}
-            className="w-full py-2.5 bg-white hover:bg-slate-100 text-slate-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-3 mb-3"
+            className="w-full py-3 bg-white hover:bg-slate-100 text-slate-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-3 mb-4"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -1494,57 +1478,57 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
             Continuer avec Google
           </button>
           
-          <div className="flex items-center gap-4 mb-3">
+          <div className="flex items-center gap-4 mb-4">
             <div className="flex-1 h-px bg-slate-700"></div>
             <span className="text-slate-500 text-xs">ou par email</span>
             <div className="flex-1 h-px bg-slate-700"></div>
           </div>
           
           {/* Form */}
-          <form onSubmit={tab === 'login' ? handleEmailLogin : handleSignup} className="space-y-3">
+          <form onSubmit={tab === 'login' ? handleEmailLogin : handleSignup} className="space-y-4">
             {tab === 'signup' && (
               <div>
-                <label className="text-sm text-slate-400 block mb-1">Nom complet</label>
+                <label className="text-sm text-slate-400 block mb-2">Nom complet</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
                   placeholder="Jean Dupont"
                 />
               </div>
             )}
             
             <div>
-              <label className="text-sm text-slate-400 block mb-1">Email</label>
+              <label className="text-sm text-slate-400 block mb-2">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
                 placeholder="vous@exemple.com"
               />
             </div>
             
             <div>
-              <label className="text-sm text-slate-400 block mb-1">Mot de passe</label>
+              <label className="text-sm text-slate-400 block mb-2">Mot de passe</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
                 placeholder="••••••••"
               />
             </div>
             
             {tab === 'signup' && (
               <div>
-                <label className="text-sm text-slate-400 block mb-1">Confirmer le mot de passe</label>
+                <label className="text-sm text-slate-400 block mb-2">Confirmer le mot de passe</label>
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
                   placeholder="••••••••"
                 />
               </div>
@@ -1563,7 +1547,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading && (
                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -2107,14 +2091,8 @@ function AppContent() {
         }
       }
       
-      // Récupérer la session (avec retry si nécessaire)
-      let session = await getValidSession();
-      
-      // Si pas de session après PKCE code, réessayer une fois
-      if (!session && code) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        session = await getValidSession();
-      }
+      // Récupérer la session
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (!mounted) return;
       
@@ -3758,7 +3736,6 @@ function AppContent() {
   const handleShare = async () => {
     if (!shareEmail || !activeCompany) return;
     
-    // Valider l'email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(shareEmail)) {
       toast.error('Adresse email invalide');
@@ -3768,16 +3745,13 @@ function AppContent() {
     setShareSending(true);
     
     try {
-      // Calculer les stats pour l'email
       const totalCostValue = filtered.reduce((s, e) => s + e.totalCost, 0);
       const uniqueEmps = new Set(filtered.map(e => e.name)).size;
       const periodsCount = periods.length;
       const avgCost = uniqueEmps > 0 ? totalCostValue / uniqueEmps : 0;
       
-      // Générer un token unique pour le partage
       const shareToken = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36);
       
-      // Sauvegarder le partage dans Supabase (si connecté)
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       
       if (currentUser) {
@@ -3802,11 +3776,9 @@ function AppContent() {
         }
       }
       
-      // Préparer le contenu de l'email
       const senderName = user?.name || 'Un utilisateur Salarize';
       const emailSubject = `📊 Rapport salarial ${activeCompany}`;
       
-      // Top 5 départements par coût
       const deptCosts = {};
       filtered.forEach(e => {
         const dept = e.department || departmentMapping[e.name] || 'Non assigné';
@@ -3822,30 +3794,22 @@ function AppContent() {
 
 ${senderName} vous partage un rapport salarial via Salarize.
 
-═══════════════════════════════════
 📊 RÉSUMÉ - ${activeCompany}
-═══════════════════════════════════
 
 💰 Coût total: €${totalCostValue.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
 👥 Nombre d'employés: ${uniqueEmps}
 📅 Périodes analysées: ${periodsCount}
 📈 Coût moyen/employé: €${avgCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
 
-───────────────────────────────────
 🏢 TOP DÉPARTEMENTS PAR COÛT
-───────────────────────────────────
 ${topDepts}
 
-${shareMessage ? `───────────────────────────────────\n💬 MESSAGE\n───────────────────────────────────\n"${shareMessage}"\n` : ''}
-═══════════════════════════════════
-
-Ce rapport a été généré automatiquement par Salarize.
-Pour plus de détails, contactez ${senderName}.
+${shareMessage ? `💬 MESSAGE: "${shareMessage}"\n` : ''}
+Ce rapport a été généré par Salarize.
 
 Cordialement,
 L'équipe Salarize`;
 
-      // Essayer d'envoyer via Edge Function (si configurée)
       let emailSent = false;
       
       try {
@@ -3867,12 +3831,10 @@ L'équipe Salarize`;
           emailSent = true;
           toast.success(`Email envoyé à ${shareEmail}`);
         }
-      } catch (edgeFnError) {
-        // Edge Function non configurée, fallback vers mailto
-        console.log('Edge Function non disponible, utilisation de mailto');
+      } catch (e) {
+        console.log('Edge Function non disponible');
       }
       
-      // Fallback: ouvrir le client mail
       if (!emailSent) {
         const mailtoLink = `mailto:${shareEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
         window.location.href = mailtoLink;
