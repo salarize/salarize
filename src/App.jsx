@@ -125,7 +125,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
 }
 
 // Landing Page Component
-function LandingPage({ onLogin }) {
+function LandingPage({ onLogin, user, onGoToDashboard }) {
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Hero Section */}
@@ -160,17 +160,19 @@ function LandingPage({ onLogin }) {
             {/* CTA */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button 
-                onClick={onLogin}
+                onClick={user ? onGoToDashboard : onLogin}
                 className="px-8 py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/25 flex items-center gap-2"
               >
-                Commencer gratuitement
+                {user ? 'Aller au dashboard' : 'Commencer gratuitement'}
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </button>
-              <button className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/10 transition-all">
-                Voir la démo
-              </button>
+              {!user && (
+                <button className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/10 transition-all">
+                  Voir la démo
+                </button>
+              )}
             </div>
           </div>
           
@@ -250,16 +252,16 @@ function LandingPage({ onLogin }) {
       <div className="max-w-6xl mx-auto px-6 py-20">
         <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 rounded-3xl p-12 border border-violet-500/20 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Prêt à simplifier votre gestion ?
+            {user ? 'Accédez à votre dashboard' : 'Prêt à simplifier votre gestion ?'}
           </h2>
           <p className="text-slate-300 text-lg mb-8 max-w-xl mx-auto">
-            Rejoignez les consultants qui utilisent Salarize pour leurs analyses salariales.
+            {user ? 'Analysez vos données salariales et générez des rapports.' : 'Rejoignez les consultants qui utilisent Salarize pour leurs analyses salariales.'}
           </p>
           <button 
-            onClick={onLogin}
+            onClick={user ? onGoToDashboard : onLogin}
             className="px-8 py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/25"
           >
-            Commencer maintenant
+            {user ? 'Aller au dashboard' : 'Commencer maintenant'}
           </button>
         </div>
       </div>
@@ -674,7 +676,6 @@ export default function App() {
           email: session.user.email,
           picture: session.user.user_metadata?.avatar_url
         });
-        setCurrentPage('dashboard');
         loadFromSupabase(session.user.id);
       } else {
         // Not logged in, load from localStorage
@@ -691,7 +692,6 @@ export default function App() {
           email: session.user.email,
           picture: session.user.user_metadata?.avatar_url
         });
-        setCurrentPage('dashboard');
         loadFromSupabase(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -1925,8 +1925,8 @@ export default function App() {
     );
   }
 
-  // Landing page (non connecté uniquement)
-  if (!user) {
+  // Landing page (home page - visible par tous)
+  if (currentPage === 'home' || currentPage === 'features') {
     return (
       <>
         <LandingHeader 
@@ -1936,12 +1936,22 @@ export default function App() {
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <LandingPage onLogin={handleLogin} />
+        <LandingPage 
+          onLogin={handleLogin} 
+          user={user} 
+          onGoToDashboard={() => setCurrentPage('dashboard')} 
+        />
       </>
     );
   }
 
-  // Profile page (connecté)
+  // Si pas connecté et essaie d'aller ailleurs que home -> rediriger vers home
+  if (!user && currentPage !== 'home') {
+    setCurrentPage('home');
+    return null;
+  }
+
+  // Profile page (connecté uniquement)
   if (currentPage === 'profile') {
     return (
       <>
@@ -1955,11 +1965,6 @@ export default function App() {
         <ProfilePage user={user} onLogout={handleLogout} />
       </>
     );
-  }
-
-  // Home page when logged in -> redirect to dashboard/upload
-  if (currentPage === 'home') {
-    setCurrentPage('dashboard');
   }
 
   // Upload screen (connected but no companies yet)
