@@ -6,7 +6,29 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase configuration
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P9GYtRaIr5DOIqIP_fh-BYR9Jo';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+    flowType: 'implicit'
+  }
+});
+
+// Traiter le hash IMMÉDIATEMENT au chargement du module (avant React)
+(async () => {
+  if (window.location.hash && window.location.hash.includes('access_token')) {
+    console.log('Hash detected, waiting for Supabase to process...');
+    // Attendre que Supabase traite le hash
+    await new Promise(resolve => setTimeout(resolve, 500));
+    // Nettoyer l'URL
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      console.log('Session created from hash:', session.user?.email);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }
+})();
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
 
@@ -869,13 +891,13 @@ export default function App() {
     let mounted = true;
     
     const initAuth = async () => {
-      // D'abord, laisser Supabase parser le hash fragment si présent (important pour mobile)
-      // Cela gère le retour OAuth avec #access_token=...
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Auth error:', error);
+      // Attendre un peu au cas où le hash est en cours de traitement
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
+      
+      // Récupérer la session
+      const { data: { session }, error } = await supabase.auth.getSession();
       
       if (!mounted) return;
       
@@ -886,33 +908,31 @@ export default function App() {
           email: session.user.email,
           picture: session.user.user_metadata?.avatar_url
         });
+        setCurrentPage('dashboard');
         loadFromSupabase(session.user.id);
-        // Nettoyer l'URL après login réussi (enlever le hash)
+        // Nettoyer l'URL
         if (window.location.hash) {
           window.history.replaceState(null, '', window.location.pathname);
         }
       } else {
-        // Not logged in, load from localStorage
         loadFromLocalStorage();
       }
     };
     
     initAuth();
 
-    // Listen for auth changes
+    // Écouter les changements d'auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
-      console.log('Auth event:', event); // Debug
-      
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session?.user) {
+      if (session?.user) {
         setUser({
           id: session.user.id,
           name: session.user.user_metadata?.full_name || session.user.email,
           email: session.user.email,
           picture: session.user.user_metadata?.avatar_url
         });
-        // Seulement charger si on a pas déjà les données
+        setCurrentPage('dashboard');
         if (Object.keys(companies).length === 0) {
           loadFromSupabase(session.user.id);
         }
@@ -1339,22 +1359,28 @@ export default function App() {
   // Google Login
   const handleLogin = async () => {
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: window.location.origin,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
-          }
+            prompt: 'select_account',
+          },
+          // Forcer PKCE pour meilleure compatibilité mobile
+          skipBrowserRedirect: false,
         }
       });
+      
+      console.log('Login initiated:', data);
+      
       if (error) {
         console.error('Login error:', error);
         alert('Erreur de connexion: ' + error.message);
       }
     } catch (err) {
       console.error('Login exception:', err);
+      alert('Exception: ' + err.message);
     }
   };
 
