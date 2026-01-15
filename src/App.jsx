@@ -350,7 +350,18 @@ function DashboardHeader({ user, onLogout, setCurrentPage }) {
   
   return (
     <div className="fixed top-0 right-0 left-64 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10">
-      <div></div>
+      {/* Left side - Home link */}
+      <button 
+        onClick={() => setCurrentPage('home')}
+        className="flex items-center gap-2 text-slate-500 hover:text-violet-600 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+        <span className="text-sm font-medium">Accueil</span>
+      </button>
+      
+      {/* Right side - Profile */}
       <div className="relative">
         <button 
           onClick={() => setShowDropdown(!showDropdown)}
@@ -472,17 +483,20 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
 }
 
 // Sidebar component OUTSIDE of App
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage }) {
   const [showActions, setShowActions] = useState(false);
   
   return (
     <div className="w-64 bg-slate-900 text-white fixed h-screen flex flex-col">
-      <div className="p-6 border-b border-slate-700 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center">
+      <button 
+        onClick={() => setCurrentPage && setCurrentPage('home')}
+        className="p-6 border-b border-slate-700 flex items-center gap-3 hover:bg-slate-800 transition-colors"
+      >
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
           <span className="text-white font-black text-lg">S</span>
         </div>
-        <span className="text-xl font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Salarize</span>
-      </div>
+        <span className="text-xl font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Salarize</span>
+      </button>
       <div className="flex-1 p-4 overflow-y-auto">
         <p className="text-slate-500 text-xs uppercase mb-2">Sociétés</p>
         {Object.keys(companies).length === 0 ? (
@@ -493,7 +507,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
               key={name}
               onClick={() => onSelectCompany(name)}
               className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                activeCompany === name ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-slate-800 text-slate-300'
+                activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
               }`}
             >
               {companies[name]?.logo ? (
@@ -522,8 +536,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                 onClick={() => { onAddCompany(); setShowActions(false); }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
               >
-                <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                 </div>
@@ -2136,6 +2150,7 @@ export default function App() {
           onManageData={() => setShowDataManager(true)}
           onManageDepts={() => setShowDeptManager(true)}
           debugMsg={debugMsg}
+          setCurrentPage={setCurrentPage}
         />
         {showModal && (
           <SelectCompanyModal 
@@ -2185,6 +2200,7 @@ export default function App() {
         onManageData={() => setShowDataManager(true)}
         onManageDepts={() => setShowDeptManager(true)}
         debugMsg={debugMsg}
+        setCurrentPage={setCurrentPage}
       />
       <DashboardHeader user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
       {showModal && pendingData && (
