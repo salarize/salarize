@@ -639,6 +639,15 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
 function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage }) {
   const [showActions, setShowActions] = useState(false);
   
+  // Calculer le nombre d'employés non assignés pour la société active
+  const unassignedCount = activeCompany && companies[activeCompany] 
+    ? new Set(
+        (companies[activeCompany].employees || [])
+          .filter(e => !e.department && !companies[activeCompany].mapping?.[e.name])
+          .map(e => e.name)
+      ).size
+    : 0;
+  
   return (
     <div className="w-64 bg-slate-900 text-white fixed h-screen flex flex-col">
       <button 
@@ -650,6 +659,25 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         </div>
         <span className="text-xl font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Salarize</span>
       </button>
+      
+      {/* Alerte employés non assignés */}
+      {unassignedCount > 0 && (
+        <button
+          onClick={onManageDepts}
+          className="mx-4 mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 hover:bg-amber-500/20 transition-colors"
+        >
+          <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="text-left">
+            <p className="text-amber-400 text-xs font-semibold">{unassignedCount} sans département</p>
+            <p className="text-amber-400/60 text-[10px]">Cliquer pour assigner</p>
+          </div>
+        </button>
+      )}
+      
       <div className="flex-1 p-4 overflow-y-auto">
         <p className="text-slate-500 text-xs uppercase mb-2">Sociétés</p>
         {Object.keys(companies).length === 0 ? (
@@ -823,6 +851,7 @@ export default function App() {
   const [lastSaved, setLastSaved] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [comparePeriod, setComparePeriod] = useState(null);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
@@ -1968,9 +1997,17 @@ export default function App() {
     });
     const top10Employees = Object.values(empCosts).sort((a, b) => b.cost - a.cost).slice(0, 10);
 
+    // Couleurs de la société (ou violet par défaut)
+    const brandColor = companies[activeCompany]?.brandColor || '139, 92, 246';
+    const brandColorHex = `rgb(${brandColor})`;
+    const brandColorLight = `rgba(${brandColor}, 0.1)`;
+    const brandColorMedium = `rgba(${brandColor}, 0.2)`;
+    const [r, g, b] = brandColor.split(',').map(c => parseInt(c.trim()));
+    const brandColorLighter = `rgb(${Math.min(255, r + 60)}, ${Math.min(255, g + 60)}, ${Math.min(255, b + 60)})`;
+
     const logoHtml = companies[activeCompany]?.logo 
       ? `<img src="${companies[activeCompany].logo}" style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover;" />`
-      : `<div style="width: 60px; height: 60px; border-radius: 12px; background: linear-gradient(135deg, #8B5CF6, #D946EF); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 28px;">${activeCompany?.charAt(0) || 'S'}</div>`;
+      : `<div style="width: 60px; height: 60px; border-radius: 12px; background: linear-gradient(135deg, ${brandColorHex}, ${brandColorLighter}); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 28px;">${activeCompany?.charAt(0) || 'S'}</div>`;
 
     // Générer les barres de répartition
     const maxDeptCost = Math.max(...sortedDepts.map(([_, d]) => d.total));
@@ -1982,6 +2019,12 @@ export default function App() {
         <title>Rapport Salarize - ${activeCompany}</title>
         <meta charset="UTF-8">
         <style>
+          :root {
+            --brand: ${brandColorHex};
+            --brand-light: ${brandColorLight};
+            --brand-medium: ${brandColorMedium};
+            --brand-lighter: ${brandColorLighter};
+          }
           * { margin: 0; padding: 0; box-sizing: border-box; }
           @page { size: A4; margin: 12mm; }
           body { 
@@ -2023,7 +2066,7 @@ export default function App() {
           .brand-name {
             font-size: 22px;
             font-weight: 800;
-            background: linear-gradient(90deg, #8B5CF6, #D946EF);
+            background: linear-gradient(90deg, var(--brand), var(--brand-lighter));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -2042,14 +2085,14 @@ export default function App() {
             margin-bottom: 28px;
           }
           .stat-card {
-            background: linear-gradient(135deg, #F5F3FF, #EDE9FE);
-            border: 1px solid #DDD6FE;
+            background: var(--brand-light);
+            border: 1px solid var(--brand-medium);
             border-radius: 12px;
             padding: 16px;
             text-align: center;
           }
           .stat-card.highlight {
-            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            background: linear-gradient(135deg, var(--brand), var(--brand-lighter));
             border: none;
           }
           .stat-card.highlight .stat-value,
@@ -2059,15 +2102,16 @@ export default function App() {
           .stat-value {
             font-size: 24px;
             font-weight: 700;
-            color: #5B21B6;
+            color: var(--brand);
           }
           .stat-label {
             font-size: 10px;
-            color: #7C3AED;
+            color: var(--brand);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-top: 4px;
             font-weight: 600;
+            opacity: 0.8;
           }
           
           /* Section Titles */
@@ -2087,7 +2131,7 @@ export default function App() {
             content: '';
             width: 4px;
             height: 20px;
-            background: linear-gradient(180deg, #8B5CF6, #D946EF);
+            background: linear-gradient(180deg, var(--brand), var(--brand-lighter));
             border-radius: 2px;
           }
           
@@ -2119,12 +2163,12 @@ export default function App() {
             background: #FAFAFA;
           }
           .total-row {
-            background: linear-gradient(90deg, #F5F3FF, #EDE9FE) !important;
+            background: var(--brand-light) !important;
             font-weight: 600;
           }
           .total-row td {
             border-bottom: none;
-            color: #5B21B6;
+            color: var(--brand);
           }
           .positive { color: #DC2626; }
           .negative { color: #16A34A; }
@@ -2151,7 +2195,7 @@ export default function App() {
           }
           .dept-bar {
             height: 100%;
-            background: linear-gradient(90deg, #8B5CF6, #A78BFA);
+            background: linear-gradient(90deg, var(--brand), var(--brand-lighter));
             border-radius: 4px;
             display: flex;
             align-items: center;
@@ -2194,7 +2238,7 @@ export default function App() {
           .footer-logo {
             width: 16px;
             height: 16px;
-            background: linear-gradient(135deg, #8B5CF6, #D946EF);
+            background: linear-gradient(135deg, var(--brand), var(--brand-lighter));
             border-radius: 4px;
           }
           
@@ -2203,7 +2247,7 @@ export default function App() {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: linear-gradient(90deg, #8B5CF6, #D946EF);
+            background: linear-gradient(90deg, var(--brand), var(--brand-lighter));
             color: white;
             border: none;
             padding: 14px 28px;
@@ -4199,6 +4243,139 @@ export default function App() {
             })()}
           </div>
         </div>
+        
+        {/* Bouton de comparaison flottant */}
+        {periods.length >= 2 && (
+          <button
+            onClick={() => setShowCompareModal(true)}
+            className="fixed bottom-6 right-6 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white px-5 py-3 rounded-xl shadow-lg shadow-violet-500/30 hover:shadow-violet-500/50 transition-all flex items-center gap-2 font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Comparer périodes
+          </button>
+        )}
+        
+        {/* Modal de comparaison */}
+        {showCompareModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                <h2 className="text-xl font-bold">📊 Comparer deux périodes</h2>
+                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="p-2 hover:bg-slate-100 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1">
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Période 1</label>
+                    <select 
+                      value={selectedPeriod === 'all' ? (periods[periods.length - 2] || '') : selectedPeriod}
+                      onChange={(e) => setSelectedPeriod(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none"
+                    >
+                      {periods.sort().map(p => (
+                        <option key={p} value={p}>{formatPeriod(p)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Période 2</label>
+                    <select 
+                      value={comparePeriod || periods[periods.length - 1] || ''}
+                      onChange={(e) => setComparePeriod(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none"
+                    >
+                      {periods.sort().map(p => (
+                        <option key={p} value={p}>{formatPeriod(p)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                {(() => {
+                  const period1 = selectedPeriod === 'all' ? periods[periods.length - 2] : selectedPeriod;
+                  const period2 = comparePeriod || periods[periods.length - 1];
+                  
+                  if (!period1 || !period2 || period1 === period2) {
+                    return <div className="text-center py-12 text-slate-400">Sélectionnez deux périodes différentes</div>;
+                  }
+                  
+                  const emps1 = employees.filter(e => e.period === period1);
+                  const emps2 = employees.filter(e => e.period === period2);
+                  const total1 = emps1.reduce((s, e) => s + e.totalCost, 0);
+                  const total2 = emps2.reduce((s, e) => s + e.totalCost, 0);
+                  const names1 = new Set(emps1.map(e => e.name));
+                  const names2 = new Set(emps2.map(e => e.name));
+                  const nouveaux = [...names2].filter(n => !names1.has(n));
+                  const partis = [...names1].filter(n => !names2.has(n));
+                  const variation = total1 > 0 ? ((total2 - total1) / total1 * 100) : 0;
+                  
+                  return (
+                    <>
+                      <div className="grid grid-cols-4 gap-4 mb-6">
+                        <div className="bg-slate-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-slate-800">€{total1.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                          <div className="text-xs text-slate-500 mt-1">{formatPeriod(period1)}</div>
+                        </div>
+                        <div className="bg-slate-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-slate-800">€{total2.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                          <div className="text-xs text-slate-500 mt-1">{formatPeriod(period2)}</div>
+                        </div>
+                        <div className={`rounded-xl p-4 text-center ${variation >= 0 ? 'bg-red-50' : 'bg-green-50'}`}>
+                          <div className={`text-2xl font-bold ${variation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {variation >= 0 ? '+' : ''}{variation.toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-slate-500 mt-1">Variation</div>
+                        </div>
+                        <div className="bg-violet-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-bold text-violet-600">€{Math.abs(total2 - total1).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                          <div className="text-xs text-slate-500 mt-1">{total2 >= total1 ? 'Hausse' : 'Baisse'}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                          <h4 className="font-semibold text-green-800 mb-2">✅ Nouveaux ({nouveaux.length})</h4>
+                          {nouveaux.length === 0 ? (
+                            <p className="text-sm text-green-600">Aucun</p>
+                          ) : (
+                            <ul className="text-sm text-green-700 space-y-1 max-h-32 overflow-y-auto">
+                              {nouveaux.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
+                              {nouveaux.length > 10 && <li className="text-green-500">... +{nouveaux.length - 10} autres</li>}
+                            </ul>
+                          )}
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                          <h4 className="font-semibold text-red-800 mb-2">❌ Départs ({partis.length})</h4>
+                          {partis.length === 0 ? (
+                            <p className="text-sm text-red-600">Aucun</p>
+                          ) : (
+                            <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
+                              {partis.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
+                              {partis.length > 10 && <li className="text-red-500">... +{partis.length - 10} autres</li>}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+              
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800">
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
