@@ -12,10 +12,12 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     persistSession: true,
     storageKey: 'salarize-auth',
+    autoRefreshToken: true,
     storage: {
       getItem: (key) => {
         try {
-          return localStorage.getItem(key) || sessionStorage.getItem(key);
+          const value = localStorage.getItem(key);
+          return value;
         } catch {
           return null;
         }
@@ -23,18 +25,31 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       setItem: (key, value) => {
         try {
           localStorage.setItem(key, value);
-          sessionStorage.setItem(key, value);
         } catch {}
       },
       removeItem: (key) => {
         try {
           localStorage.removeItem(key);
-          sessionStorage.removeItem(key);
         } catch {}
       }
     }
   }
 });
+
+// Helper pour obtenir une session valide (avec refresh automatique si nécessaire)
+const getValidSession = async () => {
+  let { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    // Essayer de rafraîchir la session
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshData.session) {
+      session = refreshData.session;
+    }
+  }
+  
+  return session;
+};
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
 
@@ -708,14 +723,11 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     
     try {
       // Vérifier qu'on a une session active
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getValidSession();
       if (!session) {
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-          setUploadingAvatar(false);
-          return;
-        }
+        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+        setUploadingAvatar(false);
+        return;
       }
       
       // Convertir en base64 pour stockage simple
@@ -765,16 +777,11 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     setSaving(true);
     try {
       // Vérifier qu'on a une session active
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const session = await getValidSession();
       if (!session) {
-        // Essayer de rafraîchir la session
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshData.session) {
-          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-          setSaving(false);
-          return;
-        }
+        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+        setSaving(false);
+        return;
       }
       
       // Mise à jour via Supabase
@@ -825,14 +832,11 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     setSaving(true);
     try {
       // Vérifier qu'on a une session active
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getValidSession();
       if (!session) {
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError) {
-          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
-          setSaving(false);
-          return;
-        }
+        setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+        setSaving(false);
+        return;
       }
       
       const { error } = await supabase.auth.updateUser({
@@ -1407,10 +1411,10 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] overflow-y-auto">
-      <div className="min-h-full flex items-center justify-center p-4">
-        <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden my-8">
+      <div className="min-h-full flex items-center justify-center p-4 py-8">
+        <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-6 text-center relative">
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-6 text-center relative flex-shrink-0">
           <button 
             onClick={onClose}
             className="absolute right-4 top-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -1432,7 +1436,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
         </div>
         
         {/* Tabs */}
-        <div className="flex border-b border-slate-700">
+        <div className="flex border-b border-slate-700 flex-shrink-0">
           <button
             onClick={() => { setTab('login'); resetForm(); }}
             className={`flex-1 py-3 text-sm font-medium transition-colors ${
@@ -1455,8 +1459,8 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
           </button>
         </div>
         
-        {/* Content */}
-        <div className="p-6">
+        {/* Content - scrollable */}
+        <div className="p-6 overflow-y-auto flex-1">
           {/* Messages */}
           {error && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm flex items-center gap-2">
@@ -2104,8 +2108,14 @@ function AppContent() {
         }
       }
       
-      // Récupérer la session
-      const { data: { session } } = await supabase.auth.getSession();
+      // Récupérer la session (avec retry si nécessaire)
+      let session = await getValidSession();
+      
+      // Si pas de session après PKCE code, réessayer une fois
+      if (!session && code) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        session = await getValidSession();
+      }
       
       if (!mounted) return;
       
