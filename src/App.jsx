@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
@@ -40,6 +40,62 @@ const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OP
 
 // Couleurs pour les graphiques
 const CHART_COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#7C3AED', '#6D28D9', '#5B21B6', '#4C1D95', '#DDD6FE', '#EDE9FE', '#F5F3FF'];
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">Oups ! Une erreur s'est produite</h1>
+            <p className="text-slate-500 mb-6">Veuillez recharger la page ou contacter le support.</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-violet-600 hover:bg-violet-700 rounded-xl font-medium text-white transition-colors"
+            >
+              Recharger la page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Custom hook for debouncing values
+function useDebounce(value, delay = 300) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  
+  return debouncedValue;
+}
 
 // Landing Page Header
 function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage }) {
@@ -827,7 +883,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
   );
 }
 
-export default function App() {
+function AppContent() {
   // Helper pour formater les périodes (2024-03 → Mars 2024)
   const formatPeriod = (period) => {
     if (!period || period === 'Unknown') return period;
@@ -873,6 +929,8 @@ export default function App() {
   const [showMergeDept, setShowMergeDept] = useState(false);
   const [mergeDeptFrom, setMergeDeptFrom] = useState('');
   const [mergeDeptTo, setMergeDeptTo] = useState('');
+  const [selectedEmployees, setSelectedEmployees] = useState(new Set()); // For bulk assign
+  const [bulkAssignDept, setBulkAssignDept] = useState(''); // Target department for bulk assign
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -887,10 +945,14 @@ export default function App() {
   const [empSortBy, setEmpSortBy] = useState('cost-desc');
   const [empCurrentPage, setEmpCurrentPage] = useState(1);
 
+  // Debounced search terms for performance
+  const debouncedEmpSearch = useDebounce(empSearchTerm, 300);
+  const debouncedDeptSearch = useDebounce(deptSearchTerm, 300);
+
   // Reset pagination when filters change
   useEffect(() => {
     setEmpCurrentPage(1);
-  }, [empSearchTerm, empDeptFilter, empSortBy]);
+  }, [debouncedEmpSearch, empDeptFilter, empSortBy]);
 
   // Check auth state on load
   useEffect(() => {
@@ -1062,10 +1124,9 @@ export default function App() {
     setIsLoading(false);
   };
 
-  // Save to Supabase
+  // Save to Supabase - Optimized with upsert
   const saveToSupabase = async (newCompanies, activeCompanyName) => {
     if (!user?.id) {
-      // Not logged in, save to localStorage
       saveToLocalStorage(newCompanies, activeCompanyName);
       return;
     }
@@ -1075,8 +1136,9 @@ export default function App() {
       for (const [companyName, companyData] of Object.entries(newCompanies)) {
         let companyId = companyData.id;
 
-        // Create or update company
+        // Create or update company with upsert
         if (!companyId) {
+          // New company - insert
           const { data: newCompany, error } = await supabase
             .from('companies')
             .insert({
@@ -1093,6 +1155,7 @@ export default function App() {
           companyId = newCompany.id;
           newCompanies[companyName].id = companyId;
         } else {
+          // Existing company - update
           await supabase
             .from('companies')
             .update({
@@ -1103,13 +1166,9 @@ export default function App() {
             .eq('id', companyId);
         }
 
-        // Delete existing employees and mappings for this company
-        await supabase.from('employees').delete().eq('company_id', companyId);
-        await supabase.from('department_mappings').delete().eq('company_id', companyId);
-
-        // Insert employees
+        // Sync employees - use upsert with composite key (company_id, name, period)
         if (companyData.employees?.length > 0) {
-          const employeesToInsert = companyData.employees.map(e => ({
+          const employeesToUpsert = companyData.employees.map(e => ({
             company_id: companyId,
             name: e.name,
             department: e.department || null,
@@ -1118,19 +1177,94 @@ export default function App() {
             period: e.period
           }));
 
-          await supabase.from('employees').insert(employeesToInsert);
+          // Upsert in batches of 500 to avoid payload limits
+          const batchSize = 500;
+          for (let i = 0; i < employeesToUpsert.length; i += batchSize) {
+            const batch = employeesToUpsert.slice(i, i + batchSize);
+            const { error } = await supabase
+              .from('employees')
+              .upsert(batch, { 
+                onConflict: 'company_id,name,period',
+                ignoreDuplicates: false 
+              });
+            if (error) {
+              // If upsert fails (no unique constraint), fall back to delete+insert for this batch
+              console.warn('Upsert failed, using fallback:', error.message);
+              await supabase.from('employees').delete().eq('company_id', companyId);
+              await supabase.from('employees').insert(employeesToUpsert);
+              break;
+            }
+          }
+
+          // Remove employees that no longer exist
+          const currentKeys = new Set(
+            companyData.employees.map(e => `${e.name}|${e.period}`)
+          );
+          
+          const { data: existingEmps } = await supabase
+            .from('employees')
+            .select('id, name, period')
+            .eq('company_id', companyId);
+          
+          const toDelete = (existingEmps || [])
+            .filter(e => !currentKeys.has(`${e.name}|${e.period}`))
+            .map(e => e.id);
+          
+          if (toDelete.length > 0) {
+            await supabase
+              .from('employees')
+              .delete()
+              .in('id', toDelete);
+          }
+        } else {
+          // No employees - delete all
+          await supabase.from('employees').delete().eq('company_id', companyId);
         }
 
-        // Insert mappings
+        // Sync department mappings
         const mappingEntries = Object.entries(companyData.mapping || {});
         if (mappingEntries.length > 0) {
-          const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
+          const mappingsToUpsert = mappingEntries.map(([empName, dept]) => ({
             company_id: companyId,
             employee_name: empName,
             department: dept
           }));
 
-          await supabase.from('department_mappings').insert(mappingsToInsert);
+          const { error } = await supabase
+            .from('department_mappings')
+            .upsert(mappingsToUpsert, { 
+              onConflict: 'company_id,employee_name',
+              ignoreDuplicates: false 
+            });
+          
+          if (error) {
+            // Fallback: delete and insert
+            console.warn('Mapping upsert failed, using fallback:', error.message);
+            await supabase.from('department_mappings').delete().eq('company_id', companyId);
+            await supabase.from('department_mappings').insert(mappingsToUpsert);
+          } else {
+            // Remove mappings that no longer exist
+            const currentMappedNames = new Set(mappingEntries.map(([name]) => name));
+            
+            const { data: existingMappings } = await supabase
+              .from('department_mappings')
+              .select('id, employee_name')
+              .eq('company_id', companyId);
+            
+            const mappingsToDelete = (existingMappings || [])
+              .filter(m => !currentMappedNames.has(m.employee_name))
+              .map(m => m.id);
+            
+            if (mappingsToDelete.length > 0) {
+              await supabase
+                .from('department_mappings')
+                .delete()
+                .in('id', mappingsToDelete);
+            }
+          }
+        } else {
+          // No mappings - delete all
+          await supabase.from('department_mappings').delete().eq('company_id', companyId);
         }
       }
 
@@ -2571,47 +2705,85 @@ export default function App() {
     saveAll(newCompanies, activeCompany);
   };
 
-  // Computed
-  const filtered = selectedPeriod === 'all' ? employees : employees.filter(e => e.period === selectedPeriod);
-  const totalCost = filtered.reduce((s, e) => s + e.totalCost, 0);
-  const uniqueNames = new Set(filtered.map(e => e.name)).size;
+  // Computed values with useMemo for performance
+  const filtered = useMemo(() => 
+    selectedPeriod === 'all' ? employees : employees.filter(e => e.period === selectedPeriod),
+    [employees, selectedPeriod]
+  );
+  
+  const totalCost = useMemo(() => 
+    filtered.reduce((s, e) => s + e.totalCost, 0),
+    [filtered]
+  );
+  
+  const uniqueNames = useMemo(() => 
+    new Set(filtered.map(e => e.name)).size,
+    [filtered]
+  );
   
   // Get unique years from periods
-  const years = [...new Set(periods.map(p => p.substring(0, 4)))].sort();
+  const years = useMemo(() => 
+    [...new Set(periods.map(p => p.substring(0, 4)))].sort(),
+    [periods]
+  );
   
   // Filter chart data by year
-  const chartData = periods
-    .filter(period => selectedYear === 'all' || period.startsWith(selectedYear))
-    .map(period => {
-      const periodEmps = employees.filter(e => e.period === period);
-      const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
-      const year = period.substring(0, 4);
-      return {
-        period: period,
-        total: Math.round(total * 100) / 100,
-        year: year
-      };
-    }).sort((a, b) => a.period.localeCompare(b.period));
+  const chartData = useMemo(() => 
+    periods
+      .filter(period => selectedYear === 'all' || period.startsWith(selectedYear))
+      .map(period => {
+        const periodEmps = employees.filter(e => e.period === period);
+        const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
+        const year = period.substring(0, 4);
+        return {
+          period: period,
+          total: Math.round(total * 100) / 100,
+          year: year
+        };
+      }).sort((a, b) => a.period.localeCompare(b.period)),
+    [periods, employees, selectedYear]
+  );
   
   // Années uniques pour les couleurs
-  const uniqueYears = [...new Set(chartData.map(d => d.year))].sort();
+  const uniqueYears = useMemo(() => 
+    [...new Set(chartData.map(d => d.year))].sort(),
+    [chartData]
+  );
   
-  const deptStats = {};
-  filtered.forEach(e => {
-    const d = e.department || departmentMapping[e.name] || 'Non assigné';
-    if (!deptStats[d]) deptStats[d] = { total: 0, count: 0 };
-    deptStats[d].total += e.totalCost;
-    deptStats[d].count++;
-  });
-  const sortedDepts = Object.entries(deptStats).sort((a, b) => b[1].total - a[1].total);
-  const maxCost = Math.max(...sortedDepts.map(([, d]) => d.total), 1);
+  const deptStats = useMemo(() => {
+    const stats = {};
+    filtered.forEach(e => {
+      const d = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (!stats[d]) stats[d] = { total: 0, count: 0 };
+      stats[d].total += e.totalCost;
+      stats[d].count++;
+    });
+    return stats;
+  }, [filtered, departmentMapping]);
+  
+  const sortedDepts = useMemo(() => 
+    Object.entries(deptStats).sort((a, b) => b[1].total - a[1].total),
+    [deptStats]
+  );
+  
+  const maxCost = useMemo(() => 
+    Math.max(...sortedDepts.map(([, d]) => d.total), 1),
+    [sortedDepts]
+  );
 
-  const empAgg = {};
-  filtered.forEach(e => {
-    if (!empAgg[e.name]) empAgg[e.name] = { name: e.name, dept: e.department || departmentMapping[e.name] || 'Non assigné', cost: 0 };
-    empAgg[e.name].cost += e.totalCost;
-  });
-  const empList = Object.values(empAgg).sort((a, b) => b.cost - a.cost);
+  const empAgg = useMemo(() => {
+    const agg = {};
+    filtered.forEach(e => {
+      if (!agg[e.name]) agg[e.name] = { name: e.name, dept: e.department || departmentMapping[e.name] || 'Non assigné', cost: 0 };
+      agg[e.name].cost += e.totalCost;
+    });
+    return agg;
+  }, [filtered, departmentMapping]);
+  
+  const empList = useMemo(() => 
+    Object.values(empAgg).sort((a, b) => b.cost - a.cost),
+    [empAgg]
+  );
 
   // Loading screen
   if (isLoading) {
@@ -3522,6 +3694,66 @@ export default function App() {
                   </div>
                 )}
                 
+                {/* Bulk assign bar */}
+                {selectedEmployees.size > 0 && (
+                  <div className="mb-3 p-3 bg-violet-50 border border-violet-200 rounded-xl flex items-center gap-3">
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-violet-700">
+                        {selectedEmployees.size} employé{selectedEmployees.size > 1 ? 's' : ''} sélectionné{selectedEmployees.size > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <select
+                      value={bulkAssignDept}
+                      onChange={e => setBulkAssignDept(e.target.value)}
+                      className="px-3 py-2 border border-violet-300 rounded-lg text-sm bg-white"
+                    >
+                      <option value="">Assigner à...</option>
+                      {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        if (!bulkAssignDept) return;
+                        
+                        const newMapping = { ...departmentMapping };
+                        const newEmps = employees.map(e => {
+                          if (selectedEmployees.has(e.name)) {
+                            newMapping[e.name] = bulkAssignDept;
+                            return { ...e, department: bulkAssignDept };
+                          }
+                          return e;
+                        });
+                        
+                        setDepartmentMapping(newMapping);
+                        setEmployees(newEmps);
+                        
+                        const newCompanies = {
+                          ...companies,
+                          [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
+                        };
+                        setCompanies(newCompanies);
+                        saveAll(newCompanies, activeCompany);
+                        
+                        setSelectedEmployees(new Set());
+                        setBulkAssignDept('');
+                      }}
+                      disabled={!bulkAssignDept}
+                      className="px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-violet-700 transition-colors"
+                    >
+                      Appliquer
+                    </button>
+                    <button
+                      onClick={() => { setSelectedEmployees(new Set()); setBulkAssignDept(''); }}
+                      className="p-2 text-violet-500 hover:bg-violet-100 rounded-lg transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3565,7 +3797,7 @@ export default function App() {
                       currentDept: e.department || departmentMapping[e.name] || null
                     }))
                     .filter(e => {
-                      if (deptSearchTerm && !e.name.toLowerCase().includes(deptSearchTerm.toLowerCase())) return false;
+                      if (debouncedDeptSearch && !e.name.toLowerCase().includes(debouncedDeptSearch.toLowerCase())) return false;
                       if (deptFilter === 'unassigned') return !e.currentDept;
                       if (deptFilter !== 'all') return e.currentDept === deptFilter;
                       return true;
@@ -3590,32 +3822,78 @@ export default function App() {
                     );
                   }
                   
-                  return uniqueEmps.map((emp, idx) => (
-                    <div key={emp.name} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
-                      {/* Avatar */}
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
-                        emp.currentDept 
-                          ? 'bg-slate-100 text-slate-600' 
-                          : 'bg-amber-100 text-amber-600'
-                      }`}>
-                        {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  // Check if all visible are selected
+                  const allVisibleSelected = uniqueEmps.length > 0 && uniqueEmps.every(e => selectedEmployees.has(e.name));
+                  const someSelected = uniqueEmps.some(e => selectedEmployees.has(e.name));
+                  
+                  return (
+                    <>
+                      {/* Select all header */}
+                      <div className="flex items-center gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 sticky top-0">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          ref={el => { if (el) el.indeterminate = someSelected && !allVisibleSelected; }}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedEmployees(new Set([...selectedEmployees, ...uniqueEmps.map(emp => emp.name)]));
+                            } else {
+                              const newSet = new Set(selectedEmployees);
+                              uniqueEmps.forEach(emp => newSet.delete(emp.name));
+                              setSelectedEmployees(newSet);
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                        />
+                        <span className="text-sm text-slate-500">
+                          {selectedEmployees.size > 0 
+                            ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}` 
+                            : 'Tout sélectionner'}
+                        </span>
                       </div>
                       
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-slate-800 truncate">{emp.name}</p>
-                      </div>
-                      
-                      <select
-                        value={emp.currentDept || ''}
-                        onChange={e => {
-                          const newDept = e.target.value || null;
+                      {uniqueEmps.map((emp, idx) => (
+                        <div key={emp.name} className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}>
+                          {/* Checkbox */}
+                          <input
+                            type="checkbox"
+                            checked={selectedEmployees.has(emp.name)}
+                            onChange={e => {
+                              const newSet = new Set(selectedEmployees);
+                              if (e.target.checked) {
+                                newSet.add(emp.name);
+                              } else {
+                                newSet.delete(emp.name);
+                              }
+                              setSelectedEmployees(newSet);
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                          />
                           
-                          const newMapping = { ...departmentMapping };
-                          if (newDept) {
-                            newMapping[emp.name] = newDept;
-                          } else {
-                            delete newMapping[emp.name];
-                          }
+                          {/* Avatar */}
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
+                            emp.currentDept 
+                              ? 'bg-slate-100 text-slate-600' 
+                              : 'bg-amber-100 text-amber-600'
+                          }`}>
+                            {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-800 truncate">{emp.name}</p>
+                          </div>
+                          
+                          <select
+                            value={emp.currentDept || ''}
+                            onChange={e => {
+                              const newDept = e.target.value || null;
+                              
+                              const newMapping = { ...departmentMapping };
+                              if (newDept) {
+                                newMapping[emp.name] = newDept;
+                              } else {
+                                delete newMapping[emp.name];
+                              }
                           
                           const newEmps = employees.map(em => 
                             em.name === emp.name ? { ...em, department: newDept } : em
@@ -3643,14 +3921,16 @@ export default function App() {
                         ))}
                       </select>
                     </div>
-                  ));
+                  ))}
+                  </>
+                  );
                 })()}
               </div>
               
               {/* Footer */}
               <div className="p-4 bg-slate-50 border-t border-slate-200">
                 <button
-                  onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}
+                  onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); setSelectedEmployees(new Set()); setBulkAssignDept(''); }}
                   className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors"
                 >
                   Terminé
@@ -4209,7 +4489,7 @@ export default function App() {
             {(() => {
               // Filter and sort employees
               let filtered = empList.filter(e => {
-                if (empSearchTerm && !e.name.toLowerCase().includes(empSearchTerm.toLowerCase())) return false;
+                if (debouncedEmpSearch && !e.name.toLowerCase().includes(debouncedEmpSearch.toLowerCase())) return false;
                 if (empDeptFilter && empDeptFilter !== 'all' && e.dept !== empDeptFilter) return false;
                 return true;
               });
@@ -4251,7 +4531,7 @@ export default function App() {
                   {/* Results count */}
                   <p className="text-sm text-slate-500 mb-4">
                     {filtered.length} employé{filtered.length > 1 ? 's' : ''} 
-                    {empSearchTerm || (empDeptFilter && empDeptFilter !== 'all') ? ' trouvé' + (filtered.length > 1 ? 's' : '') : ''}
+                    {debouncedEmpSearch || (empDeptFilter && empDeptFilter !== 'all') ? ' trouvé' + (filtered.length > 1 ? 's' : '') : ''}
                   </p>
                   
                   {/* Cards Grid */}
@@ -4486,5 +4766,14 @@ export default function App() {
         )}
       </main>
     </div>
+  );
+}
+
+// Export avec Error Boundary
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
