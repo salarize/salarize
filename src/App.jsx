@@ -656,58 +656,273 @@ function FeaturesPage({ onLogin, user, onGoToDashboard }) {
 }
 
 // Profile Page
-function ProfilePage({ user, onLogout }) {
+function ProfilePage({ user, onLogout, companies, setCurrentPage }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  
+  // Calculer les stats globales
+  const stats = useMemo(() => {
+    let totalEmployees = 0;
+    let totalCost = 0;
+    let totalPeriods = new Set();
+    let totalDepts = new Set();
+    
+    Object.values(companies || {}).forEach(company => {
+      const emps = company.employees || [];
+      totalEmployees += new Set(emps.map(e => e.name)).size;
+      totalCost += emps.reduce((s, e) => s + (e.totalCost || 0), 0);
+      emps.forEach(e => {
+        if (e.period) totalPeriods.add(e.period);
+        const dept = e.department || company.mapping?.[e.name];
+        if (dept) totalDepts.add(dept);
+      });
+    });
+    
+    return {
+      companies: Object.keys(companies || {}).length,
+      employees: totalEmployees,
+      cost: totalCost,
+      periods: totalPeriods.size,
+      departments: totalDepts.size
+    };
+  }, [companies]);
+  
+  // Date d'inscription (simulation basée sur l'ID Google)
+  const memberSince = useMemo(() => {
+    // On simule une date basée sur le hash de l'email
+    const hash = user?.email?.split('').reduce((a, b) => a + b.charCodeAt(0), 0) || 0;
+    const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    const month = months[hash % 12];
+    const year = 2024 + (hash % 2);
+    return `${month} ${year}`;
+  }, [user?.email]);
+  
   return (
     <div className="min-h-screen bg-slate-950 pt-24 pb-12">
-      <div className="max-w-2xl mx-auto px-6">
-        <h1 className="text-3xl font-bold text-white mb-8">Mon profil</h1>
+      <div className="max-w-4xl mx-auto px-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-white">Mon profil</h1>
+          <button
+            onClick={() => setCurrentPage('dashboard')}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Retour au dashboard
+          </button>
+        </div>
         
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-          {/* Profile Header */}
-          <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-8">
-            <div className="flex items-center gap-6">
-              <img src={user.picture} alt="" className="w-20 h-20 rounded-2xl" />
-              <div>
-                <h2 className="text-2xl font-bold text-white">{user.name}</h2>
-                <p className="text-slate-400">{user.email}</p>
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Colonne gauche - Infos profil */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Carte profil */}
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+              <div className="bg-gradient-to-br from-violet-600/30 to-fuchsia-600/30 p-6 text-center">
+                <img 
+                  src={user?.picture} 
+                  alt="" 
+                  className="w-24 h-24 rounded-2xl mx-auto mb-4 border-4 border-white/20"
+                />
+                <h2 className="text-xl font-bold text-white">{user?.name}</h2>
+                <p className="text-slate-400 text-sm mt-1">{user?.email}</p>
+                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full text-xs text-slate-300">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  Compte actif
+                </div>
               </div>
+              
+              <div className="p-4 border-t border-slate-800">
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-slate-500 text-sm">Membre depuis</span>
+                  <span className="text-white text-sm">{memberSince}</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-slate-500 text-sm">Connexion</span>
+                  <div className="flex items-center gap-1.5">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    <span className="text-white text-sm">Google</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Actions rapides */}
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-2">
+              <button
+                onClick={() => setCurrentPage('dashboard')}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors text-left"
+              >
+                <div className="w-10 h-10 bg-violet-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-white font-medium text-sm">Dashboard</p>
+                  <p className="text-slate-500 text-xs">Voir mes données</p>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => setCurrentPage('features')}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-colors text-left"
+              >
+                <div className="w-10 h-10 bg-fuchsia-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-white font-medium text-sm">Fonctionnalités</p>
+                  <p className="text-slate-500 text-xs">Découvrir Salarize</p>
+                </div>
+              </button>
             </div>
           </div>
           
-          {/* Profile Details */}
-          <div className="p-8 space-y-6">
-            <div>
-              <label className="text-sm text-slate-500 block mb-2">Nom complet</label>
-              <div className="px-4 py-3 bg-slate-800 rounded-xl text-white">{user.name}</div>
+          {/* Colonne droite - Stats et paramètres */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Stats globales */}
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">📊 Mes statistiques</h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-white">{stats.companies}</div>
+                  <div className="text-slate-400 text-sm mt-1">Société{stats.companies > 1 ? 's' : ''}</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-violet-400">{stats.employees}</div>
+                  <div className="text-slate-400 text-sm mt-1">Employés</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-emerald-400">{stats.periods}</div>
+                  <div className="text-slate-400 text-sm mt-1">Périodes</div>
+                </div>
+                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
+                  <div className="text-3xl font-bold text-fuchsia-400">{stats.departments}</div>
+                  <div className="text-slate-400 text-sm mt-1">Départements</div>
+                </div>
+              </div>
+              
+              {stats.cost > 0 && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300">Coût total analysé</span>
+                    <span className="text-2xl font-bold text-white">
+                      €{stats.cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="text-sm text-slate-500 block mb-2">Email</label>
-              <div className="px-4 py-3 bg-slate-800 rounded-xl text-white">{user.email}</div>
-            </div>
-            <div>
-              <label className="text-sm text-slate-500 block mb-2">Connexion</label>
-              <div className="px-4 py-3 bg-slate-800 rounded-xl text-white flex items-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Google
+            
+            {/* Mes sociétés */}
+            {stats.companies > 0 && (
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">🏢 Mes sociétés</h3>
+                <div className="space-y-2">
+                  {Object.entries(companies || {}).map(([name, data]) => (
+                    <div key={name} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        {data.logo ? (
+                          <img src={data.logo} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center text-violet-400 font-bold">
+                            {name.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-white font-medium">{name}</p>
+                          <p className="text-slate-500 text-xs">
+                            {new Set((data.employees || []).map(e => e.name)).size} employés • {(data.periods || []).length} périodes
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setCurrentPage('dashboard')}
+                        className="px-3 py-1.5 text-xs text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+                      >
+                        Voir →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Zone danger */}
+            <div className="bg-slate-900 rounded-2xl border border-red-500/20 p-6">
+              <h3 className="text-lg font-semibold text-white mb-2">⚠️ Zone dangereuse</h3>
+              <p className="text-slate-400 text-sm mb-4">Ces actions sont irréversibles.</p>
+              
+              <div className="space-y-3">
+                <button 
+                  onClick={onLogout}
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Se déconnecter
+                </button>
+                
+                <button 
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Supprimer mon compte
+                </button>
               </div>
             </div>
-          </div>
-          
-          {/* Actions */}
-          <div className="p-8 border-t border-slate-800">
-            <button 
-              onClick={onLogout}
-              className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-medium rounded-xl transition-colors"
-            >
-              Se déconnecter
-            </button>
           </div>
         </div>
+        
+        {/* Modal confirmation suppression */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-700">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-xl font-bold text-white text-center mb-2">Supprimer votre compte ?</h3>
+              <p className="text-slate-400 text-center text-sm mb-6">
+                Cette action supprimera définitivement votre compte et toutes vos données. Cette action est irréversible.
+              </p>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={() => {
+                    // TODO: Implémenter la suppression du compte
+                    alert('Fonctionnalité à venir. Contactez le support pour supprimer votre compte.');
+                    setShowDeleteConfirm(false);
+                  }}
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-colors"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -718,37 +933,55 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
   const [showDropdown, setShowDropdown] = useState(false);
   
   return (
-    <div className="fixed top-0 right-0 left-0 lg:left-64 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 z-30">
-      {/* Left side - Menu button (mobile) + Home link */}
-      <div className="flex items-center gap-3">
+    <header className="fixed top-0 right-0 left-0 lg:left-64 h-16 bg-slate-900/95 backdrop-blur-lg border-b border-white/10 flex items-center justify-between px-4 lg:px-6 z-30">
+      {/* Left side - Menu button (mobile) + Logo + Nav */}
+      <div className="flex items-center gap-4">
+        {/* Menu hamburger mobile */}
         <button 
           onClick={onMenuClick}
-          className="p-2 -ml-2 lg:hidden hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2 -ml-2 lg:hidden hover:bg-white/10 rounded-lg transition-colors"
         >
-          <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
         
+        {/* Logo visible seulement sur mobile */}
         <button 
           onClick={() => setCurrentPage('home')}
-          className="flex items-center gap-2 text-slate-500 hover:text-violet-600 transition-colors"
+          className="flex items-center gap-2 lg:hidden"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-          <span className="text-sm font-medium hidden sm:block">Accueil</span>
+          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-sm">S</span>
+          </div>
+          <span className="text-white font-bold text-lg">Salarize</span>
         </button>
+        
+        {/* Nav links desktop */}
+        <nav className="hidden lg:flex items-center gap-6">
+          <button 
+            onClick={() => setCurrentPage('home')}
+            className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
+          >
+            Accueil
+          </button>
+          <button 
+            onClick={() => setCurrentPage('features')}
+            className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
+          >
+            Fonctionnalités
+          </button>
+        </nav>
       </div>
       
       {/* Right side - Profile */}
       <div className="relative">
         <button 
           onClick={() => setShowDropdown(!showDropdown)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-slate-100 transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors"
         >
-          <img src={user?.picture} alt="" className="w-8 h-8 rounded-full" />
-          <span className="text-slate-700 text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
+          <img src={user?.picture} alt="" className="w-8 h-8 rounded-full border-2 border-white/20" />
+          <span className="text-white text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
           <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -756,7 +989,7 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
         {showDropdown && (
           <>
             <div className="fixed inset-0" onClick={() => setShowDropdown(false)} />
-            <div className="absolute right-0 top-12 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-50">
+            <div className="absolute right-0 top-14 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-50">
               <button 
                 onClick={() => { setCurrentPage('home'); setShowDropdown(false); }}
                 className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
@@ -765,6 +998,15 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
                 Accueil
+              </button>
+              <button 
+                onClick={() => { setCurrentPage('features'); setShowDropdown(false); }}
+                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Fonctionnalités
               </button>
               <button 
                 onClick={() => { setCurrentPage('profile'); setShowDropdown(false); }}
@@ -789,7 +1031,7 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
           </>
         )}
       </div>
-    </div>
+    </header>
   );
 }
 
@@ -3074,7 +3316,12 @@ function AppContent() {
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <ProfilePage user={user} onLogout={handleLogout} />
+        <ProfilePage 
+          user={user} 
+          onLogout={handleLogout} 
+          companies={companies}
+          setCurrentPage={setCurrentPage}
+        />
       </PageTransition>
     );
   }
@@ -4175,7 +4422,7 @@ function AppContent() {
         </div>
       )}
       
-      <main className="lg:ml-64 mt-14 flex-1 p-4 lg:p-6">
+      <main className="lg:ml-64 mt-16 flex-1 p-4 lg:p-6">
         <div className="flex items-center gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="relative group">
