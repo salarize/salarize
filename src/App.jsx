@@ -667,15 +667,89 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: string }
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef(null);
   
   const isGoogleUser = user?.provider === 'google' || user?.picture?.includes('googleusercontent');
   
-  // Date d'inscription simulée
+  // Date d'inscription - utiliser la vraie date si disponible
   const memberSince = useMemo(() => {
-    const hash = user?.email?.split('').reduce((a, b) => a + b.charCodeAt(0), 0) || 0;
     const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-    return `${months[hash % 12]} ${2024 + (hash % 2)}`;
-  }, [user?.email]);
+    
+    // Si on a la date de création du compte
+    if (user?.created_at) {
+      const date = new Date(user.created_at);
+      return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    }
+    
+    // Fallback: date actuelle (nouvel utilisateur)
+    const now = new Date();
+    return `${months[now.getMonth()]} ${now.getFullYear()}`;
+  }, [user?.created_at]);
+  
+  // Upload avatar
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Vérifier le type
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Veuillez sélectionner une image' });
+      return;
+    }
+    
+    // Vérifier la taille (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'L\'image ne doit pas dépasser 2MB' });
+      return;
+    }
+    
+    setUploadingAvatar(true);
+    
+    try {
+      // Vérifier qu'on a une session active
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+          setUploadingAvatar(false);
+          return;
+        }
+      }
+      
+      // Convertir en base64 pour stockage simple
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result;
+        
+        // Mettre à jour dans Supabase user metadata
+        const { error } = await supabase.auth.updateUser({
+          data: { avatar_url: base64, picture: base64 }
+        });
+        
+        if (error) {
+          setMessage({ type: 'error', text: error.message });
+          setUploadingAvatar(false);
+          return;
+        }
+        
+        // Mettre à jour localement
+        const updatedUser = { ...user, picture: base64 };
+        if (onUpdateUser) {
+          onUpdateUser(updatedUser);
+        }
+        localStorage.setItem('salarize_user', JSON.stringify(updatedUser));
+        
+        setMessage({ type: 'success', text: 'Photo de profil mise à jour' });
+        setUploadingAvatar(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Erreur lors de l\'upload' });
+      setUploadingAvatar(false);
+    }
+  };
   
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
@@ -690,11 +764,30 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     
     setSaving(true);
     try {
+      // Vérifier qu'on a une session active
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Essayer de rafraîchir la session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+          setSaving(false);
+          return;
+        }
+      }
+      
       // Mise à jour via Supabase
-      const { error } = await supabase.auth.updateUser({
-        email: editEmail !== user?.email ? editEmail : undefined,
+      const updateData = {
         data: { full_name: editName, name: editName }
-      });
+      };
+      
+      // Seulement ajouter l'email s'il a changé
+      if (editEmail !== user?.email) {
+        updateData.email = editEmail;
+      }
+      
+      const { error } = await supabase.auth.updateUser(updateData);
       
       if (error) throw error;
       
@@ -703,12 +796,17 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
         onUpdateUser({ ...user, name: editName, email: editEmail });
       }
       
+      // Mettre à jour le localStorage aussi
+      const updatedUser = { ...user, name: editName, email: editEmail };
+      localStorage.setItem('salarize_user', JSON.stringify(updatedUser));
+      
       setMessage({ type: 'success', text: editEmail !== user?.email 
         ? 'Profil mis à jour. Un email de confirmation a été envoyé.' 
         : 'Profil mis à jour avec succès' 
       });
       setIsEditing(false);
     } catch (err) {
+      console.error('Update error:', err);
       setMessage({ type: 'error', text: err.message || 'Erreur lors de la mise à jour' });
     }
     setSaving(false);
@@ -726,6 +824,17 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
     
     setSaving(true);
     try {
+      // Vérifier qu'on a une session active
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          setMessage({ type: 'error', text: 'Session expirée. Veuillez vous reconnecter.' });
+          setSaving(false);
+          return;
+        }
+      }
+      
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
@@ -789,11 +898,36 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
             {/* Carte profil */}
             <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
               <div className="bg-gradient-to-br from-violet-600/30 to-fuchsia-600/30 p-6 text-center">
-                <div className="relative inline-block">
+                <div className="relative inline-block group">
                   <img 
                     src={user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=8B5CF6&color=fff`} 
                     alt="" 
-                    className="w-24 h-24 rounded-2xl mx-auto border-4 border-white/20"
+                    className="w-24 h-24 rounded-2xl mx-auto border-4 border-white/20 object-cover"
+                  />
+                  {/* Overlay pour changer la photo */}
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                    className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    {uploadingAvatar ? (
+                      <svg className="w-6 h-6 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    )}
+                  </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
                   />
                   {isGoogleUser && (
                     <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-lg">
@@ -806,7 +940,8 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
                     </div>
                   )}
                 </div>
-                <h2 className="text-xl font-bold text-white mt-4">{user?.name}</h2>
+                <p className="text-slate-500 text-xs mt-2">Cliquez pour changer</p>
+                <h2 className="text-xl font-bold text-white mt-2">{user?.name}</h2>
                 <p className="text-slate-400 text-sm mt-1">{user?.email}</p>
                 <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full text-xs text-slate-300">
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
@@ -1863,6 +1998,11 @@ function AppContent() {
   const [comparePeriod, setComparePeriod] = useState(null);
   const [comparePeriod1, setComparePeriod1] = useState(null);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareMessage, setShareMessage] = useState('');
+  const [shareSending, setShareSending] = useState(false);
+  const [shares, setShares] = useState([]); // Liste des partages actifs
   const [selectedEmployee, setSelectedEmployee] = useState(null); // For employee evolution modal
   const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile sidebar
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false); // For period multi-select
@@ -1970,9 +2110,11 @@ function AppContent() {
       if (session?.user) {
         setUser({
           id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
           email: session.user.email,
-          picture: session.user.user_metadata?.avatar_url
+          picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+          created_at: session.user.created_at,
+          provider: session.user.app_metadata?.provider || 'email'
         });
         setCurrentPage('dashboard');
         loadFromSupabase(session.user.id);
@@ -1990,9 +2132,11 @@ function AppContent() {
       if (session?.user) {
         setUser({
           id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
           email: session.user.email,
-          picture: session.user.user_metadata?.avatar_url
+          picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+          created_at: session.user.created_at,
+          provider: session.user.app_metadata?.provider || 'email'
         });
         setCurrentPage('dashboard');
         if (Object.keys(companies).length === 0) {
@@ -3599,6 +3743,95 @@ function AppContent() {
     toast.success('Rapport PDF généré');
   };
 
+  // Partager le rapport avec un CEO/collaborateur
+  const handleShare = async () => {
+    if (!shareEmail || !activeCompany) return;
+    
+    // Valider l'email
+    if (!shareEmail.includes('@')) {
+      toast.error('Email invalide');
+      return;
+    }
+    
+    setShareSending(true);
+    
+    try {
+      // Générer un token unique pour le partage
+      const shareToken = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36);
+      
+      // Calculer les stats pour l'email
+      const totalCost = filtered.reduce((s, e) => s + e.totalCost, 0);
+      const uniqueEmps = new Set(filtered.map(e => e.name)).size;
+      const periodsCount = periods.length;
+      
+      // Sauvegarder le partage dans Supabase
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (currentUser) {
+        // Chercher l'ID de la company dans Supabase
+        const { data: companyData } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('user_id', currentUser.id)
+          .eq('name', activeCompany)
+          .single();
+        
+        if (companyData) {
+          // Créer le partage
+          const { error: shareError } = await supabase
+            .from('shares')
+            .insert({
+              company_id: companyData.id,
+              shared_by: currentUser.id,
+              shared_with_email: shareEmail,
+              token: shareToken,
+              message: shareMessage,
+              expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 jours
+            });
+          
+          if (shareError) {
+            console.error('Share error:', shareError);
+            // Continuer quand même pour envoyer l'email
+          }
+        }
+      }
+      
+      // Envoyer l'email via Supabase Edge Function ou afficher les instructions
+      // Pour l'instant, on simule l'envoi et on affiche un message
+      const shareUrl = `${window.location.origin}/shared/${shareToken}`;
+      
+      // Créer le contenu de l'email
+      const emailSubject = `Rapport salarial ${activeCompany} - Salarize`;
+      const emailBody = `
+${user?.name || 'Un utilisateur'} vous partage un rapport salarial.
+
+📊 Société: ${activeCompany}
+💰 Coût total: €${totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+👥 Employés: ${uniqueEmps}
+📅 Périodes: ${periodsCount}
+
+${shareMessage ? `Message: "${shareMessage}"` : ''}
+
+Consultez le rapport complet sur Salarize.
+      `.trim();
+      
+      // Ouvrir le client mail
+      const mailtoLink = `mailto:${shareEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+      window.open(mailtoLink, '_blank');
+      
+      toast.success(`Invitation envoyée à ${shareEmail}`);
+      setShowShareModal(false);
+      setShareEmail('');
+      setShareMessage('');
+      
+    } catch (err) {
+      console.error('Share error:', err);
+      toast.error('Erreur lors du partage');
+    }
+    
+    setShareSending(false);
+  };
+
   // Load user from localStorage
   useEffect(() => {
     try {
@@ -5035,6 +5268,16 @@ function AppContent() {
             PDF
           </button>
           
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors text-sm font-medium text-violet-700 border border-violet-200"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            Partager
+          </button>
+          
           {periods.length > 1 && (
             <div className="relative">
               <button
@@ -5993,6 +6236,127 @@ function AppContent() {
                     Fermer
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Share Modal */}
+        {showShareModal && (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}
+          >
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Partager le rapport</h2>
+                      <p className="text-violet-200 text-sm">{activeCompany}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowShareModal(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6">
+                <p className="text-slate-600 text-sm mb-4">
+                  Envoyez un résumé du rapport à votre CEO ou collaborateur. Il recevra un email avec les statistiques clés.
+                </p>
+                
+                {/* Stats preview */}
+                <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                      <div className="text-lg font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                      <div className="text-xs text-slate-500">Coût total</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-violet-600">{uniqueNames}</div>
+                      <div className="text-xs text-slate-500">Employés</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-fuchsia-600">{periods.length}</div>
+                      <div className="text-xs text-slate-500">Périodes</div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Form */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-2">
+                      Email du destinataire *
+                    </label>
+                    <input
+                      type="email"
+                      value={shareEmail}
+                      onChange={(e) => setShareEmail(e.target.value)}
+                      placeholder="ceo@entreprise.com"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none transition-colors"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-2">
+                      Message (optionnel)
+                    </label>
+                    <textarea
+                      value={shareMessage}
+                      onChange={(e) => setShareMessage(e.target.value)}
+                      placeholder="Voici le rapport salarial du mois..."
+                      rows={3}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none transition-colors resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3">
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="flex-1 py-3 border border-slate-200 rounded-xl font-medium hover:bg-slate-100 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleShare}
+                  disabled={!shareEmail || shareSending}
+                  className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl font-medium hover:from-violet-600 hover:to-fuchsia-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {shareSending ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Envoi...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Envoyer par email
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
