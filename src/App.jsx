@@ -656,45 +656,92 @@ function FeaturesPage({ onLogin, user, onGoToDashboard }) {
 }
 
 // Profile Page
-function ProfilePage({ user, onLogout, companies, setCurrentPage }) {
+function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(user?.name || '');
+  const [editEmail, setEditEmail] = useState(user?.email || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null); // { type: 'success' | 'error', text: string }
   
-  // Calculer les stats globales
-  const stats = useMemo(() => {
-    let totalEmployees = 0;
-    let totalCost = 0;
-    let totalPeriods = new Set();
-    let totalDepts = new Set();
-    
-    Object.values(companies || {}).forEach(company => {
-      const emps = company.employees || [];
-      totalEmployees += new Set(emps.map(e => e.name)).size;
-      totalCost += emps.reduce((s, e) => s + (e.totalCost || 0), 0);
-      emps.forEach(e => {
-        if (e.period) totalPeriods.add(e.period);
-        const dept = e.department || company.mapping?.[e.name];
-        if (dept) totalDepts.add(dept);
-      });
-    });
-    
-    return {
-      companies: Object.keys(companies || {}).length,
-      employees: totalEmployees,
-      cost: totalCost,
-      periods: totalPeriods.size,
-      departments: totalDepts.size
-    };
-  }, [companies]);
+  const isGoogleUser = user?.provider === 'google' || user?.picture?.includes('googleusercontent');
   
-  // Date d'inscription (simulation basée sur l'ID Google)
+  // Date d'inscription simulée
   const memberSince = useMemo(() => {
-    // On simule une date basée sur le hash de l'email
     const hash = user?.email?.split('').reduce((a, b) => a + b.charCodeAt(0), 0) || 0;
     const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-    const month = months[hash % 12];
-    const year = 2024 + (hash % 2);
-    return `${month} ${year}`;
+    return `${months[hash % 12]} ${2024 + (hash % 2)}`;
   }, [user?.email]);
+  
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      setMessage({ type: 'error', text: 'Le nom ne peut pas être vide' });
+      return;
+    }
+    
+    if (editEmail !== user?.email && !editEmail.includes('@')) {
+      setMessage({ type: 'error', text: 'Email invalide' });
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      // Mise à jour via Supabase
+      const { error } = await supabase.auth.updateUser({
+        email: editEmail !== user?.email ? editEmail : undefined,
+        data: { full_name: editName, name: editName }
+      });
+      
+      if (error) throw error;
+      
+      // Mettre à jour localement
+      if (onUpdateUser) {
+        onUpdateUser({ ...user, name: editName, email: editEmail });
+      }
+      
+      setMessage({ type: 'success', text: editEmail !== user?.email 
+        ? 'Profil mis à jour. Un email de confirmation a été envoyé.' 
+        : 'Profil mis à jour avec succès' 
+      });
+      setIsEditing(false);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Erreur lors de la mise à jour' });
+    }
+    setSaving(false);
+  };
+  
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      setMessage({ type: 'error', text: 'Le mot de passe doit contenir au moins 6 caractères' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage({ type: 'error', text: 'Les mots de passe ne correspondent pas' });
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+      
+      if (error) throw error;
+      
+      setMessage({ type: 'success', text: 'Mot de passe modifié avec succès' });
+      setShowPasswordSection(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Erreur lors du changement de mot de passe' });
+    }
+    setSaving(false);
+  };
   
   return (
     <div className="min-h-screen bg-slate-950 pt-24 pb-12">
@@ -713,18 +760,53 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage }) {
           </button>
         </div>
         
+        {/* Message de feedback */}
+        {message && (
+          <div className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
+            message.type === 'success' ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-red-500/20 border border-red-500/30'
+          }`}>
+            {message.type === 'success' ? (
+              <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            <span className={message.type === 'success' ? 'text-emerald-300' : 'text-red-300'}>{message.text}</span>
+            <button onClick={() => setMessage(null)} className="ml-auto text-slate-400 hover:text-white">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Colonne gauche - Infos profil */}
           <div className="lg:col-span-1 space-y-6">
             {/* Carte profil */}
             <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
               <div className="bg-gradient-to-br from-violet-600/30 to-fuchsia-600/30 p-6 text-center">
-                <img 
-                  src={user?.picture} 
-                  alt="" 
-                  className="w-24 h-24 rounded-2xl mx-auto mb-4 border-4 border-white/20"
-                />
-                <h2 className="text-xl font-bold text-white">{user?.name}</h2>
+                <div className="relative inline-block">
+                  <img 
+                    src={user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=8B5CF6&color=fff`} 
+                    alt="" 
+                    className="w-24 h-24 rounded-2xl mx-auto border-4 border-white/20"
+                  />
+                  {isGoogleUser && (
+                    <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-lg">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <h2 className="text-xl font-bold text-white mt-4">{user?.name}</h2>
                 <p className="text-slate-400 text-sm mt-1">{user?.email}</p>
                 <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full text-xs text-slate-300">
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
@@ -738,16 +820,8 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage }) {
                   <span className="text-white text-sm">{memberSince}</span>
                 </div>
                 <div className="flex items-center justify-between py-2">
-                  <span className="text-slate-500 text-sm">Connexion</span>
-                  <div className="flex items-center gap-1.5">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    <span className="text-white text-sm">Google</span>
-                  </div>
+                  <span className="text-slate-500 text-sm">Type de compte</span>
+                  <span className="text-white text-sm">{isGoogleUser ? 'Google' : 'Email'}</span>
                 </div>
               </div>
             </div>
@@ -786,45 +860,158 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage }) {
             </div>
           </div>
           
-          {/* Colonne droite - Stats et paramètres */}
+          {/* Colonne droite - Paramètres */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Stats globales */}
+            {/* Modifier le profil */}
             <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">📊 Mes statistiques</h3>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-white">{stats.companies}</div>
-                  <div className="text-slate-400 text-sm mt-1">Société{stats.companies > 1 ? 's' : ''}</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-violet-400">{stats.employees}</div>
-                  <div className="text-slate-400 text-sm mt-1">Employés</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-emerald-400">{stats.periods}</div>
-                  <div className="text-slate-400 text-sm mt-1">Périodes</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-fuchsia-400">{stats.departments}</div>
-                  <div className="text-slate-400 text-sm mt-1">Départements</div>
-                </div>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">✏️ Informations personnelles</h3>
+                {!isEditing && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="px-4 py-2 text-sm text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+                  >
+                    Modifier
+                  </button>
+                )}
               </div>
               
-              {stats.cost > 0 && (
-                <div className="mt-4 p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-300">Coût total analysé</span>
-                    <span className="text-2xl font-bold text-white">
-                      €{stats.cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
-                    </span>
+              {isEditing ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-2">Nom complet</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                      placeholder="Votre nom"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-2">
+                      Email
+                      {isGoogleUser && <span className="text-amber-400 ml-2">(lié à Google)</span>}
+                    </label>
+                    <input
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      disabled={isGoogleUser}
+                      className={`w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors ${isGoogleUser ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      placeholder="votre@email.com"
+                    />
+                    {isGoogleUser && (
+                      <p className="text-xs text-slate-500 mt-2">L'email est géré par votre compte Google</p>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditName(user?.name || '');
+                        setEditEmail(user?.email || '');
+                      }}
+                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={saving}
+                      className="flex-1 py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {saving && (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      )}
+                      Enregistrer
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-3 border-b border-slate-800">
+                    <span className="text-slate-400">Nom</span>
+                    <span className="text-white">{user?.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-slate-400">Email</span>
+                    <span className="text-white">{user?.email}</span>
                   </div>
                 </div>
               )}
             </div>
             
+            {/* Changer mot de passe - seulement pour les comptes email */}
+            {!isGoogleUser && (
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white">🔐 Mot de passe</h3>
+                  {!showPasswordSection && (
+                    <button
+                      onClick={() => setShowPasswordSection(true)}
+                      className="px-4 py-2 text-sm text-violet-400 hover:bg-violet-500/10 rounded-lg transition-colors"
+                    >
+                      Modifier
+                    </button>
+                  )}
+                </div>
+                
+                {showPasswordSection ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm text-slate-400 block mb-2">Nouveau mot de passe</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-slate-400 block mb-2">Confirmer le mot de passe</label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                    
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => {
+                          setShowPasswordSection(false);
+                          setNewPassword('');
+                          setConfirmPassword('');
+                        }}
+                        className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        onClick={handleChangePassword}
+                        disabled={saving || newPassword.length < 6}
+                        className="flex-1 py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50"
+                      >
+                        Changer le mot de passe
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-sm">••••••••••••</p>
+                )}
+              </div>
+            )}
+            
             {/* Mes sociétés */}
-            {stats.companies > 0 && (
+            {Object.keys(companies || {}).length > 0 && (
               <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">🏢 Mes sociétés</h3>
                 <div className="space-y-2">
@@ -910,9 +1097,20 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage }) {
                   Annuler
                 </button>
                 <button 
-                  onClick={() => {
-                    // TODO: Implémenter la suppression du compte
-                    alert('Fonctionnalité à venir. Contactez le support pour supprimer votre compte.');
+                  onClick={async () => {
+                    try {
+                      // Supprimer les données de l'utilisateur
+                      const { data: { user: currentUser } } = await supabase.auth.getUser();
+                      if (currentUser) {
+                        // Supprimer les sociétés (cascade supprimera employees et mappings)
+                        await supabase.from('companies').delete().eq('user_id', currentUser.id);
+                      }
+                      // Déconnecter
+                      await supabase.auth.signOut();
+                      onLogout();
+                    } catch (err) {
+                      setMessage({ type: 'error', text: 'Erreur lors de la suppression' });
+                    }
                     setShowDeleteConfirm(false);
                   }}
                   className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-colors"
@@ -923,6 +1121,320 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage }) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Auth Modal - Connexion / Inscription
+function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
+  const [tab, setTab] = useState(defaultTab); // 'login' | 'signup'
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setName('');
+    setError('');
+    setSuccess('');
+  };
+  
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          }
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  
+  const handleEmailLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Veuillez remplir tous les champs');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        onSuccess({
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || email.split('@')[0],
+          picture: data.user.user_metadata?.avatar_url || null,
+          provider: 'email'
+        });
+        onClose();
+      }
+    } catch (err) {
+      setError(err.message === 'Invalid login credentials' 
+        ? 'Email ou mot de passe incorrect' 
+        : err.message);
+    }
+    setLoading(false);
+  };
+  
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    
+    if (!email || !password || !name) {
+      setError('Veuillez remplir tous les champs');
+      return;
+    }
+    
+    if (password.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+            full_name: name
+          }
+        }
+      });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        if (data.user.identities?.length === 0) {
+          setError('Cet email est déjà utilisé');
+        } else {
+          setSuccess('Compte créé ! Vérifiez votre email pour confirmer votre inscription.');
+          resetForm();
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+  
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Veuillez entrer votre email');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      if (error) throw error;
+      setSuccess('Un email de réinitialisation a été envoyé');
+    } catch (err) {
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+      <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-6 text-center relative">
+          <button 
+            onClick={onClose}
+            className="absolute right-4 top-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          
+          <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <span className="text-white font-bold text-2xl">S</span>
+          </div>
+          <h2 className="text-2xl font-bold text-white">
+            {tab === 'login' ? 'Connexion' : 'Créer un compte'}
+          </h2>
+          <p className="text-slate-400 text-sm mt-1">
+            {tab === 'login' ? 'Accédez à votre espace Salarize' : 'Rejoignez Salarize gratuitement'}
+          </p>
+        </div>
+        
+        {/* Tabs */}
+        <div className="flex border-b border-slate-700">
+          <button
+            onClick={() => { setTab('login'); resetForm(); }}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              tab === 'login' 
+                ? 'text-violet-400 border-b-2 border-violet-400' 
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            Connexion
+          </button>
+          <button
+            onClick={() => { setTab('signup'); resetForm(); }}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              tab === 'signup' 
+                ? 'text-violet-400 border-b-2 border-violet-400' 
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            Inscription
+          </button>
+        </div>
+        
+        {/* Content */}
+        <div className="p-6">
+          {/* Messages */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {error}
+            </div>
+          )}
+          
+          {success && (
+            <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-300 text-sm flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {success}
+            </div>
+          )}
+          
+          {/* Google Button */}
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full py-3 bg-white hover:bg-slate-100 text-slate-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-3 mb-4"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Continuer avec Google
+          </button>
+          
+          <div className="flex items-center gap-4 mb-4">
+            <div className="flex-1 h-px bg-slate-700"></div>
+            <span className="text-slate-500 text-xs">ou par email</span>
+            <div className="flex-1 h-px bg-slate-700"></div>
+          </div>
+          
+          {/* Form */}
+          <form onSubmit={tab === 'login' ? handleEmailLogin : handleSignup} className="space-y-4">
+            {tab === 'signup' && (
+              <div>
+                <label className="text-sm text-slate-400 block mb-2">Nom complet</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                  placeholder="Jean Dupont"
+                />
+              </div>
+            )}
+            
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                placeholder="vous@exemple.com"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm text-slate-400 block mb-2">Mot de passe</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                placeholder="••••••••"
+              />
+            </div>
+            
+            {tab === 'signup' && (
+              <div>
+                <label className="text-sm text-slate-400 block mb-2">Confirmer le mot de passe</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+            )}
+            
+            {tab === 'login' && (
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-sm text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                Mot de passe oublié ?
+              </button>
+            )}
+            
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading && (
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {tab === 'login' ? 'Se connecter' : 'Créer mon compte'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
@@ -1354,6 +1866,7 @@ function AppContent() {
   const [selectedEmployee, setSelectedEmployee] = useState(null); // For employee evolution modal
   const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile sidebar
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false); // For period multi-select
+  const [showAuthModal, setShowAuthModal] = useState(false); // For auth modal
   
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
@@ -1979,27 +2492,14 @@ function AppContent() {
   };
 
   // Google Login
-  const handleLogin = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'select_account',
-          }
-        }
-      });
-      
-      if (error) {
-        console.error('Login error:', error);
-        alert('Erreur de connexion: ' + error.message);
-      }
-    } catch (err) {
-      console.error('Login exception:', err);
-      alert('Exception: ' + err.message);
-    }
+  const handleLogin = () => {
+    setShowAuthModal(true);
+  };
+  
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+    localStorage.setItem('salarize_user', JSON.stringify(userData));
+    setShowAuthModal(false);
   };
 
   // Logout
@@ -2019,7 +2519,7 @@ function AppContent() {
     setEmployees(c.employees || []);
     setDepartmentMapping(c.mapping || {});
     setPeriods(c.periods || []);
-    setSelectedPeriod('all');
+    setSelectedPeriods([]);
     setView('dashboard');
   };
 
@@ -3275,6 +3775,11 @@ function AppContent() {
           user={user} 
           onGoToDashboard={() => setCurrentPage('dashboard')} 
         />
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
       </PageTransition>
     );
   }
@@ -3294,6 +3799,11 @@ function AppContent() {
           onLogin={handleLogin} 
           user={user} 
           onGoToDashboard={() => setCurrentPage('dashboard')} 
+        />
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
         />
       </PageTransition>
     );
