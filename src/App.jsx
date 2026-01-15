@@ -1265,6 +1265,101 @@ export default function App() {
             onCancel={handleModalCancel}
           />
         )}
+        {pendingPeriodSelection && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">📅 Quelle période importez-vous ?</h2>
+                <button 
+                  onClick={() => setPendingPeriodSelection(null)}
+                  className="p-1 hover:bg-slate-100 rounded"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="mb-5 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                <div className="flex gap-3">
+                  <div className="text-emerald-500 mt-0.5">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-sm">
+                    <p className="font-semibold text-emerald-800 mb-1">Fichier prêt à importer</p>
+                    <p className="text-emerald-700">
+                      <strong>{pendingPeriodSelection.employees.length} employés</strong> trouvés dans ce fichier.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-5">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Sélectionnez la période de ce fichier
+                </label>
+                <div className="flex gap-2">
+                  <select 
+                    id="period-year-upload"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none text-lg"
+                    defaultValue={new Date().getFullYear()}
+                  >
+                    {[2023, 2024, 2025, 2026].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <select 
+                    id="period-month-upload"
+                    className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none"
+                    defaultValue={String(new Date().getMonth() + 1).padStart(2, '0')}
+                  >
+                    {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
+                      <option key={m} value={m}>
+                        {['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][parseInt(m) - 1]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setPendingPeriodSelection(null)}
+                  className="flex-1 py-2.5 border border-slate-200 rounded-lg hover:bg-slate-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => {
+                    const year = document.getElementById('period-year-upload').value;
+                    const month = document.getElementById('period-month-upload').value;
+                    const period = `${year}-${month}`;
+                    
+                    const updatedEmployees = pendingPeriodSelection.employees.map(e => ({
+                      ...e,
+                      period
+                    }));
+                    
+                    const result = {
+                      employees: updatedEmployees,
+                      periods: [period]
+                    };
+                    
+                    setDebugMsg(`${result.employees.length} entrées`);
+                    setPendingPeriodSelection(null);
+                    setPendingData(result);
+                    setShowModal(true);
+                  }}
+                  className="flex-1 py-2.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 font-medium"
+                >
+                  Importer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="bg-white rounded-3xl p-10 text-center max-w-md shadow-2xl">
           <h1 className="text-4xl font-black bg-gradient-to-r from-emerald-500 to-cyan-500 bg-clip-text text-transparent mb-1">Salarize</h1>
           <p className="text-slate-400 text-sm mb-8">Salary & Analyze</p>
