@@ -2109,7 +2109,7 @@ function AppContent() {
           created_at: session.user.created_at,
           provider: session.user.app_metadata?.provider || 'email'
         });
-        setCurrentPage('dashboard');
+        // Ne pas rediriger automatiquement - rester sur la landing page
         loadFromSupabase(session.user.id);
       } else {
         loadFromLocalStorage();
@@ -2122,7 +2122,8 @@ function AppContent() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
-      if (session?.user) {
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Seulement après une nouvelle connexion, aller au dashboard
         setUser({
           id: session.user.id,
           name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
@@ -2135,6 +2136,16 @@ function AppContent() {
         if (Object.keys(companies).length === 0) {
           loadFromSupabase(session.user.id);
         }
+      } else if (session?.user) {
+        // Session existante, juste mettre à jour l'user sans rediriger
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
+          email: session.user.email,
+          picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+          created_at: session.user.created_at,
+          provider: session.user.app_metadata?.provider || 'email'
+        });
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setCompanies({});
