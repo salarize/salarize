@@ -2788,19 +2788,121 @@ export default function App() {
 
   // Dashboard
   return (
-    <div className="min-h-screen flex bg-slate-50">
-      <Sidebar 
-        companies={companies}
-        activeCompany={activeCompany}
-        onSelectCompany={loadCompany}
-        onImportClick={() => setShowImportModal(true)}
-        onAddCompany={() => setShowNewCompanyModal(true)}
-        onManageData={() => setShowDataManager(true)}
-        onManageDepts={() => setShowDeptManager(true)}
-        debugMsg={debugMsg}
-        setCurrentPage={setCurrentPage}
-      />
-      <DashboardHeader user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+    <div className="min-h-screen bg-slate-900">
+      <LandingHeader user={user} onLogin={() => {}} onLogout={handleLogout} currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      
+      {/* Main content with padding for header */}
+      <div className="pt-20 px-6 pb-12 max-w-7xl mx-auto">
+        
+        {/* Company selector bar */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            {/* Company dropdown */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowLogoMenu(!showLogoMenu)}
+                className="flex items-center gap-3 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl hover:bg-slate-700 transition-colors"
+              >
+                {companies[activeCompany]?.logo ? (
+                  <img src={companies[activeCompany].logo} alt="" className="w-8 h-8 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-bold">
+                    {activeCompany?.charAt(0) || 'S'}
+                  </div>
+                )}
+                <span className="text-white font-semibold">{activeCompany || 'Sélectionner'}</span>
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {showLogoMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowLogoMenu(false)} />
+                  <div className="absolute top-full left-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-2 w-64 z-20">
+                    <p className="px-4 py-2 text-xs text-slate-500 uppercase">Vos sociétés</p>
+                    {Object.keys(companies).map(name => (
+                      <button
+                        key={name}
+                        onClick={() => { loadCompany(name); setShowLogoMenu(false); }}
+                        className={`w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-slate-700 transition-colors ${activeCompany === name ? 'bg-violet-500/20' : ''}`}
+                      >
+                        {companies[name]?.logo ? (
+                          <img src={companies[name].logo} alt="" className="w-6 h-6 rounded object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-slate-600 flex items-center justify-center text-xs font-bold text-white">
+                            {name.charAt(0)}
+                          </div>
+                        )}
+                        <span className={`${activeCompany === name ? 'text-violet-400' : 'text-slate-300'}`}>{name}</span>
+                      </button>
+                    ))}
+                    <div className="border-t border-slate-700 mt-2 pt-2">
+                      <button
+                        onClick={() => { setShowNewCompanyModal(true); setShowLogoMenu(false); }}
+                        className="w-full text-left px-4 py-2.5 flex items-center gap-3 text-violet-400 hover:bg-slate-700"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Nouvelle société
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Alert for unassigned employees */}
+            {(() => {
+              const unassignedCount = activeCompany && companies[activeCompany] 
+                ? new Set(
+                    (companies[activeCompany].employees || [])
+                      .filter(e => !e.department && !companies[activeCompany].mapping?.[e.name])
+                      .map(e => e.name)
+                  ).size
+                : 0;
+              
+              if (unassignedCount > 0) {
+                return (
+                  <button
+                    onClick={() => setShowDeptManager(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="text-amber-400 text-sm font-medium">{unassignedCount} sans département</span>
+                  </button>
+                );
+              }
+              return null;
+            })()}
+          </div>
+          
+          {/* Action buttons */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Importer
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-white font-medium hover:opacity-90 transition-opacity"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export PDF
+            </button>
+          </div>
+        </div>
+
       {showModal && pendingData && (
         <SelectCompanyModal 
           companies={companies}
@@ -3553,830 +3655,366 @@ export default function App() {
         </div>
       )}
       
-      <main className="ml-64 mt-14 flex-1 p-6">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="relative group">
-              {companies[activeCompany]?.logo ? (
-                <img src={companies[activeCompany].logo} alt="" className="w-12 h-12 rounded-lg object-cover" />
-              ) : (
-                <div className="w-12 h-12 rounded-lg bg-slate-200 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              )}
-              <button
-                onClick={() => setShowLogoMenu(!showLogoMenu)}
-                className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-              >
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      {/* Stats Cards */}
+      {activeCompany && employees.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-400 text-sm">Coût Total</span>
+              <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-              </button>
-              
-              {showLogoMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowLogoMenu(false)} />
-                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-20">
-                    <label className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      {companies[activeCompany]?.logo ? 'Modifier le logo' : 'Ajouter un logo'}
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={(e) => { handleLogoChange(e); setShowLogoMenu(false); }}
-                        className="hidden" 
-                      />
-                    </label>
-                    {companies[activeCompany]?.logo && (
-                      <button
-                        onClick={() => { handleLogoDelete(); setShowLogoMenu(false); }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Supprimer le logo
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-800">{activeCompany}</h1>
-                <button
-                  onClick={() => setShowCompanySettings(true)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
-                  title="Paramètres société"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
               </div>
-              {companies[activeCompany]?.website ? (
-                <a 
-                  href={companies[activeCompany].website.startsWith('http') ? companies[activeCompany].website : `https://${companies[activeCompany].website}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm hover:underline"
-                  style={{ color: `rgb(${getBrandColor()})` }}
-                >
-                  {companies[activeCompany].website.replace(/^https?:\/\//, '')}
-                </a>
-              ) : (
-                <p className="text-slate-400 text-sm">Analyse des coûts salariaux</p>
-              )}
             </div>
+            <div className="text-3xl font-bold text-white">€{totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+            <div className="text-sm text-slate-500 mt-1">{selectedPeriod === 'all' ? 'Toutes périodes' : formatPeriod(selectedPeriod)}</div>
           </div>
-          <div className="flex-1" />
           
-          <button
-            onClick={handleExportPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm font-medium text-slate-700"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Exporter PDF
-          </button>
-          
-          {periods.length > 1 && (
-            <select 
-              value={selectedPeriod} 
-              onChange={e => setSelectedPeriod(e.target.value)} 
-              className="px-3 py-2 border border-slate-200 rounded-lg bg-white"
-            >
-              <option value="all">Toutes périodes</option>
-              {(() => {
-                const grouped = periods.reduce((acc, p) => {
-                  const year = p.substring(0, 4);
-                  if (!acc[year]) acc[year] = [];
-                  acc[year].push(p);
-                  return acc;
-                }, {});
-                
-                return Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => (
-                  <optgroup key={year} label={`── ${year} ──`}>
-                    {yearPeriods.sort().reverse().map(p => (
-                      <option key={p} value={p}>{formatPeriod(p)}</option>
-                    ))}
-                  </optgroup>
-                ));
-              })()}
-            </select>
-          )}
-        </div>
-
-        {/* Data Manager Modal */}
-        {showDataManager && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
-              
-              {/* Confirmation overlay */}
-              {confirmAction && (
-                <div className="absolute inset-0 bg-white rounded-2xl p-6 flex flex-col items-center justify-center z-10">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-                    confirmAction.type === 'delete' ? 'bg-red-100' : 'bg-amber-100'
-                  }`}>
-                    <svg className={`w-8 h-8 ${confirmAction.type === 'delete' ? 'text-red-600' : 'text-amber-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">
-                    {confirmAction.type === 'delete' && 'Supprimer la société ?'}
-                    {confirmAction.type === 'clear' && 'Réinitialiser les données ?'}
-                    {confirmAction.type === 'deletePeriod' && `Supprimer ${formatPeriod(confirmAction.period)} ?`}
-                  </h3>
-                  
-                  <p className="text-slate-500 text-center mb-6">
-                    {confirmAction.type === 'delete' && `"${activeCompany}" et toutes ses données seront supprimés définitivement.`}
-                    {confirmAction.type === 'clear' && `Toutes les données de "${activeCompany}" seront supprimées. La société sera conservée.`}
-                    {confirmAction.type === 'deletePeriod' && `Les données de la période ${formatPeriod(confirmAction.period)} seront supprimées.`}
-                  </p>
-                  
-                  <div className="flex gap-3 w-full max-w-xs">
-                    <button
-                      onClick={() => setConfirmAction(null)}
-                      className="flex-1 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 font-medium"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirmAction.type === 'delete') {
-                          deleteCompany();
-                        } else if (confirmAction.type === 'clear') {
-                          clearCompanyData();
-                          setShowDataManager(false);
-                        } else if (confirmAction.type === 'deletePeriod') {
-                          deletePeriod(confirmAction.period);
-                        }
-                        setConfirmAction(null);
-                      }}
-                      className={`flex-1 py-2 rounded-lg font-medium text-white ${
-                        confirmAction.type === 'delete' ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'
-                      }`}
-                    >
-                      Confirmer
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold">⚙️ Gestion des données</h2>
-                <button 
-                  onClick={() => { setShowDataManager(false); setConfirmAction(null); }}
-                  className="p-1 hover:bg-slate-100 rounded"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="mb-6">
-                <h3 className="font-semibold text-slate-700 mb-3">📅 Périodes importées</h3>
-                {periods.length === 0 ? (
-                  <p className="text-slate-400 text-sm">Aucune donnée importée</p>
-                ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {/* Grouper par année */}
-                    {Object.entries(
-                      periods.reduce((acc, period) => {
-                        const year = period.substring(0, 4);
-                        if (!acc[year]) acc[year] = [];
-                        acc[year].push(period);
-                        return acc;
-                      }, {})
-                    ).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => {
-                      const yearTotal = yearPeriods.reduce((sum, p) => {
-                        return sum + employees.filter(e => e.period === p).reduce((s, e) => s + e.totalCost, 0);
-                      }, 0);
-                      const yearEmps = yearPeriods.reduce((sum, p) => {
-                        return sum + employees.filter(e => e.period === p).length;
-                      }, 0);
-                      
-                      return (
-                        <details key={year} className="bg-slate-50 rounded-lg" open>
-                          <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-slate-800">{year}</span>
-                              <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">
-                                {yearPeriods.length} mois
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-slate-600">
-                                €{yearTotal.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                              </span>
-                              <button
-                                onClick={(e) => { e.preventDefault(); exportYearToExcel(year); }}
-                                className="p-1.5 text-violet-500 hover:text-violet-700 hover:bg-violet-50 rounded transition-colors"
-                                title={`Télécharger ${year}`}
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                              </button>
-                            </div>
-                          </summary>
-                          <div className="px-3 pb-2 space-y-1">
-                            {yearPeriods.sort().map(period => {
-                              const periodEmps = employees.filter(e => e.period === period);
-                              const periodTotal = periodEmps.reduce((s, e) => s + e.totalCost, 0);
-                              return (
-                                <div key={period} className="flex items-center justify-between py-1.5 px-2 hover:bg-slate-100 rounded text-sm group">
-                                  <span className="text-slate-600">{['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'][parseInt(period.substring(5), 10) - 1]}</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-slate-500">
-                                      €{periodTotal.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                                    </span>
-                                    <button
-                                      onClick={() => exportPeriodToExcel(period)}
-                                      className="p-1 text-violet-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                      title="Télécharger ce mois"
-                                    >
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                      </svg>
-                                    </button>
-                                    <button
-                                      onClick={() => setConfirmAction({ type: 'deletePeriod', period })}
-                                      className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                      title="Supprimer"
-                                    >
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </details>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              
-              <div className="border-t border-slate-200 pt-6 space-y-3">
-                <h3 className="font-semibold text-slate-700 mb-3">🔧 Actions</h3>
-                
-                <label className="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:border-violet-500 hover:bg-violet-50 transition-colors">
-                  <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-700">Importer de nouvelles données</p>
-                    <p className="text-slate-400 text-sm">Ajouter un fichier Excel</p>
-                  </div>
-                  <input 
-                    type="file" 
-                    accept=".xlsx,.xls" 
-                    onChange={(e) => { handleFileChange(e); setShowDataManager(false); }}
-                    className="hidden" 
-                  />
-                </label>
-                
-                <button
-                  onClick={() => setConfirmAction({ type: 'clear' })}
-                  className="flex items-center gap-3 w-full p-3 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors text-left"
-                >
-                  <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-amber-700">Réinitialiser les données</p>
-                    <p className="text-slate-400 text-sm">Supprimer toutes les données importées</p>
-                  </div>
-                </button>
-                
-                <button
-                  onClick={() => setConfirmAction({ type: 'delete' })}
-                  className="flex items-center gap-3 w-full p-3 border border-red-200 rounded-lg hover:bg-red-50 transition-colors text-left"
-                >
-                  <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-medium text-red-600">Supprimer la société</p>
-                    <p className="text-slate-400 text-sm">Supprimer {activeCompany} et toutes ses données</p>
-                  </div>
-                </button>
+          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-400 text-sm">Employés</span>
+              <div className="w-10 h-10 bg-fuchsia-500/20 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
               </div>
             </div>
+            <div className="text-3xl font-bold text-white">{uniqueNames}</div>
+            <div className="text-sm text-slate-500 mt-1">Collaborateurs uniques</div>
           </div>
-        )}
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Coût Total</p>
-            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
+          
+          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-400 text-sm">Départements</span>
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-white">{Object.keys(deptStats).length}</div>
+            <div className="text-sm text-slate-500 mt-1">Départements actifs</div>
           </div>
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Employés</p>
-            <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
-          </div>
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Départements</p>
-            <p className="text-2xl font-bold text-slate-800">{Object.keys(deptStats).length}</p>
-          </div>
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Coût Moyen</p>
-            <p className="text-2xl font-bold text-slate-800">€{(totalCost / (uniqueNames || 1)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          
+          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-slate-400 text-sm">Coût Moyen</span>
+              <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-3xl font-bold text-white">€{uniqueNames > 0 ? Math.round(totalCost / uniqueNames).toLocaleString('fr-BE') : 0}</div>
+            <div className="text-sm text-slate-500 mt-1">Par employé</div>
           </div>
         </div>
-
-        {/* Evolution Chart */}
-        {chartData.length >= 1 && (
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-slate-800">📊 Évolution des coûts salariaux</h2>
-              {years.length > 1 && (
-                <select
-                  value={selectedYear}
-                  onChange={e => setSelectedYear(e.target.value)}
-                  className="px-3 py-1 border border-slate-200 rounded-lg bg-white text-sm"
-                >
-                  <option value="all">Toutes les années</option>
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              )}
-            </div>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="period" 
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    tickLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => {
-                      const month = parseInt(value.substring(5), 10);
-                      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-                      const year = value.substring(2, 4);
-                      return `${monthNames[month - 1]} '${year}`;
-                    }}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip 
-                    formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût total']}
-                    labelFormatter={(label) => formatPeriod(label)}
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: 'none', 
-                      borderRadius: '8px',
-                      color: '#fff'
-                    }}
-                    labelStyle={{ color: '#94a3b8' }}
-                  />
-                  <Bar 
-                    dataKey="total" 
-                    fill={`rgb(${getBrandColor()})`}
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+      )}
+      
+      {/* Main content grid */}
+      {activeCompany && employees.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left column - Charts */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Evolution Chart */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">📈 Évolution des coûts</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={periods.map(period => {
+                    const periodEmps = employees.filter(e => e.period === period);
+                    return {
+                      name: formatPeriod(period),
+                      cost: periodEmps.reduce((s, e) => s + e.totalCost, 0)
+                    };
+                  }).sort((a, b) => a.name.localeCompare(b.name))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} tickFormatter={(v) => `€${(v/1000).toFixed(0)}k`} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      labelStyle={{ color: '#f1f5f9' }}
+                      formatter={(value) => [`€${value.toLocaleString('fr-BE')}`, 'Coût']}
+                    />
+                    <Line type="monotone" dataKey="cost" stroke="#8B5CF6" strokeWidth={3} dot={{ fill: '#8B5CF6', strokeWidth: 2 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
             
-            {chartData.length >= 2 && (
-              <div className="mt-4 flex gap-4 justify-center text-sm flex-wrap">
-                <div className="bg-slate-50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-500">Mois précédent: </span>
-                  <span className="font-bold text-slate-800">
-                    €{chartData[chartData.length - 2].total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="bg-slate-50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-500">Mois actuel: </span>
-                  <span className="font-bold text-slate-800">
-                    €{chartData[chartData.length - 1].total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="bg-slate-50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-500">Variation: </span>
-                  <span className={`font-bold ${
-                    chartData[chartData.length - 1].total >= chartData[chartData.length - 2].total 
-                      ? 'text-red-500' 
-                      : 'text-violet-500'
-                  }`}>
-                    {chartData[chartData.length - 1].total >= chartData[chartData.length - 2].total ? '↑' : '↓'}
-                    {' '}
-                    {Math.abs(
-                      ((chartData[chartData.length - 1].total - chartData[chartData.length - 2].total) / 
-                      chartData[chartData.length - 2].total) * 100
-                    ).toFixed(1)}%
-                  </span>
-                </div>
-                {/* Même mois années précédentes */}
-                {(() => {
-                  const currentPeriod = chartData[chartData.length - 1].period;
-                  const currentMonth = currentPeriod.substring(5); // "03" par exemple
-                  const currentYear = parseInt(currentPeriod.substring(0, 4));
-                  
-                  const sameMonthPrevYears = chartData.filter(d => {
-                    const month = d.period.substring(5);
-                    const year = parseInt(d.period.substring(0, 4));
-                    return month === currentMonth && year < currentYear;
-                  }).sort((a, b) => b.period.localeCompare(a.period));
-                  
-                  if (sameMonthPrevYears.length === 0) return null;
-                  
-                  return sameMonthPrevYears.map((prev, idx) => {
-                    const variation = ((chartData[chartData.length - 1].total - prev.total) / prev.total * 100);
-                    const yearDiff = currentYear - parseInt(prev.period.substring(0, 4));
-                    const label = yearDiff === 1 ? 'Année préc. (même mois)' : `${prev.period.substring(0, 4)} (même mois)`;
-                    
-                    return (
-                      <div key={prev.period} className="bg-slate-50 px-4 py-2 rounded-lg">
-                        <span className="text-slate-500">{label}: </span>
-                        <span className="font-bold text-slate-800">
-                          €{prev.total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                        <span className={`ml-2 text-xs font-medium ${variation >= 0 ? 'text-red-500' : 'text-violet-500'}`}>
-                          ({variation >= 0 ? '+' : ''}{variation.toFixed(1)}%)
-                        </span>
+            {/* Department breakdown */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">🏢 Répartition par département</h3>
+              <div className="space-y-3">
+                {sortedDepts.slice(0, 6).map(([dept, data], idx) => {
+                  const pct = (data.total / totalCost * 100);
+                  return (
+                    <div key={dept} className="flex items-center gap-4">
+                      <div className="w-32 text-sm text-slate-300 truncate">{dept}</div>
+                      <div className="flex-1 h-8 bg-slate-700/50 rounded-lg overflow-hidden">
+                        <div 
+                          className="h-full rounded-lg flex items-center justify-end px-3"
+                          style={{ 
+                            width: `${pct}%`, 
+                            background: `linear-gradient(90deg, ${CHART_COLORS[idx % CHART_COLORS.length]}, ${CHART_COLORS[(idx + 1) % CHART_COLORS.length]})`
+                          }}
+                        >
+                          <span className="text-xs font-semibold text-white">{pct.toFixed(1)}%</span>
+                        </div>
                       </div>
-                    );
-                  });
-                })()}
+                      <div className="w-24 text-right text-sm font-semibold text-white">
+                        €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Departments */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
-          <h2 className="font-bold text-slate-800 mb-4">Répartition par Département</h2>
-          <div className="space-y-3">
-            {sortedDepts.map(([dept, data]) => (
-              <div key={dept} className="flex items-center gap-4">
-                <span className="w-28 font-medium text-sm truncate text-slate-700">{dept}</span>
-                <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full rounded-full transition-all duration-500" 
-                    style={{ 
-                      width: `${(data.total / maxCost) * 100}%`,
-                      backgroundColor: `rgb(${getBrandColor()})`
-                    }} 
-                  />
-                </div>
-                <span className="w-32 text-right font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Employee Detail Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100">
-          <div className="p-6 border-b border-slate-100">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <h2 className="font-bold text-slate-800">👥 Détail par Employé</h2>
-              
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* Search */}
-                <div className="relative">
-                  <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Rechercher..."
-                    value={empSearchTerm || ''}
-                    onChange={e => setEmpSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg w-full sm:w-48 focus:border-violet-500 outline-none text-sm"
-                  />
-                </div>
-                
-                {/* Department filter */}
-                <select
-                  value={empDeptFilter || 'all'}
-                  onChange={e => setEmpDeptFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+              {sortedDepts.length > 6 && (
+                <button 
+                  onClick={() => setShowDeptManager(true)}
+                  className="mt-4 text-sm text-violet-400 hover:text-violet-300"
                 >
-                  <option value="all">Tous les départements</option>
-                  {Object.keys(deptStats).sort().map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-                
-                {/* Sort */}
-                <select
-                  value={empSortBy || 'cost-desc'}
-                  onChange={e => setEmpSortBy(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-                >
-                  <option value="cost-desc">Coût ↓</option>
-                  <option value="cost-asc">Coût ↑</option>
-                  <option value="name-asc">Nom A→Z</option>
-                  <option value="name-desc">Nom Z→A</option>
-                </select>
-              </div>
+                  Voir tous les départements →
+                </button>
+              )}
             </div>
           </div>
           
-          {/* Employee Cards Grid */}
-          <div className="p-6">
-            {(() => {
-              // Filter and sort employees
-              let filtered = empList.filter(e => {
-                if (empSearchTerm && !e.name.toLowerCase().includes(empSearchTerm.toLowerCase())) return false;
-                if (empDeptFilter && empDeptFilter !== 'all' && e.dept !== empDeptFilter) return false;
-                return true;
-              });
+          {/* Right column - Periods & Top employees */}
+          <div className="space-y-6">
+            {/* Period selector */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">📅 Périodes</h3>
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white mb-4 focus:border-violet-500 outline-none"
+              >
+                <option value="all">Toutes les périodes</option>
+                {periods.sort().reverse().map(p => (
+                  <option key={p} value={p}>{formatPeriod(p)}</option>
+                ))}
+              </select>
               
-              // Sort
-              filtered.sort((a, b) => {
-                switch (empSortBy || 'cost-desc') {
-                  case 'cost-desc': return b.cost - a.cost;
-                  case 'cost-asc': return a.cost - b.cost;
-                  case 'name-asc': return a.name.localeCompare(b.name);
-                  case 'name-desc': return b.name.localeCompare(a.name);
-                  default: return 0;
-                }
-              });
-              
-              // Pagination
-              const itemsPerPage = 12;
-              const totalPages = Math.ceil(filtered.length / itemsPerPage);
-              const currentPage = empCurrentPage || 1;
-              const startIdx = (currentPage - 1) * itemsPerPage;
-              const paginatedEmps = filtered.slice(startIdx, startIdx + itemsPerPage);
-              
-              if (filtered.length === 0) {
-                return (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                    <p className="text-slate-500 font-medium">Aucun employé trouvé</p>
-                    <p className="text-slate-400 text-sm mt-1">Essayez de modifier vos filtres</p>
-                  </div>
-                );
-              }
-              
-              return (
-                <>
-                  {/* Results count */}
-                  <p className="text-sm text-slate-500 mb-4">
-                    {filtered.length} employé{filtered.length > 1 ? 's' : ''} 
-                    {empSearchTerm || (empDeptFilter && empDeptFilter !== 'all') ? ' trouvé' + (filtered.length > 1 ? 's' : '') : ''}
-                  </p>
-                  
-                  {/* Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-                    {paginatedEmps.map((e, i) => (
-                      <div key={i} className="bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors border border-slate-100 hover:border-slate-200">
-                        <div className="flex items-start gap-3">
-                          {/* Avatar */}
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                            e.dept === 'Non assigné' 
-                              ? 'bg-amber-100 text-amber-600' 
-                              : 'bg-violet-100 text-violet-600'
-                          }`}>
-                            {e.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-800 truncate">{e.name}</p>
-                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${
-                              e.dept === 'Non assigné' 
-                                ? 'bg-amber-100 text-amber-700' 
-                                : 'bg-slate-200 text-slate-600'
-                            }`}>
-                              {e.dept}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-3 pt-3 border-t border-slate-200">
-                          <p className="text-lg font-bold text-slate-800">
-                            €{e.cost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => setEmpCurrentPage(Math.max(1, currentPage - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        ← Préc.
-                      </button>
-                      
-                      <div className="flex gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
-                          }
-                          
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setEmpCurrentPage(pageNum)}
-                              className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                                currentPage === pageNum
-                                  ? 'bg-violet-500 text-white'
-                                  : 'border border-slate-200 hover:bg-slate-50'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      
-                      <button
-                        onClick={() => setEmpCurrentPage(Math.min(totalPages, currentPage + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        Suiv. →
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Total */}
-                  <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
-                    <span className="font-bold text-slate-700">Total ({filtered.length} employés)</span>
-                    <span className="text-xl font-bold text-violet-600">
-                      €{filtered.reduce((sum, e) => sum + e.cost, 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-        
-        {/* Bouton de comparaison flottant */}
-        {periods.length >= 2 && (
-          <button
-            onClick={() => setShowCompareModal(true)}
-            className="fixed bottom-6 right-6 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white px-5 py-3 rounded-xl shadow-lg shadow-violet-500/30 hover:shadow-violet-500/50 transition-all flex items-center gap-2 font-medium"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Comparer périodes
-          </button>
-        )}
-        
-        {/* Modal de comparaison */}
-        {showCompareModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-              <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                <h2 className="text-xl font-bold">📊 Comparer deux périodes</h2>
-                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="p-2 hover:bg-slate-100 rounded-lg">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="p-6 overflow-y-auto flex-1">
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Période 1</label>
-                    <select 
-                      value={selectedPeriod === 'all' ? (periods[periods.length - 2] || '') : selectedPeriod}
-                      onChange={(e) => setSelectedPeriod(e.target.value)}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none"
-                    >
-                      {periods.sort().map(p => (
-                        <option key={p} value={p}>{formatPeriod(p)}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Période 2</label>
-                    <select 
-                      value={comparePeriod || periods[periods.length - 1] || ''}
-                      onChange={(e) => setComparePeriod(e.target.value)}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none"
-                    >
-                      {periods.sort().map(p => (
-                        <option key={p} value={p}>{formatPeriod(p)}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                
-                {(() => {
-                  const period1 = selectedPeriod === 'all' ? periods[periods.length - 2] : selectedPeriod;
-                  const period2 = comparePeriod || periods[periods.length - 1];
-                  
-                  if (!period1 || !period2 || period1 === period2) {
-                    return <div className="text-center py-12 text-slate-400">Sélectionnez deux périodes différentes</div>;
-                  }
-                  
-                  const emps1 = employees.filter(e => e.period === period1);
-                  const emps2 = employees.filter(e => e.period === period2);
-                  const total1 = emps1.reduce((s, e) => s + e.totalCost, 0);
-                  const total2 = emps2.reduce((s, e) => s + e.totalCost, 0);
-                  const names1 = new Set(emps1.map(e => e.name));
-                  const names2 = new Set(emps2.map(e => e.name));
-                  const nouveaux = [...names2].filter(n => !names1.has(n));
-                  const partis = [...names1].filter(n => !names2.has(n));
-                  const variation = total1 > 0 ? ((total2 - total1) / total1 * 100) : 0;
-                  
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {periods.sort().reverse().slice(0, 6).map(period => {
+                  const periodTotal = employees.filter(e => e.period === period).reduce((s, e) => s + e.totalCost, 0);
                   return (
-                    <>
-                      <div className="grid grid-cols-4 gap-4 mb-6">
-                        <div className="bg-slate-50 rounded-xl p-4 text-center">
-                          <div className="text-2xl font-bold text-slate-800">€{total1.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
-                          <div className="text-xs text-slate-500 mt-1">{formatPeriod(period1)}</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-xl p-4 text-center">
-                          <div className="text-2xl font-bold text-slate-800">€{total2.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
-                          <div className="text-xs text-slate-500 mt-1">{formatPeriod(period2)}</div>
-                        </div>
-                        <div className={`rounded-xl p-4 text-center ${variation >= 0 ? 'bg-red-50' : 'bg-green-50'}`}>
-                          <div className={`text-2xl font-bold ${variation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {variation >= 0 ? '+' : ''}{variation.toFixed(1)}%
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1">Variation</div>
-                        </div>
-                        <div className="bg-violet-50 rounded-xl p-4 text-center">
-                          <div className="text-2xl font-bold text-violet-600">€{Math.abs(total2 - total1).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
-                          <div className="text-xs text-slate-500 mt-1">{total2 >= total1 ? 'Hausse' : 'Baisse'}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-6">
-                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                          <h4 className="font-semibold text-green-800 mb-2">✅ Nouveaux ({nouveaux.length})</h4>
-                          {nouveaux.length === 0 ? (
-                            <p className="text-sm text-green-600">Aucun</p>
-                          ) : (
-                            <ul className="text-sm text-green-700 space-y-1 max-h-32 overflow-y-auto">
-                              {nouveaux.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
-                              {nouveaux.length > 10 && <li className="text-green-500">... +{nouveaux.length - 10} autres</li>}
-                            </ul>
-                          )}
-                        </div>
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                          <h4 className="font-semibold text-red-800 mb-2">❌ Départs ({partis.length})</h4>
-                          {partis.length === 0 ? (
-                            <p className="text-sm text-red-600">Aucun</p>
-                          ) : (
-                            <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
-                              {partis.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
-                              {partis.length > 10 && <li className="text-red-500">... +{partis.length - 10} autres</li>}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
-                    </>
+                    <button
+                      key={period}
+                      onClick={() => setSelectedPeriod(period)}
+                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-colors ${
+                        selectedPeriod === period ? 'bg-violet-500/20 border border-violet-500/50' : 'bg-slate-700/30 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <span className={selectedPeriod === period ? 'text-violet-300' : 'text-slate-300'}>{formatPeriod(period)}</span>
+                      <span className={`font-semibold ${selectedPeriod === period ? 'text-violet-300' : 'text-white'}`}>
+                        €{periodTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                      </span>
+                    </button>
                   );
-                })()}
+                })}
               </div>
-              
-              <div className="p-4 border-t border-slate-200 bg-slate-50">
-                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800">
-                  Fermer
-                </button>
+            </div>
+            
+            {/* Top employees */}
+            <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">👥 Top employés</h3>
+              <div className="space-y-3">
+                {(() => {
+                  const empCosts = {};
+                  filtered.forEach(e => {
+                    if (!empCosts[e.name]) empCosts[e.name] = { name: e.name, cost: 0, dept: e.department || departmentMapping[e.name] || 'Non assigné' };
+                    empCosts[e.name].cost += e.totalCost;
+                  });
+                  return Object.values(empCosts).sort((a, b) => b.cost - a.cost).slice(0, 5).map((emp, idx) => (
+                    <div key={emp.name} className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg">
+                      <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                        {idx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white font-medium truncate">{emp.name}</div>
+                        <div className="text-xs text-slate-400">{emp.dept}</div>
+                      </div>
+                      <div className="text-white font-semibold">€{emp.cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                    </div>
+                  ));
+                })()}
               </div>
             </div>
           </div>
-        )}
-      </main>
+        </div>
+      ) : activeCompany ? (
+        /* Empty state */
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">Aucune donnée</h3>
+          <p className="text-slate-400 mb-6">Importez un fichier Excel pour commencer</p>
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="px-6 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-white font-medium hover:opacity-90"
+          >
+            Importer des données
+          </button>
+        </div>
+      ) : (
+        /* No company selected */
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-20 h-20 bg-slate-800 rounded-2xl flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-2">Aucune société</h3>
+          <p className="text-slate-400 mb-6">Créez votre première société pour commencer</p>
+          <button
+            onClick={() => setShowNewCompanyModal(true)}
+            className="px-6 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-white font-medium hover:opacity-90"
+          >
+            Créer une société
+          </button>
+        </div>
+      )}
+      
+      {/* Compare button */}
+      {periods.length >= 2 && (
+        <button
+          onClick={() => setShowCompareModal(true)}
+          className="fixed bottom-6 right-6 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white px-5 py-3 rounded-xl shadow-lg shadow-violet-500/30 hover:shadow-violet-500/50 transition-all flex items-center gap-2 font-medium"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Comparer
+        </button>
+      )}
+      
+      {/* Compare Modal */}
+      {showCompareModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-700 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">📊 Comparer deux périodes</h2>
+              <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Période 1</label>
+                  <select 
+                    value={selectedPeriod === 'all' ? (periods[periods.length - 2] || '') : selectedPeriod}
+                    onChange={(e) => setSelectedPeriod(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:border-violet-500 outline-none"
+                  >
+                    {periods.sort().map(p => (
+                      <option key={p} value={p}>{formatPeriod(p)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Période 2</label>
+                  <select 
+                    value={comparePeriod || periods[periods.length - 1] || ''}
+                    onChange={(e) => setComparePeriod(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white focus:border-violet-500 outline-none"
+                  >
+                    {periods.sort().map(p => (
+                      <option key={p} value={p}>{formatPeriod(p)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {(() => {
+                const period1 = selectedPeriod === 'all' ? periods[periods.length - 2] : selectedPeriod;
+                const period2 = comparePeriod || periods[periods.length - 1];
+                
+                if (!period1 || !period2 || period1 === period2) {
+                  return <div className="text-center py-12 text-slate-500">Sélectionnez deux périodes différentes</div>;
+                }
+                
+                const emps1 = employees.filter(e => e.period === period1);
+                const emps2 = employees.filter(e => e.period === period2);
+                const total1 = emps1.reduce((s, e) => s + e.totalCost, 0);
+                const total2 = emps2.reduce((s, e) => s + e.totalCost, 0);
+                const names1 = new Set(emps1.map(e => e.name));
+                const names2 = new Set(emps2.map(e => e.name));
+                const nouveaux = [...names2].filter(n => !names1.has(n));
+                const partis = [...names1].filter(n => !names2.has(n));
+                const variation = total1 > 0 ? ((total2 - total1) / total1 * 100) : 0;
+                
+                return (
+                  <>
+                    <div className="grid grid-cols-4 gap-4 mb-6">
+                      <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-bold text-white">€{total1.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                        <div className="text-xs text-slate-400 mt-1">{formatPeriod(period1)}</div>
+                      </div>
+                      <div className="bg-slate-700/50 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-bold text-white">€{total2.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                        <div className="text-xs text-slate-400 mt-1">{formatPeriod(period2)}</div>
+                      </div>
+                      <div className={`rounded-xl p-4 text-center ${variation >= 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
+                        <div className={`text-2xl font-bold ${variation >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+                          {variation >= 0 ? '+' : ''}{variation.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">Variation</div>
+                      </div>
+                      <div className="bg-violet-500/20 rounded-xl p-4 text-center">
+                        <div className="text-2xl font-bold text-violet-400">€{Math.abs(total2 - total1).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                        <div className="text-xs text-slate-400 mt-1">{total2 >= total1 ? 'Hausse' : 'Baisse'}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                        <h4 className="font-semibold text-green-400 mb-2">✅ Nouveaux ({nouveaux.length})</h4>
+                        {nouveaux.length === 0 ? (
+                          <p className="text-sm text-green-400/60">Aucun</p>
+                        ) : (
+                          <ul className="text-sm text-green-400/80 space-y-1 max-h-32 overflow-y-auto">
+                            {nouveaux.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
+                            {nouveaux.length > 10 && <li className="text-green-400/50">... +{nouveaux.length - 10} autres</li>}
+                          </ul>
+                        )}
+                      </div>
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                        <h4 className="font-semibold text-red-400 mb-2">❌ Départs ({partis.length})</h4>
+                        {partis.length === 0 ? (
+                          <p className="text-sm text-red-400/60">Aucun</p>
+                        ) : (
+                          <ul className="text-sm text-red-400/80 space-y-1 max-h-32 overflow-y-auto">
+                            {partis.slice(0, 10).map(n => <li key={n}>• {n}</li>)}
+                            {partis.length > 10 && <li className="text-red-400/50">... +{partis.length - 10} autres</li>}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            
+            <div className="p-4 border-t border-slate-700 bg-slate-800">
+              <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="w-full py-3 bg-slate-700 text-white rounded-xl font-medium hover:bg-slate-600">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      </div>
     </div>
   );
 }
