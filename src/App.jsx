@@ -866,8 +866,19 @@ export default function App() {
 
   // Check auth state on load
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let mounted = true;
+    
+    const initAuth = async () => {
+      // D'abord, laisser Supabase parser le hash fragment si présent (important pour mobile)
+      // Cela gère le retour OAuth avec #access_token=...
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Auth error:', error);
+      }
+      
+      if (!mounted) return;
+      
       if (session?.user) {
         setUser({
           id: session.user.id,
@@ -876,22 +887,35 @@ export default function App() {
           picture: session.user.user_metadata?.avatar_url
         });
         loadFromSupabase(session.user.id);
+        // Nettoyer l'URL après login réussi (enlever le hash)
+        if (window.location.hash) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
       } else {
         // Not logged in, load from localStorage
         loadFromLocalStorage();
       }
-    });
+    };
+    
+    initAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
+      if (!mounted) return;
+      
+      console.log('Auth event:', event); // Debug
+      
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session?.user) {
         setUser({
           id: session.user.id,
           name: session.user.user_metadata?.full_name || session.user.email,
           email: session.user.email,
           picture: session.user.user_metadata?.avatar_url
         });
-        loadFromSupabase(session.user.id);
+        // Seulement charger si on a pas déjà les données
+        if (Object.keys(companies).length === 0) {
+          loadFromSupabase(session.user.id);
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setCompanies({});
@@ -902,7 +926,10 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Load data from localStorage (for non-logged-in users)
@@ -1311,13 +1338,24 @@ export default function App() {
 
   // Google Login
   const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: 'https://salarize.pages.dev'
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
+      });
+      if (error) {
+        console.error('Login error:', error);
+        alert('Erreur de connexion: ' + error.message);
       }
-    });
-    if (error) console.error('Login error:', error);
+    } catch (err) {
+      console.error('Login exception:', err);
+    }
   };
 
   // Logout
