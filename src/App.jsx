@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
@@ -1406,8 +1406,9 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] overflow-y-auto">
+      <div className="min-h-full flex items-center justify-center p-4">
+        <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden my-8">
         {/* Header */}
         <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-6 text-center relative">
           <button 
@@ -1570,6 +1571,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
             </button>
           </form>
         </div>
+      </div>
       </div>
     </div>
   );
