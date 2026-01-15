@@ -1395,28 +1395,32 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   if (!isOpen) return null;
   
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-start justify-center pt-20 p-4 overflow-y-auto">
+      <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-6 text-center relative">
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-4 text-center relative">
           <button 
             onClick={onClose}
-            className="absolute right-4 top-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="absolute right-3 top-3 p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
           
-          <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <span className="text-white font-bold text-2xl">S</span>
+          <div className="flex items-center justify-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-lg">S</span>
+            </div>
+            <div className="text-left">
+              <h2 className="text-xl font-bold text-white">
+                {tab === 'login' ? 'Connexion' : 'Créer un compte'}
+              </h2>
+              <p className="text-slate-400 text-xs">
+                {tab === 'login' ? 'Accédez à votre espace' : 'Rejoignez Salarize'}
+              </p>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold text-white">
-            {tab === 'login' ? 'Connexion' : 'Créer un compte'}
-          </h2>
-          <p className="text-slate-400 text-sm mt-1">
-            {tab === 'login' ? 'Accédez à votre espace Salarize' : 'Rejoignez Salarize gratuitement'}
-          </p>
         </div>
         
         {/* Tabs */}
