@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase configuration
@@ -9,6 +9,9 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
+
+// Couleurs pour les graphiques
+const CHART_COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#7C3AED', '#6D28D9', '#5B21B6', '#4C1D95', '#DDD6FE', '#EDE9FE', '#F5F3FF'];
 
 // Landing Page Header
 function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage }) {
@@ -138,7 +141,7 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
           <div className="text-center">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full mb-8">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="w-2 h-2 bg-violet-500 rounded-full animate-pulse" />
               <span className="text-slate-300 text-sm">Nouvelle version disponible</span>
             </div>
             
@@ -266,6 +269,156 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
         </div>
       </div>
       
+      {/* Footer */}
+      <footer className="border-t border-slate-800 py-12">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">S</span>
+              </div>
+              <span className="text-white font-bold">Salarize</span>
+            </div>
+            <p className="text-slate-500 text-sm">
+              © 2025 Salarize. Tous droits réservés.
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// Features Page
+function FeaturesPage({ onLogin, user, onGoToDashboard }) {
+  const features = [
+    {
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+      ),
+      title: "Import multi-formats",
+      description: "Importez vos fichiers Acerta, Excel (.xlsx, .xls) et CSV. Détection automatique des colonnes et mapping intelligent des données.",
+      details: ["Export Acerta", "Fichiers Excel", "Détection automatique", "Mapping intelligent"]
+    },
+    {
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      title: "Visualisation avancée",
+      description: "Graphiques interactifs pour comprendre la répartition de vos coûts. Vue par département, évolution temporelle, comparaisons.",
+      details: ["Graphiques interactifs", "Répartition par département", "Évolution mensuelle", "Comparaisons"]
+    },
+    {
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      title: "Export professionnel",
+      description: "Générez des rapports PDF prêts à présenter à vos clients. Export Excel pour analyses détaillées.",
+      details: ["Rapports PDF", "Export Excel", "Logo personnalisé", "Prêt à présenter"]
+    },
+    {
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+      title: "Multi-sociétés",
+      description: "Gérez plusieurs entreprises depuis un seul compte. Chaque société a ses propres données et paramètres.",
+      details: ["Plusieurs sociétés", "Données isolées", "Logo par société", "Switching rapide"]
+    },
+    {
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
+      ),
+      title: "Gestion des départements",
+      description: "Assignez vos employés aux départements, fusionnez ou renommez les départements existants.",
+      details: ["Assignation rapide", "Fusion départements", "Renommage", "Filtres avancés"]
+    },
+    {
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+        </svg>
+      ),
+      title: "Synchronisation cloud",
+      description: "Vos données sont automatiquement sauvegardées et synchronisées. Accédez-y depuis n'importe quel appareil.",
+      details: ["Sauvegarde auto", "Sync temps réel", "Multi-appareils", "Données sécurisées"]
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      {/* Hero */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-fuchsia-600/20" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-violet-500/20 to-transparent rounded-full blur-3xl" />
+        
+        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+              Fonctionnalités
+            </h1>
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+              Découvrez tous les outils pour simplifier votre analyse salariale
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Features Grid */}
+      <div className="max-w-6xl mx-auto px-6 py-16">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {features.map((feature, index) => (
+            <div 
+              key={index}
+              className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-all hover:-translate-y-1"
+            >
+              <div className="w-16 h-16 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 text-violet-400">
+                {feature.icon}
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
+              <p className="text-slate-400 mb-4">{feature.description}</p>
+              <ul className="space-y-2">
+                {feature.details.map((detail, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-slate-500">
+                    <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {detail}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div className="max-w-6xl mx-auto px-6 py-16">
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 rounded-3xl p-12 border border-violet-500/20 text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Prêt à commencer ?
+          </h2>
+          <p className="text-slate-300 text-lg mb-8 max-w-xl mx-auto">
+            Créez votre compte gratuitement et importez vos premières données.
+          </p>
+          <button 
+            onClick={user ? onGoToDashboard : onLogin}
+            className="px-8 py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/25"
+          >
+            {user ? 'Aller au dashboard' : 'Commencer gratuitement'}
+          </button>
+        </div>
+      </div>
+
       {/* Footer */}
       <footer className="border-t border-slate-800 py-12">
         <div className="max-w-6xl mx-auto px-6">
@@ -432,7 +585,7 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
                 <button
                   key={name}
                   onClick={() => onSelect(name)}
-                  className="w-full text-left px-4 py-3 border-2 border-slate-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all"
+                  className="w-full text-left px-4 py-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 transition-all"
                 >
                   <span className="font-semibold">{name}</span>
                   <span className="text-slate-400 text-sm ml-2">({companies[name]?.employees?.length || 0} entrées)</span>
@@ -458,7 +611,7 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
               onSelect(newName.trim());
             }
           }}
-          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl mb-4 focus:border-emerald-500 outline-none"
+          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl mb-4 focus:border-violet-500 outline-none"
           autoFocus
         />
         
@@ -472,7 +625,7 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
           <button
             onClick={() => newName.trim() && onSelect(newName.trim())}
             disabled={!newName.trim()}
-            className="flex-1 py-2 bg-emerald-500 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-emerald-600"
+            className="flex-1 py-2 bg-violet-500 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-violet-600"
           >
             Créer & Importer
           </button>
@@ -551,8 +704,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                 onClick={() => { onImportClick(); setShowActions(false); }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
               >
-                <div className="w-8 h-8 bg-cyan-500/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-8 h-8 bg-fuchsia-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                 </div>
@@ -602,7 +755,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         
         <button
           onClick={() => setShowActions(!showActions)}
-          className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 text-center py-3 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-center py-3 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
         >
           <svg className={`w-5 h-5 transition-transform ${showActions ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -667,6 +820,9 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [comparePeriod, setComparePeriod] = useState(null);
   
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
@@ -897,6 +1053,231 @@ export default function App() {
     } else {
       saveToLocalStorage(newCompanies, active);
     }
+    setLastSaved(new Date());
+  };
+
+  // Export Excel amélioré
+  const exportToExcel = () => {
+    if (!activeCompany || employees.length === 0) return;
+    
+    const company = companies[activeCompany];
+    const filtered = selectedPeriod === 'all' 
+      ? employees 
+      : employees.filter(e => e.period === selectedPeriod);
+    
+    // Feuille 1 : Résumé
+    const deptData = {};
+    filtered.forEach(e => {
+      const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (!deptData[dept]) deptData[dept] = { count: 0, cost: 0 };
+      deptData[dept].count++;
+      deptData[dept].cost += e.totalCost;
+    });
+    
+    const summaryData = Object.entries(deptData).map(([dept, data]) => ({
+      'Département': dept,
+      'Nombre d\'employés': data.count,
+      'Coût total (€)': Math.round(data.cost * 100) / 100,
+      'Coût moyen (€)': Math.round((data.cost / data.count) * 100) / 100
+    }));
+    
+    const totalCost = filtered.reduce((sum, e) => sum + e.totalCost, 0);
+    summaryData.push({
+      'Département': 'TOTAL',
+      'Nombre d\'employés': filtered.length,
+      'Coût total (€)': Math.round(totalCost * 100) / 100,
+      'Coût moyen (€)': Math.round((totalCost / filtered.length) * 100) / 100
+    });
+    
+    // Feuille 2 : Détail employés
+    const detailData = filtered.map(e => ({
+      'Nom': e.name,
+      'Département': e.department || departmentMapping[e.name] || 'Non assigné',
+      'Fonction': e.function || '-',
+      'Période': formatPeriod(e.period),
+      'Coût total (€)': Math.round(e.totalCost * 100) / 100
+    }));
+    
+    // Créer le workbook
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.json_to_sheet(summaryData);
+    const ws2 = XLSX.utils.json_to_sheet(detailData);
+    
+    XLSX.utils.book_append_sheet(wb, ws1, 'Résumé par département');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Détail employés');
+    
+    // Télécharger
+    const periodStr = selectedPeriod === 'all' ? 'Complet' : formatPeriod(selectedPeriod);
+    XLSX.writeFile(wb, `Salarize_${activeCompany}_${periodStr}.xlsx`);
+  };
+
+  // Export PDF
+  const exportToPDF = async () => {
+    if (!activeCompany || employees.length === 0) return;
+    
+    const company = companies[activeCompany];
+    const filtered = selectedPeriod === 'all' 
+      ? employees 
+      : employees.filter(e => e.period === selectedPeriod);
+    
+    // Calculs
+    const totalCost = filtered.reduce((sum, e) => sum + e.totalCost, 0);
+    const avgCost = totalCost / filtered.length;
+    
+    const deptData = {};
+    filtered.forEach(e => {
+      const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (!deptData[dept]) deptData[dept] = { count: 0, cost: 0 };
+      deptData[dept].count++;
+      deptData[dept].cost += e.totalCost;
+    });
+    
+    const deptArray = Object.entries(deptData)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.cost - a.cost);
+    
+    // Top 10 employés
+    const empAgg = {};
+    filtered.forEach(e => {
+      if (!empAgg[e.name]) empAgg[e.name] = { name: e.name, dept: e.department || departmentMapping[e.name] || 'Non assigné', cost: 0 };
+      empAgg[e.name].cost += e.totalCost;
+    });
+    const topEmployees = Object.values(empAgg).sort((a, b) => b.cost - a.cost).slice(0, 10);
+    
+    // Charger jsPDF dynamiquement
+    const jsPDFModule = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    const { jsPDF } = jsPDFModule.default || window.jspdf;
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+    
+    // Header avec couleur
+    doc.setFillColor(139, 92, 246); // violet
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Titre
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Rapport Salarial', 20, 25);
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(activeCompany, 20, 35);
+    
+    // Période
+    const periodStr = selectedPeriod === 'all' ? 'Toutes périodes' : formatPeriod(selectedPeriod);
+    doc.text(periodStr, pageWidth - 20, 25, { align: 'right' });
+    doc.text(new Date().toLocaleDateString('fr-FR'), pageWidth - 20, 35, { align: 'right' });
+    
+    y = 55;
+    
+    // Chiffres clés
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Chiffres clés', 20, y);
+    y += 10;
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    
+    // Box pour les KPIs
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(20, y, pageWidth - 40, 35, 3, 3, 'F');
+    
+    doc.text(`Coût total: ${totalCost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`, 30, y + 12);
+    doc.text(`Nombre d'employés: ${filtered.length}`, 30, y + 24);
+    doc.text(`Coût moyen: ${avgCost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`, pageWidth / 2, y + 12);
+    doc.text(`Départements: ${Object.keys(deptData).length}`, pageWidth / 2, y + 24);
+    
+    y += 50;
+    
+    // Répartition par département
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Répartition par département', 20, y);
+    y += 10;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    // Table header
+    doc.setFillColor(139, 92, 246);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(20, y, pageWidth - 40, 8, 'F');
+    doc.text('Département', 25, y + 6);
+    doc.text('Employés', 100, y + 6);
+    doc.text('Coût', 140, y + 6);
+    doc.text('%', 175, y + 6);
+    y += 8;
+    
+    doc.setTextColor(0, 0, 0);
+    deptArray.forEach((dept, i) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+      const bgColor = i % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
+      doc.setFillColor(...bgColor);
+      doc.rect(20, y, pageWidth - 40, 8, 'F');
+      doc.text(dept.name.substring(0, 25), 25, y + 6);
+      doc.text(String(dept.count), 100, y + 6);
+      doc.text(dept.cost.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €', 140, y + 6);
+      doc.text(((dept.cost / totalCost) * 100).toFixed(1) + '%', 175, y + 6);
+      y += 8;
+    });
+    
+    y += 15;
+    
+    // Top 10 employés
+    if (y > 200) {
+      doc.addPage();
+      y = 20;
+    }
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Top 10 employés par coût', 20, y);
+    y += 10;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    // Table header
+    doc.setFillColor(139, 92, 246);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(20, y, pageWidth - 40, 8, 'F');
+    doc.text('#', 25, y + 6);
+    doc.text('Nom', 35, y + 6);
+    doc.text('Département', 100, y + 6);
+    doc.text('Coût', 155, y + 6);
+    y += 8;
+    
+    doc.setTextColor(0, 0, 0);
+    topEmployees.forEach((emp, i) => {
+      const bgColor = i % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
+      doc.setFillColor(...bgColor);
+      doc.rect(20, y, pageWidth - 40, 8, 'F');
+      doc.text(String(i + 1), 25, y + 6);
+      doc.text(emp.name.substring(0, 30), 35, y + 6);
+      doc.text(emp.dept.substring(0, 20), 100, y + 6);
+      doc.text(emp.cost.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €', 155, y + 6);
+      y += 8;
+    });
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Généré par Salarize - Page ${i}/${pageCount}`, pageWidth / 2, 290, { align: 'center' });
+    }
+    
+    // Télécharger
+    doc.save(`Rapport_${activeCompany}_${periodStr.replace(/ /g, '_')}.pdf`);
   };
 
   // Google Login
@@ -1409,7 +1790,7 @@ export default function App() {
     
     // Trouver la couleur la plus fréquente
     let maxCount = 0;
-    let dominantColor = '16, 185, 129'; // Default emerald
+    let dominantColor = '139, 92, 246'; // Default violet
     
     for (const [key, count] of Object.entries(colorCounts)) {
       if (count > maxCount) {
@@ -1578,9 +1959,21 @@ export default function App() {
       return prev === 0 ? '-' : (curr >= prev ? `+${pct}%` : `${pct}%`);
     };
 
+    // Top 10 employés par coût
+    const empCosts = {};
+    filtered.forEach(e => {
+      const name = e.name;
+      if (!empCosts[name]) empCosts[name] = { name, dept: e.department || departmentMapping[name] || 'Non assigné', cost: 0 };
+      empCosts[name].cost += e.totalCost;
+    });
+    const top10Employees = Object.values(empCosts).sort((a, b) => b.cost - a.cost).slice(0, 10);
+
     const logoHtml = companies[activeCompany]?.logo 
-      ? `<img src="${companies[activeCompany].logo}" style="width: 50px; height: 50px; border-radius: 8px; object-fit: cover;" />`
-      : `<div style="width: 50px; height: 50px; border-radius: 8px; background: linear-gradient(135deg, #10b981, #06b6d4); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">${activeCompany?.charAt(0) || 'S'}</div>`;
+      ? `<img src="${companies[activeCompany].logo}" style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover;" />`
+      : `<div style="width: 60px; height: 60px; border-radius: 12px; background: linear-gradient(135deg, #8B5CF6, #D946EF); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 28px;">${activeCompany?.charAt(0) || 'S'}</div>`;
+
+    // Générer les barres de répartition
+    const maxDeptCost = Math.max(...sortedDepts.map(([_, d]) => d.total));
 
     const html = `
       <!DOCTYPE html>
@@ -1590,126 +1983,243 @@ export default function App() {
         <meta charset="UTF-8">
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          @page { size: A4; margin: 15mm; }
+          @page { size: A4; margin: 12mm; }
           body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             color: #1e293b;
-            padding: 40px;
+            padding: 32px;
             max-width: 210mm;
             margin: 0 auto;
             background: white;
+            font-size: 13px;
+            line-height: 1.5;
           }
           .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 30px;
+            margin-bottom: 28px;
             padding-bottom: 20px;
-            border-bottom: 2px solid #e2e8f0;
+            border-bottom: 3px solid #8B5CF6;
           }
           .header-left {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 16px;
           }
           .header h1 {
-            font-size: 24px;
+            font-size: 26px;
             color: #1e293b;
+            font-weight: 700;
           }
-          .header p {
+          .header-subtitle {
             color: #64748b;
-            font-size: 12px;
+            font-size: 13px;
+            margin-top: 2px;
           }
           .brand {
             text-align: right;
           }
           .brand-name {
-            font-size: 18px;
+            font-size: 22px;
             font-weight: 800;
-            background: linear-gradient(90deg, #10b981, #06b6d4);
+            background: linear-gradient(90deg, #8B5CF6, #D946EF);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
           }
+          .brand-date {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+          }
+          
+          /* Stats Grid */
           .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 30px;
+            gap: 12px;
+            margin-bottom: 28px;
           }
           .stat-card {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            background: linear-gradient(135deg, #F5F3FF, #EDE9FE);
+            border: 1px solid #DDD6FE;
             border-radius: 12px;
-            padding: 15px;
+            padding: 16px;
             text-align: center;
           }
+          .stat-card.highlight {
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            border: none;
+          }
+          .stat-card.highlight .stat-value,
+          .stat-card.highlight .stat-label {
+            color: white;
+          }
           .stat-value {
-            font-size: 22px;
+            font-size: 24px;
             font-weight: 700;
-            color: #1e293b;
+            color: #5B21B6;
           }
           .stat-label {
-            font-size: 11px;
-            color: #64748b;
+            font-size: 10px;
+            color: #7C3AED;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-top: 4px;
+            font-weight: 600;
+          }
+          
+          /* Section Titles */
+          .section {
+            margin-bottom: 24px;
           }
           .section-title {
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 15px;
+            font-weight: 700;
             color: #1e293b;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
           }
+          .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #8B5CF6, #D946EF);
+            border-radius: 2px;
+          }
+          
+          /* Tables */
           table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 30px;
             font-size: 12px;
           }
           th {
-            background: #f1f5f9;
-            padding: 12px;
+            background: #F8FAFC;
+            padding: 10px 12px;
             text-align: left;
             font-weight: 600;
             color: #475569;
-            border-bottom: 2px solid #e2e8f0;
+            border-bottom: 2px solid #E2E8F0;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
           }
           th:last-child, td:last-child {
             text-align: right;
           }
           td {
             padding: 10px 12px;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid #F1F5F9;
+          }
+          tr:hover {
+            background: #FAFAFA;
           }
           .total-row {
-            background: #f1f5f9;
+            background: linear-gradient(90deg, #F5F3FF, #EDE9FE) !important;
             font-weight: 600;
           }
-          .positive { color: #ef4444; }
-          .negative { color: #10b981; }
+          .total-row td {
+            border-bottom: none;
+            color: #5B21B6;
+          }
+          .positive { color: #DC2626; }
+          .negative { color: #16A34A; }
+          
+          /* Department Bars */
+          .dept-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #F1F5F9;
+          }
+          .dept-name {
+            width: 140px;
+            font-weight: 500;
+            font-size: 12px;
+          }
+          .dept-bar-container {
+            flex: 1;
+            height: 24px;
+            background: #F1F5F9;
+            border-radius: 4px;
+            margin: 0 12px;
+            overflow: hidden;
+          }
+          .dept-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #8B5CF6, #A78BFA);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+          }
+          .dept-cost {
+            width: 100px;
+            text-align: right;
+            font-weight: 600;
+            font-size: 12px;
+          }
+          
+          /* Two Columns Layout */
+          .two-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+          }
+          
+          /* Footer */
           .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e2e8f0;
-            text-align: center;
-            color: #94a3b8;
+            margin-top: 32px;
+            padding-top: 16px;
+            border-top: 1px solid #E2E8F0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #94A3B8;
             font-size: 10px;
           }
+          .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+          .footer-logo {
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #8B5CF6, #D946EF);
+            border-radius: 4px;
+          }
+          
+          /* Print Button */
           .print-btn {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: linear-gradient(90deg, #10b981, #06b6d4);
+            background: linear-gradient(90deg, #8B5CF6, #D946EF);
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            padding: 14px 28px;
+            border-radius: 10px;
             font-weight: 600;
             cursor: pointer;
             font-size: 14px;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
           }
-          .print-btn:hover { opacity: 0.9; }
+          .print-btn:hover { 
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+          }
           @media print {
             .print-btn { display: none; }
             body { padding: 0; }
@@ -1717,24 +2227,29 @@ export default function App() {
         </style>
       </head>
       <body>
-        <button class="print-btn" onclick="window.print()">🖨️ Imprimer / PDF</button>
+        <button class="print-btn" onclick="window.print()">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+          </svg>
+          Imprimer / PDF
+        </button>
         
         <div class="header">
           <div class="header-left">
             ${logoHtml}
             <div>
               <h1>${activeCompany}</h1>
-              <p>Rapport des coûts salariaux</p>
+              <div class="header-subtitle">Rapport des coûts salariaux • ${selectedPeriod === 'all' ? 'Toutes périodes' : formatPeriod(selectedPeriod)}</div>
             </div>
           </div>
           <div class="brand">
             <div class="brand-name">Salarize</div>
-            <p style="font-size: 10px; color: #94a3b8;">Généré le ${new Date().toLocaleDateString('fr-BE')}</p>
+            <div class="brand-date">Généré le ${new Date().toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
           </div>
         </div>
 
         <div class="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card highlight">
             <div class="stat-value">€${totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
             <div class="stat-label">Coût Total</div>
           </div>
@@ -1747,76 +2262,95 @@ export default function App() {
             <div class="stat-label">Départements</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">${periods.length}</div>
-            <div class="stat-label">Périodes</div>
+            <div class="stat-value">€${uniqueNames > 0 ? Math.round(totalCost / uniqueNames).toLocaleString('fr-BE') : 0}</div>
+            <div class="stat-label">Coût Moyen</div>
           </div>
         </div>
 
-        <div class="section-title">📊 Évolution mensuelle des coûts</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Période</th>
-              <th>Employés</th>
-              <th>Variation</th>
-              <th>Coût Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${monthlyData.map((m, idx) => `
-              <tr>
-                <td><strong>${formatPeriod(m.period)}</strong></td>
-                <td>${m.employees}</td>
-                <td class="${getVariation(idx).startsWith('+') ? 'positive' : getVariation(idx).startsWith('-') && getVariation(idx) !== '-' ? 'negative' : ''}">${getVariation(idx)}</td>
-                <td><strong>€${m.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</strong></td>
-              </tr>
-            `).join('')}
-            <tr class="total-row">
-              <td><strong>TOTAL</strong></td>
-              <td></td>
-              <td></td>
-              <td><strong>€${monthlyData.reduce((s, m) => s + m.total, 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</strong></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="section-title">🏢 Répartition par département</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Département</th>
-              <th>% du total</th>
-              <th>Coût Total</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div class="section">
+          <div class="section-title">Répartition par département</div>
+          <div style="background: #FAFAFA; border-radius: 12px; padding: 16px;">
             ${sortedDepts.map(([dept, data]) => `
-              <tr>
-                <td><strong>${dept}</strong></td>
-                <td>${(data.total / totalCost * 100).toFixed(1)}%</td>
-                <td><strong>€${data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</strong></td>
-              </tr>
+              <div class="dept-row">
+                <div class="dept-name">${dept}</div>
+                <div class="dept-bar-container">
+                  <div class="dept-bar" style="width: ${(data.total / maxDeptCost * 100)}%">
+                    ${(data.total / totalCost * 100).toFixed(1)}%
+                  </div>
+                </div>
+                <div class="dept-cost">€${data.total.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</div>
+              </div>
             `).join('')}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        <div class="two-cols">
+          <div class="section">
+            <div class="section-title">Évolution mensuelle</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Période</th>
+                  <th>Var.</th>
+                  <th>Coût</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${monthlyData.slice(-12).map((m, idx) => `
+                  <tr>
+                    <td><strong>${formatPeriod(m.period)}</strong></td>
+                    <td class="${getVariation(idx).startsWith('+') ? 'positive' : getVariation(idx).startsWith('-') && getVariation(idx) !== '-' ? 'negative' : ''}">${getVariation(idx)}</td>
+                    <td><strong>€${m.total.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
+                  </tr>
+                `).join('')}
+                <tr class="total-row">
+                  <td><strong>Total</strong></td>
+                  <td></td>
+                  <td><strong>€${monthlyData.reduce((s, m) => s + m.total, 0).toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Top 10 employés</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Employé</th>
+                  <th>Coût</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${top10Employees.map((emp, idx) => `
+                  <tr>
+                    <td>
+                      <strong>${emp.name}</strong>
+                      <div style="font-size: 10px; color: #94A3B8;">${emp.dept}</div>
+                    </td>
+                    <td><strong>€${emp.cost.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         <div class="footer">
-          Rapport généré par Salarize • ${new Date().toLocaleDateString('fr-BE')} à ${new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })}
+          <div class="footer-brand">
+            <div class="footer-logo"></div>
+            <span>Rapport généré par <strong>Salarize</strong></span>
+          </div>
+          <div>${new Date().toLocaleDateString('fr-BE')} à ${new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })}</div>
         </div>
       </body>
       </html>
     `;
 
-    // Télécharger comme fichier HTML
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Rapport_${activeCompany}_${new Date().toISOString().split('T')[0]}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Ouvrir dans une nouvelle fenêtre pour imprimer
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   // Load user from localStorage
@@ -1939,8 +2473,8 @@ export default function App() {
     );
   }
 
-  // Landing page (home page - visible par tous)
-  if (currentPage === 'home' || currentPage === 'features') {
+  // Landing page (home)
+  if (currentPage === 'home') {
     return (
       <>
         <LandingHeader 
@@ -1951,6 +2485,26 @@ export default function App() {
           setCurrentPage={setCurrentPage}
         />
         <LandingPage 
+          onLogin={handleLogin} 
+          user={user} 
+          onGoToDashboard={() => setCurrentPage('dashboard')} 
+        />
+      </>
+    );
+  }
+
+  // Features page
+  if (currentPage === 'features') {
+    return (
+      <>
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <FeaturesPage 
           onLogin={handleLogin} 
           user={user} 
           onGoToDashboard={() => setCurrentPage('dashboard')} 
@@ -2173,7 +2727,7 @@ export default function App() {
                 <button 
                   key={d} 
                   onClick={() => assignDept(d)} 
-                  className="p-3 border-2 border-slate-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 font-medium transition-all"
+                  className="p-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 font-medium transition-all"
                 >
                   {d}
                 </button>
@@ -2223,7 +2777,7 @@ export default function App() {
               value={newCompanyName}
               onChange={e => setNewCompanyName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreateEmptyCompany()}
-              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl mb-4 focus:border-emerald-500 outline-none"
+              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl mb-4 focus:border-violet-500 outline-none"
               autoFocus
             />
             <div className="flex gap-3">
@@ -2236,7 +2790,7 @@ export default function App() {
               <button
                 onClick={handleCreateEmptyCompany}
                 disabled={!newCompanyName.trim()}
-                className="flex-1 py-2 bg-emerald-500 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-emerald-600"
+                className="flex-1 py-2 bg-violet-500 text-white rounded-lg font-medium disabled:opacity-50 hover:bg-violet-600"
               >
                 Créer
               </button>
@@ -2270,7 +2824,7 @@ export default function App() {
                     type="text"
                     id="company-name-input"
                     defaultValue={activeCompany}
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none"
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                   />
                   <button
                     onClick={() => {
@@ -2308,7 +2862,7 @@ export default function App() {
                   placeholder="www.example.com"
                   value={companies[activeCompany]?.website || ''}
                   onChange={e => handleWebsiteChange(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                 />
               </div>
               
@@ -2402,11 +2956,11 @@ export default function App() {
             </div>
             
             {activeCompany && (
-              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
-                <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mb-4 p-3 bg-violet-50 border border-violet-200 rounded-lg flex items-center gap-2">
+                <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-sm text-emerald-800">
+                <span className="text-sm text-violet-800">
                   Vous importez votre fichier dans <strong>{activeCompany}</strong>
                 </span>
               </div>
@@ -2426,24 +2980,24 @@ export default function App() {
               }}
               className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
                 isDragging 
-                  ? 'border-emerald-500 bg-emerald-50' 
+                  ? 'border-violet-500 bg-violet-50' 
                   : 'border-slate-200 hover:border-slate-300'
               }`}
             >
               <div className={`w-14 h-14 mx-auto mb-3 rounded-full flex items-center justify-center transition-colors ${
-                isDragging ? 'bg-emerald-100' : 'bg-slate-100'
+                isDragging ? 'bg-violet-100' : 'bg-slate-100'
               }`}>
-                <svg className={`w-7 h-7 transition-colors ${isDragging ? 'text-emerald-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-7 h-7 transition-colors ${isDragging ? 'text-violet-600' : 'text-slate-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
               
-              <p className={`font-medium mb-1 ${isDragging ? 'text-emerald-700' : 'text-slate-700'}`}>
+              <p className={`font-medium mb-1 ${isDragging ? 'text-violet-700' : 'text-slate-700'}`}>
                 {isDragging ? 'Déposez le fichier ici' : 'Glissez-déposez votre fichier Excel'}
               </p>
               <p className="text-slate-400 text-sm mb-3">ou</p>
               
-              <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-lg font-medium cursor-pointer hover:opacity-90 transition-opacity text-sm">
+              <label className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg font-medium cursor-pointer hover:opacity-90 transition-opacity text-sm">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
@@ -2507,16 +3061,16 @@ export default function App() {
               </button>
             </div>
             
-            <div className="mb-5 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div className="mb-5 p-4 bg-violet-50 border border-violet-200 rounded-xl">
               <div className="flex gap-3">
-                <div className="text-emerald-500 mt-0.5">
+                <div className="text-violet-500 mt-0.5">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 <div className="text-sm">
-                  <p className="font-semibold text-emerald-800 mb-1">Fichier prêt à importer</p>
-                  <p className="text-emerald-700">
+                  <p className="font-semibold text-violet-800 mb-1">Fichier prêt à importer</p>
+                  <p className="text-violet-700">
                     <strong>{pendingPeriodSelection.employees.length} employés</strong> trouvés dans ce fichier.
                   </p>
                 </div>
@@ -2530,7 +3084,7 @@ export default function App() {
               <div className="flex gap-2">
                 <select 
                   id="period-year"
-                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none text-lg"
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none text-lg"
                   defaultValue={new Date().getFullYear()}
                 >
                   {[2023, 2024, 2025, 2026].map(y => (
@@ -2539,7 +3093,7 @@ export default function App() {
                 </select>
                 <select 
                   id="period-month"
-                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none"
+                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
                   defaultValue={String(new Date().getMonth() + 1).padStart(2, '0')}
                 >
                   {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
@@ -2586,7 +3140,7 @@ export default function App() {
                     setShowModal(true);
                   }
                 }}
-                className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white rounded-lg font-medium hover:opacity-90"
+                className="flex-1 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg font-medium hover:opacity-90"
               >
                 Importer
               </button>
@@ -3181,7 +3735,7 @@ export default function App() {
                               </span>
                               <button
                                 onClick={(e) => { e.preventDefault(); exportYearToExcel(year); }}
-                                className="p-1.5 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors"
+                                className="p-1.5 text-violet-500 hover:text-violet-700 hover:bg-violet-50 rounded transition-colors"
                                 title={`Télécharger ${year}`}
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3203,7 +3757,7 @@ export default function App() {
                                     </span>
                                     <button
                                       onClick={() => exportPeriodToExcel(period)}
-                                      className="p-1 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                      className="p-1 text-violet-400 hover:text-violet-600 hover:bg-violet-50 rounded transition-colors opacity-0 group-hover:opacity-100"
                                       title="Télécharger ce mois"
                                     >
                                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3234,9 +3788,9 @@ export default function App() {
               <div className="border-t border-slate-200 pt-6 space-y-3">
                 <h3 className="font-semibold text-slate-700 mb-3">🔧 Actions</h3>
                 
-                <label className="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:border-emerald-500 hover:bg-emerald-50 transition-colors">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <label className="flex items-center gap-3 p-3 border-2 border-dashed border-slate-200 rounded-lg cursor-pointer hover:border-violet-500 hover:bg-violet-50 transition-colors">
+                  <div className="w-10 h-10 bg-violet-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
                   </div>
@@ -3381,7 +3935,7 @@ export default function App() {
                   <span className={`font-bold ${
                     chartData[chartData.length - 1].total >= chartData[chartData.length - 2].total 
                       ? 'text-red-500' 
-                      : 'text-emerald-500'
+                      : 'text-violet-500'
                   }`}>
                     {chartData[chartData.length - 1].total >= chartData[chartData.length - 2].total ? '↑' : '↓'}
                     {' '}
@@ -3416,7 +3970,7 @@ export default function App() {
                         <span className="font-bold text-slate-800">
                           €{prev.total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
-                        <span className={`ml-2 text-xs font-medium ${variation >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                        <span className={`ml-2 text-xs font-medium ${variation >= 0 ? 'text-red-500' : 'text-violet-500'}`}>
                           ({variation >= 0 ? '+' : ''}{variation.toFixed(1)}%)
                         </span>
                       </div>
@@ -3467,7 +4021,7 @@ export default function App() {
                     placeholder="Rechercher..."
                     value={empSearchTerm || ''}
                     onChange={e => setEmpSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg w-full sm:w-48 focus:border-emerald-500 outline-none text-sm"
+                    className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg w-full sm:w-48 focus:border-violet-500 outline-none text-sm"
                   />
                 </div>
                 
@@ -3557,7 +4111,7 @@ export default function App() {
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
                             e.dept === 'Non assigné' 
                               ? 'bg-amber-100 text-amber-600' 
-                              : 'bg-emerald-100 text-emerald-600'
+                              : 'bg-violet-100 text-violet-600'
                           }`}>
                             {e.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                           </div>
@@ -3613,7 +4167,7 @@ export default function App() {
                               onClick={() => setEmpCurrentPage(pageNum)}
                               className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                                 currentPage === pageNum
-                                  ? 'bg-emerald-500 text-white'
+                                  ? 'bg-violet-500 text-white'
                                   : 'border border-slate-200 hover:bg-slate-50'
                               }`}
                             >
@@ -3636,7 +4190,7 @@ export default function App() {
                   {/* Total */}
                   <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
                     <span className="font-bold text-slate-700">Total ({filtered.length} employés)</span>
-                    <span className="text-xl font-bold text-emerald-600">
+                    <span className="text-xl font-bold text-violet-600">
                       €{filtered.reduce((sum, e) => sum + e.cost, 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
