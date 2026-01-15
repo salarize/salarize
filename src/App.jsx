@@ -63,11 +63,25 @@ if (typeof document !== 'undefined' && !document.getElementById('salarize-animat
       from { opacity: 0; transform: translateX(-16px); }
       to { opacity: 1; transform: translateX(0); }
     }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(100%); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideOutRight {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(100%); }
+    }
     .animate-fadeIn {
       animation: fadeIn 0.3s ease-out forwards;
     }
     .animate-slideIn {
       animation: slideIn 0.3s ease-out forwards;
+    }
+    .animate-slideInRight {
+      animation: slideInRight 0.3s ease-out forwards;
+    }
+    .animate-slideOutRight {
+      animation: slideOutRight 0.2s ease-in forwards;
     }
     .animate-stagger > * {
       opacity: 0;
@@ -81,6 +95,82 @@ if (typeof document !== 'undefined' && !document.getElementById('salarize-animat
     .animate-stagger > *:nth-child(6) { animation-delay: 0.3s; }
   `;
   document.head.appendChild(style);
+}
+
+// Toast notification system
+const ToastContext = React.createContext(null);
+
+function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+  
+  const addToast = useCallback((message, type = 'success', duration = 3000) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type, exiting: false }]);
+    
+    setTimeout(() => {
+      setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, 200);
+    }, duration);
+  }, []);
+  
+  const toast = useMemo(() => ({
+    success: (msg) => addToast(msg, 'success'),
+    error: (msg) => addToast(msg, 'error'),
+    info: (msg) => addToast(msg, 'info'),
+    warning: (msg) => addToast(msg, 'warning')
+  }), [addToast]);
+  
+  return (
+    <ToastContext.Provider value={toast}>
+      {children}
+      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+        {toasts.map(t => (
+          <div
+            key={t.id}
+            className={`px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 min-w-[280px] ${t.exiting ? 'animate-slideOutRight' : 'animate-slideInRight'} ${
+              t.type === 'success' ? 'bg-emerald-500 text-white' :
+              t.type === 'error' ? 'bg-red-500 text-white' :
+              t.type === 'warning' ? 'bg-amber-500 text-white' :
+              'bg-slate-800 text-white'
+            }`}
+          >
+            {t.type === 'success' && (
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            {t.type === 'error' && (
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            {t.type === 'warning' && (
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            )}
+            {t.type === 'info' && (
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            <span className="text-sm font-medium">{t.message}</span>
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+function useToast() {
+  const context = React.useContext(ToastContext);
+  if (!context) {
+    // Return no-op functions if outside provider
+    return { success: () => {}, error: () => {}, info: () => {}, warning: () => {} };
+  }
+  return context;
 }
 
 // Error Boundary Component
@@ -624,21 +714,32 @@ function ProfilePage({ user, onLogout }) {
 }
 
 // Dashboard Header (for when in dashboard view)
-function DashboardHeader({ user, onLogout, setCurrentPage }) {
+function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
   const [showDropdown, setShowDropdown] = useState(false);
   
   return (
-    <div className="fixed top-0 right-0 left-64 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10">
-      {/* Left side - Home link */}
-      <button 
-        onClick={() => setCurrentPage('home')}
-        className="flex items-center gap-2 text-slate-500 hover:text-violet-600 transition-colors"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-        <span className="text-sm font-medium">Accueil</span>
-      </button>
+    <div className="fixed top-0 right-0 left-0 lg:left-64 h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 z-30">
+      {/* Left side - Menu button (mobile) + Home link */}
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={onMenuClick}
+          className="p-2 -ml-2 lg:hidden hover:bg-slate-100 rounded-lg transition-colors"
+        >
+          <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        
+        <button 
+          onClick={() => setCurrentPage('home')}
+          className="flex items-center gap-2 text-slate-500 hover:text-violet-600 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          <span className="text-sm font-medium hidden sm:block">Accueil</span>
+        </button>
+      </div>
       
       {/* Right side - Profile */}
       <div className="relative">
@@ -762,7 +863,7 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
 }
 
 // Sidebar component OUTSIDE of App
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose }) {
   const [showActions, setShowActions] = useState(false);
   
   // Calculer employés non assignés
@@ -775,16 +876,39 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
     : 0;
   
   return (
-    <div className="w-64 bg-slate-900 text-white fixed h-screen flex flex-col">
-      <button 
-        onClick={() => setCurrentPage && setCurrentPage('home')}
-        className="p-6 border-b border-slate-700 flex items-center gap-3 hover:bg-slate-800 transition-colors"
-      >
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-          <span className="text-white font-black text-lg">S</span>
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      
+      <div className={`w-64 bg-slate-900 text-white fixed h-screen flex flex-col z-50 transition-transform duration-300 lg:translate-x-0 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="flex items-center justify-between">
+          <button 
+            onClick={() => setCurrentPage && setCurrentPage('home')}
+            className="flex-1 p-6 border-b border-slate-700 flex items-center gap-3 hover:bg-slate-800 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
+              <span className="text-white font-black text-lg">S</span>
+            </div>
+            <span className="text-xl font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Salarize</span>
+          </button>
+          
+          {/* Close button mobile */}
+          <button 
+            onClick={onClose}
+            className="p-4 border-b border-slate-700 lg:hidden hover:bg-slate-800 transition-colors"
+          >
+            <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <span className="text-xl font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Salarize</span>
-      </button>
       
       {/* Alerte employés non assignés */}
       {unassignedCount > 0 && (
@@ -922,10 +1046,14 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         )}
       </div>
     </div>
+    </>
   );
 }
 
 function AppContent() {
+  // Toast notifications
+  const toast = useToast();
+  
   // Helper pour formater les périodes (2024-03 → Mars 2024)
   const formatPeriod = (period) => {
     if (!period || period === 'Unknown') return period;
@@ -947,7 +1075,7 @@ function AppContent() {
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [view, setView] = useState('upload');
   const [periods, setPeriods] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [selectedPeriods, setSelectedPeriods] = useState([]); // Empty = all periods
   const [showModal, setShowModal] = useState(false);
   const [showNewCompanyModal, setShowNewCompanyModal] = useState(false);
   const [pendingData, setPendingData] = useState(null);
@@ -979,7 +1107,11 @@ function AppContent() {
   const [lastSaved, setLastSaved] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [comparePeriod, setComparePeriod] = useState(null);
+  const [comparePeriod1, setComparePeriod1] = useState(null);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null); // For employee evolution modal
+  const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile sidebar
+  const [showPeriodDropdown, setShowPeriodDropdown] = useState(false); // For period multi-select
   
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
@@ -995,6 +1127,48 @@ function AppContent() {
   useEffect(() => {
     setEmpCurrentPage(1);
   }, [debouncedEmpSearch, empDeptFilter, empSortBy]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Escape - fermer les modals
+      if (e.key === 'Escape') {
+        if (showExportModal) setShowExportModal(false);
+        else if (showDataManager) { setShowDataManager(false); setConfirmAction(null); }
+        else if (showDeptManager) { setShowDeptManager(false); setSelectedEmployees(new Set()); }
+        else if (showCompanySettings) setShowCompanySettings(false);
+        else if (showImportModal) setShowImportModal(false);
+        else if (showModal) setShowModal(false);
+        else if (showNewCompanyModal) setShowNewCompanyModal(false);
+        else if (showCompareModal) { setShowCompareModal(false); setComparePeriod(null); setComparePeriod1(null); }
+      }
+      
+      // Cmd/Ctrl + E - Export Excel
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e' && currentPage === 'dashboard') {
+        e.preventDefault();
+        if (activeCompany && employees.length > 0) {
+          exportToExcel();
+        }
+      }
+      
+      // Cmd/Ctrl + P - Export PDF (override default print)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && currentPage === 'dashboard') {
+        e.preventDefault();
+        if (activeCompany && employees.length > 0) {
+          handleExportPDF();
+        }
+      }
+      
+      // Cmd/Ctrl + I - Import
+      if ((e.metaKey || e.ctrlKey) && e.key === 'i' && currentPage === 'dashboard') {
+        e.preventDefault();
+        setShowImportModal(true);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, activeCompany, employees.length]);
 
   // Check auth state on load
   useEffect(() => {
@@ -1342,13 +1516,13 @@ function AppContent() {
     if (!activeCompany || employees.length === 0) return;
     
     const company = companies[activeCompany];
-    const filtered = selectedPeriod === 'all' 
+    const filteredData = selectedPeriods.length === 0 
       ? employees 
-      : employees.filter(e => e.period === selectedPeriod);
+      : employees.filter(e => selectedPeriods.includes(e.period));
     
     // Feuille 1 : Résumé
     const deptData = {};
-    filtered.forEach(e => {
+    filteredData.forEach(e => {
       const dept = e.department || departmentMapping[e.name] || 'Non assigné';
       if (!deptData[dept]) deptData[dept] = { count: 0, cost: 0 };
       deptData[dept].count++;
@@ -1362,16 +1536,16 @@ function AppContent() {
       'Coût moyen (€)': Math.round((data.cost / data.count) * 100) / 100
     }));
     
-    const totalCost = filtered.reduce((sum, e) => sum + e.totalCost, 0);
+    const totalCostExport = filteredData.reduce((sum, e) => sum + e.totalCost, 0);
     summaryData.push({
       'Département': 'TOTAL',
-      'Nombre d\'employés': filtered.length,
-      'Coût total (€)': Math.round(totalCost * 100) / 100,
-      'Coût moyen (€)': Math.round((totalCost / filtered.length) * 100) / 100
+      'Nombre d\'employés': filteredData.length,
+      'Coût total (€)': Math.round(totalCostExport * 100) / 100,
+      'Coût moyen (€)': Math.round((totalCostExport / filteredData.length) * 100) / 100
     });
     
     // Feuille 2 : Détail employés
-    const detailData = filtered.map(e => ({
+    const detailData = filteredData.map(e => ({
       'Nom': e.name,
       'Département': e.department || departmentMapping[e.name] || 'Non assigné',
       'Fonction': e.function || '-',
@@ -1388,8 +1562,9 @@ function AppContent() {
     XLSX.utils.book_append_sheet(wb, ws2, 'Détail employés');
     
     // Télécharger
-    const periodStr = selectedPeriod === 'all' ? 'Complet' : formatPeriod(selectedPeriod);
+    const periodStr = selectedPeriods.length === 0 ? 'Complet' : selectedPeriods.map(formatPeriod).join('_');
     XLSX.writeFile(wb, `Salarize_${activeCompany}_${periodStr}.xlsx`);
+    toast.success('Export Excel téléchargé');
   };
 
   // Export PDF
@@ -1397,16 +1572,16 @@ function AppContent() {
     if (!activeCompany || employees.length === 0) return;
     
     const company = companies[activeCompany];
-    const filtered = selectedPeriod === 'all' 
+    const filteredData = selectedPeriods.length === 0 
       ? employees 
-      : employees.filter(e => e.period === selectedPeriod);
+      : employees.filter(e => selectedPeriods.includes(e.period));
     
     // Calculs
-    const totalCost = filtered.reduce((sum, e) => sum + e.totalCost, 0);
-    const avgCost = totalCost / filtered.length;
+    const totalCostPdf = filteredData.reduce((sum, e) => sum + e.totalCost, 0);
+    const avgCost = totalCostPdf / filteredData.length;
     
     const deptData = {};
-    filtered.forEach(e => {
+    filteredData.forEach(e => {
       const dept = e.department || departmentMapping[e.name] || 'Non assigné';
       if (!deptData[dept]) deptData[dept] = { count: 0, cost: 0 };
       deptData[dept].count++;
@@ -1419,7 +1594,7 @@ function AppContent() {
     
     // Top 10 employés
     const empAgg = {};
-    filtered.forEach(e => {
+    filteredData.forEach(e => {
       if (!empAgg[e.name]) empAgg[e.name] = { name: e.name, dept: e.department || departmentMapping[e.name] || 'Non assigné', cost: 0 };
       empAgg[e.name].cost += e.totalCost;
     });
@@ -1448,8 +1623,8 @@ function AppContent() {
     doc.text(activeCompany, 20, 35);
     
     // Période
-    const periodStr = selectedPeriod === 'all' ? 'Toutes périodes' : formatPeriod(selectedPeriod);
-    doc.text(periodStr, pageWidth - 20, 25, { align: 'right' });
+    const periodStr = selectedPeriods.length === 0 ? 'Toutes périodes' : selectedPeriods.map(formatPeriod).join(', ');
+    doc.text(periodStr.length > 30 ? periodStr.substring(0, 30) + '...' : periodStr, pageWidth - 20, 25, { align: 'right' });
     doc.text(new Date().toLocaleDateString('fr-FR'), pageWidth - 20, 35, { align: 'right' });
     
     y = 55;
@@ -2567,7 +2742,7 @@ function AppContent() {
             ${logoHtml}
             <div>
               <h1>${activeCompany}</h1>
-              <div class="header-subtitle">Rapport des coûts salariaux • ${selectedPeriod === 'all' ? 'Toutes périodes' : formatPeriod(selectedPeriod)}</div>
+              <div class="header-subtitle">Rapport des coûts salariaux • ${selectedPeriods.length === 0 ? 'Toutes périodes' : selectedPeriods.map(formatPeriod).join(', ')}</div>
             </div>
           </div>
           <div class="brand">
@@ -2679,6 +2854,7 @@ function AppContent() {
     const printWindow = window.open('', '_blank');
     printWindow.document.write(html);
     printWindow.document.close();
+    toast.success('Rapport PDF généré');
   };
 
   // Load user from localStorage
@@ -2749,8 +2925,10 @@ function AppContent() {
 
   // Computed values with useMemo for performance
   const filtered = useMemo(() => 
-    selectedPeriod === 'all' ? employees : employees.filter(e => e.period === selectedPeriod),
-    [employees, selectedPeriod]
+    selectedPeriods.length === 0 
+      ? employees 
+      : employees.filter(e => selectedPeriods.includes(e.period)),
+    [employees, selectedPeriods]
   );
   
   const totalCost = useMemo(() => 
@@ -3074,6 +3252,8 @@ function AppContent() {
             onManageDepts={() => setShowDeptManager(true)}
             debugMsg={debugMsg}
             setCurrentPage={setCurrentPage}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -3084,7 +3264,7 @@ function AppContent() {
               onCancel={handleModalCancel}
             />
           )}
-          <div className="ml-64 flex-1 flex items-center justify-center bg-slate-100 p-4">
+          <div className="lg:ml-64 flex-1 flex items-center justify-center bg-slate-100 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center shadow-xl">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <p className="font-semibold text-amber-800">🏷️ {pendingAssignments.length} employé(s) sans département</p>
@@ -3119,15 +3299,22 @@ function AppContent() {
         <Sidebar 
           companies={companies}
           activeCompany={activeCompany}
-          onSelectCompany={loadCompany}
-          onImportClick={() => setShowImportModal(true)}
-          onAddCompany={() => setShowNewCompanyModal(true)}
-          onManageData={() => setShowDataManager(true)}
-        onManageDepts={() => setShowDeptManager(true)}
-        debugMsg={debugMsg}
-        setCurrentPage={setCurrentPage}
-      />
-      <DashboardHeader user={user} onLogout={handleLogout} setCurrentPage={setCurrentPage} />
+          onSelectCompany={(name) => { loadCompany(name); setSidebarOpen(false); }}
+          onImportClick={() => { setShowImportModal(true); setSidebarOpen(false); }}
+          onAddCompany={() => { setShowNewCompanyModal(true); setSidebarOpen(false); }}
+          onManageData={() => { setShowDataManager(true); setSidebarOpen(false); }}
+          onManageDepts={() => { setShowDeptManager(true); setSidebarOpen(false); }}
+          debugMsg={debugMsg}
+          setCurrentPage={setCurrentPage}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+        <DashboardHeader 
+          user={user} 
+          onLogout={handleLogout} 
+          setCurrentPage={setCurrentPage} 
+          onMenuClick={() => setSidebarOpen(true)}
+        />
       {showModal && pendingData && (
         <SelectCompanyModal 
           companies={companies}
@@ -3988,7 +4175,7 @@ function AppContent() {
         </div>
       )}
       
-      <main className="ml-64 mt-14 flex-1 p-6">
+      <main className="lg:ml-64 mt-14 flex-1 p-4 lg:p-6">
         <div className="flex items-center gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="relative group">
@@ -4072,39 +4259,111 @@ function AppContent() {
           <div className="flex-1" />
           
           <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors text-sm font-medium text-emerald-700 border border-emerald-200"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Excel
+          </button>
+          
+          <button
             onClick={handleExportPDF}
             className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm font-medium text-slate-700"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Exporter PDF
+            PDF
           </button>
           
           {periods.length > 1 && (
-            <select 
-              value={selectedPeriod} 
-              onChange={e => setSelectedPeriod(e.target.value)} 
-              className="px-3 py-2 border border-slate-200 rounded-lg bg-white"
-            >
-              <option value="all">Toutes périodes</option>
-              {(() => {
-                const grouped = periods.reduce((acc, p) => {
-                  const year = p.substring(0, 4);
-                  if (!acc[year]) acc[year] = [];
-                  acc[year].push(p);
-                  return acc;
-                }, {});
-                
-                return Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => (
-                  <optgroup key={year} label={`── ${year} ──`}>
-                    {yearPeriods.sort().reverse().map(p => (
-                      <option key={p} value={p}>{formatPeriod(p)}</option>
-                    ))}
-                  </optgroup>
-                ));
-              })()}
-            </select>
+            <div className="relative">
+              <button
+                onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+                className="px-3 py-2 border border-slate-200 rounded-lg bg-white flex items-center gap-2 hover:border-slate-300 transition-colors"
+              >
+                <span className="text-sm">
+                  {selectedPeriods.length === 0 
+                    ? 'Toutes périodes' 
+                    : selectedPeriods.length === 1 
+                      ? formatPeriod(selectedPeriods[0])
+                      : `${selectedPeriods.length} périodes`}
+                </span>
+                <svg className={`w-4 h-4 text-slate-400 transition-transform ${showPeriodDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              {showPeriodDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowPeriodDropdown(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 w-64 max-h-80 overflow-y-auto">
+                    <div className="p-2 border-b border-slate-100 sticky top-0 bg-white">
+                      <button
+                        onClick={() => setSelectedPeriods([])}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                          selectedPeriods.length === 0 ? 'bg-violet-100 text-violet-700 font-medium' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        ✓ Toutes les périodes
+                      </button>
+                    </div>
+                    
+                    {(() => {
+                      const grouped = periods.reduce((acc, p) => {
+                        const year = p.substring(0, 4);
+                        if (!acc[year]) acc[year] = [];
+                        acc[year].push(p);
+                        return acc;
+                      }, {});
+                      
+                      return Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => (
+                        <div key={year} className="p-2">
+                          <div className="flex items-center justify-between px-2 mb-1">
+                            <span className="text-xs font-semibold text-slate-500 uppercase">{year}</span>
+                            <button
+                              onClick={() => {
+                                const allYearSelected = yearPeriods.every(p => selectedPeriods.includes(p));
+                                if (allYearSelected) {
+                                  setSelectedPeriods(selectedPeriods.filter(p => !yearPeriods.includes(p)));
+                                } else {
+                                  setSelectedPeriods([...new Set([...selectedPeriods, ...yearPeriods])]);
+                                }
+                              }}
+                              className="text-xs text-violet-600 hover:text-violet-700"
+                            >
+                              {yearPeriods.every(p => selectedPeriods.includes(p)) ? 'Désél.' : 'Tout'}
+                            </button>
+                          </div>
+                          {yearPeriods.sort().reverse().map(p => (
+                            <label
+                              key={p}
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedPeriods.includes(p)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedPeriods([...selectedPeriods, p]);
+                                  } else {
+                                    setSelectedPeriods(selectedPeriods.filter(sp => sp !== p));
+                                  }
+                                }}
+                                className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                              />
+                              <span className="text-sm">{formatPeriod(p)}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -4584,7 +4843,11 @@ function AppContent() {
                   {/* Cards Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                     {paginatedEmps.map((e, i) => (
-                      <div key={i} className="bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors border border-slate-100 hover:border-slate-200">
+                      <div 
+                        key={i} 
+                        onClick={() => setSelectedEmployee(e.name)}
+                        className="bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors border border-slate-100 hover:border-slate-200 cursor-pointer"
+                      >
                         <div className="flex items-start gap-3">
                           {/* Avatar */}
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
@@ -4605,6 +4868,10 @@ function AppContent() {
                               {e.dept}
                             </span>
                           </div>
+                          
+                          <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
                         </div>
                         
                         <div className="mt-3 pt-3 border-t border-slate-200">
@@ -4698,7 +4965,7 @@ function AppContent() {
             <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
               <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="text-xl font-bold">📊 Comparer deux périodes</h2>
-                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="p-2 hover:bg-slate-100 rounded-lg">
+                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); setComparePeriod1(null); }} className="p-2 hover:bg-slate-100 rounded-lg">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -4710,8 +4977,8 @@ function AppContent() {
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Période 1</label>
                     <select 
-                      value={selectedPeriod === 'all' ? (periods[periods.length - 2] || '') : selectedPeriod}
-                      onChange={(e) => setSelectedPeriod(e.target.value)}
+                      value={comparePeriod1 || (periods.length > 1 ? periods[periods.length - 2] : '')}
+                      onChange={(e) => setComparePeriod1(e.target.value)}
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-violet-500 outline-none"
                     >
                       {periods.sort().map(p => (
@@ -4734,7 +5001,7 @@ function AppContent() {
                 </div>
                 
                 {(() => {
-                  const period1 = selectedPeriod === 'all' ? periods[periods.length - 2] : selectedPeriod;
+                  const period1 = comparePeriod1 || (periods.length > 1 ? periods[periods.length - 2] : null);
                   const period2 = comparePeriod || periods[periods.length - 1];
                   
                   if (!period1 || !period2 || period1 === period2) {
@@ -4804,9 +5071,171 @@ function AppContent() {
               </div>
               
               <div className="p-4 border-t border-slate-200 bg-slate-50">
-                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800">
+                <button onClick={() => { setShowCompareModal(false); setComparePeriod(null); setComparePeriod1(null); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800">
                   Fermer
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Employee Evolution Modal */}
+        {selectedEmployee && (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setSelectedEmployee(null); }}
+          >
+            <div className="min-h-full flex items-start justify-center p-4 pt-8 pb-8">
+              <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-br from-violet-600 via-violet-700 to-purple-800 p-6 text-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center text-xl font-bold">
+                        {selectedEmployee.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold tracking-tight">{selectedEmployee}</h2>
+                        <p className="text-violet-200 text-sm mt-0.5">
+                          {employees.find(e => e.name === selectedEmployee)?.department || 
+                           departmentMapping[selectedEmployee] || 'Non assigné'}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setSelectedEmployee(null)}
+                      className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Evolution Chart */}
+                <div className="p-6">
+                  {(() => {
+                    const empData = employees
+                      .filter(e => e.name === selectedEmployee)
+                      .sort((a, b) => a.period.localeCompare(b.period));
+                    
+                    const chartData = empData.map(e => ({
+                      period: formatPeriod(e.period),
+                      cost: e.totalCost
+                    }));
+                    
+                    const totalCost = empData.reduce((s, e) => s + e.totalCost, 0);
+                    const avgCost = empData.length > 0 ? totalCost / empData.length : 0;
+                    const minCost = empData.length > 0 ? Math.min(...empData.map(e => e.totalCost)) : 0;
+                    const maxCost = empData.length > 0 ? Math.max(...empData.map(e => e.totalCost)) : 0;
+                    
+                    // Variation
+                    let variation = null;
+                    if (empData.length >= 2) {
+                      const first = empData[0].totalCost;
+                      const last = empData[empData.length - 1].totalCost;
+                      variation = ((last - first) / first) * 100;
+                    }
+                    
+                    return (
+                      <>
+                        {/* Stats */}
+                        <div className="grid grid-cols-4 gap-3 mb-6">
+                          <div className="bg-slate-50 rounded-xl p-3 text-center">
+                            <div className="text-xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                            <div className="text-xs text-slate-500">Total</div>
+                          </div>
+                          <div className="bg-slate-50 rounded-xl p-3 text-center">
+                            <div className="text-xl font-bold text-slate-800">€{avgCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                            <div className="text-xs text-slate-500">Moyenne</div>
+                          </div>
+                          <div className="bg-slate-50 rounded-xl p-3 text-center">
+                            <div className="text-xl font-bold text-slate-800">{empData.length}</div>
+                            <div className="text-xs text-slate-500">Périodes</div>
+                          </div>
+                          {variation !== null && (
+                            <div className={`rounded-xl p-3 text-center ${variation >= 0 ? 'bg-red-50' : 'bg-green-50'}`}>
+                              <div className={`text-xl font-bold ${variation >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {variation >= 0 ? '+' : ''}{variation.toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-slate-500">Évolution</div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Chart */}
+                        {chartData.length > 1 ? (
+                          <div className="h-64 mb-6">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                                <XAxis 
+                                  dataKey="period" 
+                                  tick={{ fontSize: 11, fill: '#64748B' }}
+                                  axisLine={{ stroke: '#E2E8F0' }}
+                                />
+                                <YAxis 
+                                  tick={{ fontSize: 11, fill: '#64748B' }}
+                                  axisLine={{ stroke: '#E2E8F0' }}
+                                  tickFormatter={v => `€${(v/1000).toFixed(0)}k`}
+                                />
+                                <Tooltip 
+                                  formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût']}
+                                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                />
+                                <Bar dataKey="cost" fill="#8B5CF6" radius={[6, 6, 0, 0]} />
+                                <ReferenceLine y={avgCost} stroke="#A78BFA" strokeDasharray="5 5" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        ) : (
+                          <div className="bg-slate-50 rounded-xl p-8 text-center mb-6">
+                            <p className="text-slate-500">Une seule période disponible</p>
+                          </div>
+                        )}
+                        
+                        {/* Detail by period */}
+                        <div className="border border-slate-200 rounded-xl overflow-hidden">
+                          <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
+                            <h4 className="font-semibold text-slate-700 text-sm">Détail par période</h4>
+                          </div>
+                          <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                            {empData.map((e, i) => {
+                              const prevCost = i > 0 ? empData[i - 1].totalCost : null;
+                              const diff = prevCost ? ((e.totalCost - prevCost) / prevCost) * 100 : null;
+                              
+                              return (
+                                <div key={e.period} className="flex items-center justify-between px-4 py-3">
+                                  <span className="text-sm text-slate-600">{formatPeriod(e.period)}</span>
+                                  <div className="flex items-center gap-3">
+                                    {diff !== null && (
+                                      <span className={`text-xs font-medium ${diff >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                        {diff >= 0 ? '+' : ''}{diff.toFixed(1)}%
+                                      </span>
+                                    )}
+                                    <span className="font-semibold text-slate-800">
+                                      €{e.totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                
+                <div className="p-4 border-t border-slate-200 bg-slate-50">
+                  <button 
+                    onClick={() => setSelectedEmployee(null)}
+                    className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800"
+                  >
+                    Fermer
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -4817,11 +5246,13 @@ function AppContent() {
   );
 }
 
-// Export avec Error Boundary
+// Export avec Error Boundary et Toast Provider
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </ErrorBoundary>
   );
 }
