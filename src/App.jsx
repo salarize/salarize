@@ -648,7 +648,8 @@ export default function App() {
   const [showMergeDept, setShowMergeDept] = useState(false);
   const [mergeDeptFrom, setMergeDeptFrom] = useState('');
   const [mergeDeptTo, setMergeDeptTo] = useState('');
-  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'
+  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   
   // Employee detail section states
