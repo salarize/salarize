@@ -674,6 +674,7 @@ export default function App() {
           email: session.user.email,
           picture: session.user.user_metadata?.avatar_url
         });
+        setCurrentPage('dashboard');
         loadFromSupabase(session.user.id);
       } else {
         // Not logged in, load from localStorage
@@ -690,6 +691,7 @@ export default function App() {
           email: session.user.email,
           picture: session.user.user_metadata?.avatar_url
         });
+        setCurrentPage('dashboard');
         loadFromSupabase(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -697,6 +699,7 @@ export default function App() {
         setActiveCompany(null);
         setEmployees([]);
         setView('upload');
+        setCurrentPage('home');
       }
     });
 
@@ -1922,8 +1925,8 @@ export default function App() {
     );
   }
 
-  // Landing page (non connecté ou page home)
-  if (!user || currentPage === 'home' || currentPage === 'features') {
+  // Landing page (non connecté uniquement)
+  if (!user) {
     return (
       <>
         <LandingHeader 
@@ -1938,7 +1941,7 @@ export default function App() {
     );
   }
 
-  // Profile page
+  // Profile page (connecté)
   if (currentPage === 'profile') {
     return (
       <>
@@ -1952,6 +1955,11 @@ export default function App() {
         <ProfilePage user={user} onLogout={handleLogout} />
       </>
     );
+  }
+
+  // Home page when logged in -> redirect to dashboard/upload
+  if (currentPage === 'home') {
+    setCurrentPage('dashboard');
   }
 
   // Upload screen (connected but no companies yet)
