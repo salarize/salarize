@@ -870,39 +870,94 @@ export default function App() {
     
     const initAuth = async () => {
       // 1. Vérifier si on a un hash avec access_token (retour OAuth)
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hash = window.location.hash;
+      
+      if (hash && hash.includes('access_token')) {
+        const hashParams = new URLSearchParams(hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         
         if (accessToken && refreshToken) {
-          // Forcer la création de session avec les tokens
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-          
-          if (!error && data.session) {
-            // Nettoyer l'URL
-            window.history.replaceState(null, '', window.location.pathname);
-            
-            if (!mounted) return;
-            
-            setUser({
-              id: data.session.user.id,
-              name: data.session.user.user_metadata?.full_name || data.session.user.email,
-              email: data.session.user.email,
-              picture: data.session.user.user_metadata?.avatar_url
+          try {
+            // Forcer la création de session avec les tokens
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
             });
-            setCurrentPage('dashboard');
-            loadFromSupabase(data.session.user.id);
-            setIsLoading(false);
-            return; // On a réussi, on sort
+            
+            if (error) {
+              console.error('setSession error:', error);
+              // En cas d'erreur, stocker les tokens pour retry
+              localStorage.setItem('salarize_pending_auth', JSON.stringify({
+                accessToken,
+                refreshToken,
+                timestamp: Date.now()
+              }));
+              // Recharger la page sans le hash
+              window.location.href = window.location.origin + window.location.pathname;
+              return;
+            }
+            
+            if (data.session) {
+              // Succès ! Nettoyer l'URL
+              window.history.replaceState(null, '', window.location.pathname);
+              
+              if (!mounted) return;
+              
+              setUser({
+                id: data.session.user.id,
+                name: data.session.user.user_metadata?.full_name || data.session.user.email,
+                email: data.session.user.email,
+                picture: data.session.user.user_metadata?.avatar_url
+              });
+              setCurrentPage('dashboard');
+              loadFromSupabase(data.session.user.id);
+              setIsLoading(false);
+              return;
+            }
+          } catch (err) {
+            console.error('Auth exception:', err);
           }
         }
       }
       
-      // 2. Sinon, vérifier s'il y a une session existante
+      // 2. Vérifier s'il y a des tokens en attente (retry après reload sur mobile)
+      const pendingAuth = localStorage.getItem('salarize_pending_auth');
+      if (pendingAuth) {
+        try {
+          const { accessToken, refreshToken, timestamp } = JSON.parse(pendingAuth);
+          // Valide seulement si moins de 5 minutes
+          if (Date.now() - timestamp < 5 * 60 * 1000) {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+            
+            if (!error && data.session) {
+              localStorage.removeItem('salarize_pending_auth');
+              
+              if (!mounted) return;
+              
+              setUser({
+                id: data.session.user.id,
+                name: data.session.user.user_metadata?.full_name || data.session.user.email,
+                email: data.session.user.email,
+                picture: data.session.user.user_metadata?.avatar_url
+              });
+              setCurrentPage('dashboard');
+              loadFromSupabase(data.session.user.id);
+              setIsLoading(false);
+              return;
+            }
+          }
+          // Tokens expirés ou invalides, nettoyer
+          localStorage.removeItem('salarize_pending_auth');
+        } catch (e) {
+          localStorage.removeItem('salarize_pending_auth');
+        }
+      }
+      
+      // 3. Sinon, vérifier s'il y a une session existante
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!mounted) return;
