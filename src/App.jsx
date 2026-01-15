@@ -6,7 +6,35 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase configuration
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P9GYtRaIr5DOIqIP_fh-BYR9Jo';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    flowType: 'pkce',
+    detectSessionInUrl: true,
+    persistSession: true,
+    storageKey: 'salarize-auth',
+    storage: {
+      getItem: (key) => {
+        try {
+          return localStorage.getItem(key) || sessionStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      },
+      setItem: (key, value) => {
+        try {
+          localStorage.setItem(key, value);
+          sessionStorage.setItem(key, value);
+        } catch {}
+      },
+      removeItem: (key) => {
+        try {
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        } catch {}
+      }
+    }
+  }
+});
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
 
@@ -869,95 +897,39 @@ export default function App() {
     let mounted = true;
     
     const initAuth = async () => {
-      // 1. Vérifier si on a un hash avec access_token (retour OAuth)
-      const hash = window.location.hash;
+      // Avec PKCE, Supabase gère automatiquement le code dans l'URL
+      // On doit juste attendre que ça se fasse
       
-      if (hash && hash.includes('access_token')) {
-        const hashParams = new URLSearchParams(hash.substring(1));
+      // Vérifier s'il y a un code dans l'URL (PKCE flow)
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      
+      if (code) {
+        // Laisser Supabase échanger le code contre une session
+        // Cela se fait automatiquement via detectSessionInUrl
+        // Attendre un peu pour laisser le temps
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Nettoyer l'URL
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      
+      // Aussi gérer le hash (ancien flow implicite) au cas où
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         
         if (accessToken && refreshToken) {
-          try {
-            // Forcer la création de session avec les tokens
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
-            
-            if (error) {
-              console.error('setSession error:', error);
-              // En cas d'erreur, stocker les tokens pour retry
-              localStorage.setItem('salarize_pending_auth', JSON.stringify({
-                accessToken,
-                refreshToken,
-                timestamp: Date.now()
-              }));
-              // Recharger la page sans le hash
-              window.location.href = window.location.origin + window.location.pathname;
-              return;
-            }
-            
-            if (data.session) {
-              // Succès ! Nettoyer l'URL
-              window.history.replaceState(null, '', window.location.pathname);
-              
-              if (!mounted) return;
-              
-              setUser({
-                id: data.session.user.id,
-                name: data.session.user.user_metadata?.full_name || data.session.user.email,
-                email: data.session.user.email,
-                picture: data.session.user.user_metadata?.avatar_url
-              });
-              setCurrentPage('dashboard');
-              loadFromSupabase(data.session.user.id);
-              setIsLoading(false);
-              return;
-            }
-          } catch (err) {
-            console.error('Auth exception:', err);
-          }
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          window.history.replaceState(null, '', window.location.pathname);
         }
       }
       
-      // 2. Vérifier s'il y a des tokens en attente (retry après reload sur mobile)
-      const pendingAuth = localStorage.getItem('salarize_pending_auth');
-      if (pendingAuth) {
-        try {
-          const { accessToken, refreshToken, timestamp } = JSON.parse(pendingAuth);
-          // Valide seulement si moins de 5 minutes
-          if (Date.now() - timestamp < 5 * 60 * 1000) {
-            const { data, error } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken
-            });
-            
-            if (!error && data.session) {
-              localStorage.removeItem('salarize_pending_auth');
-              
-              if (!mounted) return;
-              
-              setUser({
-                id: data.session.user.id,
-                name: data.session.user.user_metadata?.full_name || data.session.user.email,
-                email: data.session.user.email,
-                picture: data.session.user.user_metadata?.avatar_url
-              });
-              setCurrentPage('dashboard');
-              loadFromSupabase(data.session.user.id);
-              setIsLoading(false);
-              return;
-            }
-          }
-          // Tokens expirés ou invalides, nettoyer
-          localStorage.removeItem('salarize_pending_auth');
-        } catch (e) {
-          localStorage.removeItem('salarize_pending_auth');
-        }
-      }
-      
-      // 3. Sinon, vérifier s'il y a une session existante
+      // Récupérer la session
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!mounted) return;
@@ -1423,13 +1395,9 @@ export default function App() {
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
-          },
-          // Forcer PKCE pour meilleure compatibilité mobile
-          skipBrowserRedirect: false,
+          }
         }
       });
-      
-      console.log('Login initiated:', data);
       
       if (error) {
         console.error('Login error:', error);
