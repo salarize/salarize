@@ -6608,30 +6608,30 @@ L'équipe Salarize`;
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                       
-                      <span className="font-medium text-slate-700 text-sm truncate flex-1">{dept}</span>
+                      <span className="font-medium text-slate-700 text-sm w-28 truncate">{dept}</span>
+                      
+                      {/* Barre de progression - largeur fixe */}
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden w-32 sm:w-48 flex-shrink-0">
+                        <div 
+                          className="h-full rounded-full" 
+                          style={{ 
+                            width: `${(data.total / maxCost) * 100}%`,
+                            backgroundColor: `rgb(${getBrandColor()})`
+                          }} 
+                        />
+                      </div>
                       
                       {/* Comparaisons inline */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 ml-auto">
                         {comparison.variationVsPrevMonth !== null && (
                           <span className={`text-xs font-medium ${comparison.variationVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                             {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
                           </span>
                         )}
-                        <span className="text-xs text-slate-400">{data.count} emp.</span>
+                        <span className="text-xs text-slate-400 hidden sm:inline">{data.count} emp.</span>
                         <span className="text-xs text-slate-400 w-10 text-right">{pct}%</span>
-                        <span className="font-semibold text-slate-800 text-sm w-24 text-right">€{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</span>
+                        <span className="font-semibold text-slate-800 text-sm w-20 sm:w-24 text-right">€{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</span>
                       </div>
-                    </div>
-                    
-                    {/* Barre de progression fine */}
-                    <div className="h-1 bg-slate-100 rounded-full overflow-hidden mt-1.5 ml-5">
-                      <div 
-                        className="h-full rounded-full" 
-                        style={{ 
-                          width: `${(data.total / maxCost) * 100}%`,
-                          backgroundColor: `rgb(${getBrandColor()})`
-                        }} 
-                      />
                     </div>
                   </div>
                   
