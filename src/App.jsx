@@ -2028,7 +2028,43 @@ function AppContent() {
     let mounted = true;
     
     const initAuth = async () => {
-      // Récupérer la session
+      // Détecter le token dans le hash (flow implicite)
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          
+          if (error) {
+            console.error('Session error:', error);
+          } else if (data.session) {
+            // Nettoyer l'URL
+            window.history.replaceState(null, '', window.location.pathname);
+            
+            // Mettre à jour l'user
+            const user = data.session.user;
+            setUser({
+              id: user.id,
+              name: user.user_metadata?.full_name || user.user_metadata?.name || user.email,
+              email: user.email,
+              picture: user.user_metadata?.avatar_url || user.user_metadata?.picture,
+              created_at: user.created_at,
+              provider: user.app_metadata?.provider || 'email'
+            });
+            setCurrentPage('dashboard');
+            loadFromSupabase(user.id);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+      
+      // Récupérer la session existante
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
