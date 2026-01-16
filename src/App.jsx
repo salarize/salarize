@@ -6,14 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase configuration
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P9GYtRaIr5DOIqIP_fh-BYR9Jo';
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    flowType: 'implicit',
-    detectSessionInUrl: true,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
-});
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Helper pour obtenir une session valide
 const getValidSession = async () => {
@@ -2035,17 +2028,12 @@ function AppContent() {
     let mounted = true;
     
     const initAuth = async () => {
-      // Gérer le hash (flow implicite) - le token est dans l'URL
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-        // Supabase détecte automatiquement le token avec detectSessionInUrl
-        // Attendre un peu pour que Supabase traite le token
-        await new Promise(resolve => setTimeout(resolve, 500));
-        // Nettoyer l'URL
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-      
       // Récupérer la session
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Auth error:', error);
+      }
       
       if (!mounted) return;
       
@@ -2058,11 +2046,11 @@ function AppContent() {
           created_at: session.user.created_at,
           provider: session.user.app_metadata?.provider || 'email'
         });
-        // Ne pas rediriger automatiquement - rester sur la landing page
         loadFromSupabase(session.user.id);
       } else {
         loadFromLocalStorage();
       }
+      setIsLoading(false);
     };
     
     initAuth();
