@@ -5967,7 +5967,7 @@ L'équipe Salarize`;
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-1">
               <p className="text-slate-400 text-sm">Coût Total</p>
-              {comparisonData?.variationVsPrevMonth !== null && (
+              {comparisonData && comparisonData.variationVsPrevMonth !== null && (
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                   comparisonData.variationVsPrevMonth >= 0 
                     ? 'bg-red-50 text-red-600' 
@@ -5978,7 +5978,7 @@ L'équipe Salarize`;
               )}
             </div>
             <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
-            {comparisonData?.diffVsPrevMonth !== null && (
+            {comparisonData && comparisonData.diffVsPrevMonth !== null && (
               <p className={`text-xs mt-1 ${comparisonData.diffVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                 {comparisonData.diffVsPrevMonth >= 0 ? '+' : ''}€{comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })} vs mois préc.
               </p>
@@ -6028,25 +6028,27 @@ L'équipe Salarize`;
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-slate-300">Mois actuel</span>
-                    <span className="font-bold">€{comparisonData.current.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-300">Mois précédent</span>
-                    <span className="font-bold">€{comparisonData.prevMonth.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold">€{comparisonData.prevMonth?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="border-t border-slate-700 pt-3">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-300">Différence</span>
-                      <span className={`font-bold text-lg ${comparisonData.diffVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {comparisonData.diffVsPrevMonth >= 0 ? '+' : ''}€{comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+                      <span className={`font-bold text-lg ${(comparisonData.diffVsPrevMonth || 0) >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {(comparisonData.diffVsPrevMonth || 0) >= 0 ? '+' : ''}€{(comparisonData.diffVsPrevMonth || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center mt-1">
-                      <span className="text-slate-400 text-sm">Variation</span>
-                      <span className={`font-semibold ${comparisonData.variationVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(2)}%
-                      </span>
-                    </div>
+                    {comparisonData.variationVsPrevMonth !== null && (
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-slate-400 text-sm">Variation</span>
+                        <span className={`font-semibold ${comparisonData.variationVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(2)}%
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -6072,25 +6074,27 @@ L'équipe Salarize`;
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-violet-200">Cette année</span>
-                    <span className="font-bold">€{comparisonData.current.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-violet-200">Année précédente</span>
-                    <span className="font-bold">€{comparisonData.sameMonthLastYear.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                    <span className="font-bold">€{comparisonData.sameMonthLastYear?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="border-t border-violet-500/50 pt-3">
                     <div className="flex justify-between items-center">
                       <span className="text-violet-200">Différence</span>
-                      <span className={`font-bold text-lg ${comparisonData.diffVsLastYear >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
-                        {comparisonData.diffVsLastYear >= 0 ? '+' : ''}€{comparisonData.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+                      <span className={`font-bold text-lg ${(comparisonData.diffVsLastYear || 0) >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                        {(comparisonData.diffVsLastYear || 0) >= 0 ? '+' : ''}€{(comparisonData.diffVsLastYear || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center mt-1">
-                      <span className="text-violet-300 text-sm">Variation annuelle</span>
-                      <span className={`font-semibold ${comparisonData.variationVsLastYear >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
-                        {comparisonData.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsLastYear).toFixed(2)}%
-                      </span>
-                    </div>
+                    {comparisonData.variationVsLastYear !== null && (
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-violet-300 text-sm">Variation annuelle</span>
+                        <span className={`font-semibold ${comparisonData.variationVsLastYear >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                          {comparisonData.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsLastYear).toFixed(2)}%
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
