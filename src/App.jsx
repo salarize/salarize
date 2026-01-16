@@ -87,6 +87,249 @@ if (typeof document !== 'undefined' && !document.getElementById('salarize-animat
   document.head.appendChild(style);
 }
 
+// ============================================
+// COMPOSANTS RÉUTILISABLES & OPTIMISATIONS
+// ============================================
+
+// Skeleton Loading Components
+const Skeleton = ({ className = '', variant = 'rect' }) => {
+  const baseClass = 'animate-pulse bg-slate-200 rounded';
+  if (variant === 'circle') return <div className={`${baseClass} rounded-full ${className}`} />;
+  if (variant === 'text') return <div className={`${baseClass} h-4 ${className}`} />;
+  return <div className={`${baseClass} ${className}`} />;
+};
+
+const CardSkeleton = () => (
+  <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+    <div className="flex items-center justify-between mb-2">
+      <Skeleton variant="text" className="w-20 h-3" />
+      <Skeleton className="w-12 h-5 rounded-full" />
+    </div>
+    <Skeleton variant="text" className="w-32 h-7 mb-1" />
+    <Skeleton variant="text" className="w-24 h-3" />
+  </div>
+);
+
+const ChartSkeleton = () => (
+  <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+    <div className="flex items-center justify-between mb-4">
+      <Skeleton variant="text" className="w-48 h-5" />
+      <Skeleton className="w-32 h-8 rounded-lg" />
+    </div>
+    <div className="h-64 flex items-end gap-2 pt-8">
+      {[40, 65, 45, 80, 55, 70, 60, 75, 50, 85, 65, 72].map((h, i) => (
+        <Skeleton key={i} className="flex-1 rounded-t" style={{ height: `${h}%` }} />
+      ))}
+    </div>
+  </div>
+);
+
+const DeptListSkeleton = () => (
+  <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+    <div className="flex items-center justify-between mb-3">
+      <Skeleton variant="text" className="w-48 h-5" />
+    </div>
+    <div className="space-y-2">
+      {[1, 2, 3, 4, 5].map(i => (
+        <div key={i} className="py-2.5">
+          <div className="flex items-center gap-2">
+            <Skeleton className="w-3 h-3" />
+            <Skeleton variant="text" className="w-24 h-4" />
+            <div className="flex-1" />
+            <Skeleton variant="text" className="w-8 h-4" />
+            <Skeleton variant="text" className="w-12 h-4" />
+            <Skeleton variant="text" className="w-20 h-4" />
+          </div>
+          <Skeleton className="h-1 mt-1.5 ml-5" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const TableSkeleton = ({ rows = 5 }) => (
+  <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+    <div className="p-6 border-b border-slate-100">
+      <div className="flex items-center justify-between">
+        <Skeleton variant="text" className="w-40 h-5" />
+        <div className="flex gap-3">
+          <Skeleton className="w-48 h-10 rounded-lg" />
+          <Skeleton className="w-32 h-10 rounded-lg" />
+        </div>
+      </div>
+    </div>
+    <div className="divide-y divide-slate-100">
+      {Array(rows).fill(0).map((_, i) => (
+        <div key={i} className="p-4 flex items-center gap-4">
+          <Skeleton className="w-10 h-10 rounded-full" />
+          <div className="flex-1">
+            <Skeleton variant="text" className="w-32 h-4 mb-1" />
+            <Skeleton variant="text" className="w-20 h-3" />
+          </div>
+          <Skeleton variant="text" className="w-16 h-4" />
+          <Skeleton variant="text" className="w-24 h-5" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// Dashboard Loading State
+const DashboardSkeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    {/* Header */}
+    <div className="flex items-center gap-4">
+      <Skeleton className="w-12 h-12 rounded-lg" />
+      <div>
+        <Skeleton variant="text" className="w-40 h-6 mb-1" />
+        <Skeleton variant="text" className="w-24 h-4" />
+      </div>
+    </div>
+    
+    {/* KPI Cards */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <CardSkeleton />
+      <CardSkeleton />
+      <CardSkeleton />
+      <CardSkeleton />
+    </div>
+    
+    {/* Chart */}
+    <ChartSkeleton />
+    
+    {/* Departments */}
+    <DeptListSkeleton />
+  </div>
+);
+
+// Optimized Button Component
+const Button = React.memo(({ 
+  children, 
+  onClick, 
+  variant = 'primary', 
+  size = 'md', 
+  disabled = false,
+  loading = false,
+  className = '',
+  icon,
+  ...props 
+}) => {
+  const baseStyles = 'inline-flex items-center justify-center font-medium transition-all rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+  
+  const variants = {
+    primary: 'bg-violet-500 hover:bg-violet-600 text-white focus:ring-violet-500',
+    secondary: 'bg-slate-100 hover:bg-slate-200 text-slate-700 focus:ring-slate-500',
+    outline: 'border border-slate-200 hover:bg-slate-50 text-slate-700 focus:ring-slate-500',
+    danger: 'bg-red-500 hover:bg-red-600 text-white focus:ring-red-500',
+    ghost: 'hover:bg-slate-100 text-slate-600 focus:ring-slate-500',
+  };
+  
+  const sizes = {
+    sm: 'px-3 py-1.5 text-sm gap-1.5',
+    md: 'px-4 py-2 text-sm gap-2',
+    lg: 'px-6 py-3 text-base gap-2',
+  };
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
+      {...props}
+    >
+      {loading ? (
+        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+      ) : icon}
+      {children}
+    </button>
+  );
+});
+
+// Optimized Modal Component
+const Modal = React.memo(({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  size = 'md',
+  showClose = true 
+}) => {
+  const sizes = {
+    sm: 'max-w-sm',
+    md: 'max-w-lg',
+    lg: 'max-w-2xl',
+    xl: 'max-w-4xl',
+    full: 'max-w-[95vw]'
+  };
+
+  if (!isOpen) return null;
+  
+  return (
+    <div 
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-16 sm:pt-24 overflow-y-auto"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className={`bg-white rounded-2xl w-full ${sizes[size]} shadow-2xl`}>
+        {title && (
+          <div className="flex items-center justify-between p-6 border-b border-slate-100">
+            <h2 className="text-xl font-bold text-slate-800">{title}</h2>
+            {showClose && (
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+});
+
+// Empty State Component
+const EmptyState = React.memo(({ 
+  icon, 
+  title, 
+  description, 
+  action 
+}) => (
+  <div className="text-center py-12">
+    {icon && (
+      <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        {icon}
+      </div>
+    )}
+    <h3 className="text-lg font-semibold text-slate-800 mb-2">{title}</h3>
+    {description && <p className="text-slate-500 mb-4 max-w-sm mx-auto">{description}</p>}
+    {action}
+  </div>
+));
+
+// Number formatting utilities (memoized)
+const formatCurrency = (value, decimals = 2) => {
+  if (value == null || isNaN(value)) return '€0';
+  return `€${value.toLocaleString('fr-BE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+};
+
+const formatPercent = (value, decimals = 1) => {
+  if (value == null || isNaN(value)) return '0%';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(decimals)}%`;
+};
+
+const formatNumber = (value) => {
+  if (value == null || isNaN(value)) return '0';
+  return value.toLocaleString('fr-BE');
+};
+
 // Toast notification system
 const ToastContext = React.createContext(null);
 
@@ -4310,8 +4553,15 @@ L'équipe Salarize`;
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg font-medium">Chargement...</p>
+          <div className="w-20 h-20 relative mx-auto mb-6">
+            <div className="w-20 h-20 border-4 border-violet-500/30 rounded-full"></div>
+            <div className="w-20 h-20 border-4 border-violet-500 border-t-transparent rounded-full animate-spin absolute inset-0"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">S</span>
+            </div>
+          </div>
+          <p className="text-white text-lg font-medium mb-1">Salarize</p>
+          <p className="text-slate-400 text-sm">Chargement de votre espace...</p>
         </div>
       </div>
     );
@@ -5495,6 +5745,11 @@ L'équipe Salarize`;
       )}
       
       <main className="lg:ml-64 mt-16 flex-1 p-4 lg:p-6">
+        {/* Skeleton de chargement pendant le chargement des données */}
+        {isLoadingData ? (
+          <DashboardSkeleton />
+        ) : (
+        <>
         <div className="flex items-center gap-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="relative group">
@@ -7667,6 +7922,8 @@ L'équipe Salarize`;
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
       </main>
     </div>
