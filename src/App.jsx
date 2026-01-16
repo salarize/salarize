@@ -1781,7 +1781,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         </button>
       )}
       
-      <div className="flex-1 p-4 overflow-y-auto">
+      <div className="flex-1 p-4 pb-20 overflow-y-auto">
         <p className="text-slate-500 text-xs uppercase mb-2">Sociétés</p>
         {Object.keys(companies).length === 0 ? (
           <p className="text-slate-600 text-sm">Aucune société</p>
@@ -1807,8 +1807,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         )}
       </div>
       
-      {/* Actions Menu */}
-      <div className="p-4 border-t border-slate-700 relative">
+      {/* Actions Menu - Fixed at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 bg-slate-900 border-t border-slate-700">
         {showActions && (
           <>
             <div 
@@ -1886,17 +1886,13 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         
         <button
           onClick={() => setShowActions(!showActions)}
-          className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-center py-3 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-violet-500 to-fuchsia-500 text-center py-3 rounded-xl font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-lg"
         >
           <svg className={`w-5 h-5 transition-transform ${showActions ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
           Actions
         </button>
-        
-        {debugMsg && (
-          <p className="text-xs text-slate-400 mt-2 text-center">{debugMsg}</p>
-        )}
       </div>
     </div>
     </>
@@ -5565,190 +5561,223 @@ L'équipe Salarize`;
           </div>
           <div className="flex-1" />
           
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors text-sm font-medium text-emerald-700 border border-emerald-200"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Excel
-          </button>
-          
-          <button
-            onClick={handleExportPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm font-medium text-slate-700"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            PDF
-          </button>
-          
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-50 hover:bg-violet-100 rounded-lg transition-colors text-sm font-medium text-violet-700 border border-violet-200"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            Partager
-          </button>
-          
-          {/* Bouton Alertes */}
-          <button
-            onClick={() => setShowAlertsPanel(!showAlertsPanel)}
-            className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium border ${
-              generatedAlerts.length > 0 
-                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' 
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-            Alertes
-            {generatedAlerts.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {generatedAlerts.length}
-              </span>
-            )}
-          </button>
-          
-          {/* Bouton Budget */}
-          <button
-            onClick={() => setShowBudgetModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-sm font-medium text-blue-700 border border-blue-200"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            Budget
-          </button>
-          
-          {/* Filtre Période Rapide */}
-          <select
-            value={periodFilter}
-            onChange={e => setPeriodFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm hover:border-slate-300 transition-colors"
-          >
-            <option value="all">Toutes périodes</option>
-            <option value="3m">3 derniers mois</option>
-            <option value="6m">6 derniers mois</option>
-            <option value="12m">12 derniers mois</option>
-            <option value="ytd">Année en cours (YTD)</option>
-          </select>
-          
-          {/* Bouton KPI Settings */}
-          <button
-            onClick={() => setShowKpiSettings(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm text-slate-600"
-            title="Personnaliser le dashboard"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-            </svg>
-          </button>
-          
-          {/* Bouton Historique */}
-          <button
-            onClick={() => setShowActivityLog(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm text-slate-600"
-            title="Historique des modifications"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-          
-          {periods.length > 1 && (
-            <div className="relative">
-              <button
-                onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
-                className="px-3 py-2 border border-slate-200 rounded-lg bg-white flex items-center gap-2 hover:border-slate-300 transition-colors"
-              >
-                <span className="text-sm">
-                  {selectedPeriods.length === 0 
-                    ? 'Toutes périodes' 
-                    : selectedPeriods.length === 1 
-                      ? formatPeriod(selectedPeriods[0])
-                      : `${selectedPeriods.length} périodes`}
-                </span>
-                <svg className={`w-4 h-4 text-slate-400 transition-transform ${showPeriodDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* Barre d'actions regroupée */}
+          <div className="flex items-center gap-2">
+            {/* Groupe Export */}
+            <div className="relative group">
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700 shadow-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Exporter
+                <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
+              <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                <button
+                  onClick={exportToExcel}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left rounded-t-xl"
+                >
+                  <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700 text-sm">Excel</p>
+                    <p className="text-slate-400 text-xs">Données complètes</p>
+                  </div>
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left rounded-b-xl border-t border-slate-100"
+                >
+                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700 text-sm">PDF</p>
+                    <p className="text-slate-400 text-xs">Rapport imprimable</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+            
+            {/* Bouton Partager */}
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors text-sm font-medium text-white shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Partager
+            </button>
+            
+            {/* Séparateur */}
+            <div className="w-px h-8 bg-slate-200 mx-1"></div>
+            
+            {/* Bouton Alertes */}
+            <button
+              onClick={() => setShowAlertsPanel(!showAlertsPanel)}
+              className={`relative flex items-center justify-center w-10 h-10 rounded-lg transition-colors ${
+                generatedAlerts.length > 0 
+                  ? 'bg-amber-100 hover:bg-amber-200 text-amber-600' 
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
+              }`}
+              title="Alertes"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {generatedAlerts.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                  {generatedAlerts.length}
+                </span>
+              )}
+            </button>
+            
+            {/* Bouton Budget */}
+            <button
+              onClick={() => setShowBudgetModal(true)}
+              className="flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-500"
+              title="Budget"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+            
+            {/* Séparateur */}
+            <div className="w-px h-8 bg-slate-200 mx-1"></div>
+            
+            {/* Filtre Période */}
+            <select
+              value={periodFilter}
+              onChange={e => setPeriodFilter(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm hover:border-slate-300 transition-colors cursor-pointer"
+            >
+              <option value="all">Toutes périodes</option>
+              <option value="3m">3 derniers mois</option>
+              <option value="6m">6 derniers mois</option>
+              <option value="12m">12 derniers mois</option>
+              <option value="ytd">Année en cours</option>
+            </select>
+            
+            {/* Menu Plus (...) */}
+            <div className="relative group">
+              <button className="flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-500">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </button>
+              <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                <button
+                  onClick={() => setShowKpiSettings(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left rounded-t-xl"
+                >
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  <span className="text-sm text-slate-700">Personnaliser le dashboard</span>
+                </button>
+                <button
+                  onClick={() => setShowActivityLog(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
+                >
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm text-slate-700">Historique des modifications</span>
+                </button>
+                {periods.length > 1 && (
+                  <button
+                    onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-t border-slate-100 rounded-b-xl"
+                  >
+                    <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-sm text-slate-700">Sélection périodes</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Period Multi-Select Dropdown - Moved to floating panel */}
+        {showPeriodDropdown && periods.length > 1 && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowPeriodDropdown(false)} />
+            <div className="fixed right-6 top-32 bg-white border border-slate-200 rounded-xl shadow-lg z-50 w-64 max-h-80 overflow-y-auto">
+              <div className="p-2 border-b border-slate-100 sticky top-0 bg-white">
+                <p className="text-xs font-semibold text-slate-500 uppercase px-2 mb-2">Sélection des périodes</p>
+                <button
+                  onClick={() => setSelectedPeriods([])}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedPeriods.length === 0 ? 'bg-violet-100 text-violet-700 font-medium' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  ✓ Toutes les périodes
+                </button>
+              </div>
               
-              {showPeriodDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowPeriodDropdown(false)} />
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 w-64 max-h-80 overflow-y-auto">
-                    <div className="p-2 border-b border-slate-100 sticky top-0 bg-white">
+              {(() => {
+                const grouped = periods.reduce((acc, p) => {
+                  const year = p.substring(0, 4);
+                  if (!acc[year]) acc[year] = [];
+                  acc[year].push(p);
+                  return acc;
+                }, {});
+                
+                return Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => (
+                  <div key={year} className="p-2">
+                    <div className="flex items-center justify-between px-2 mb-1">
+                      <span className="text-xs font-semibold text-slate-500 uppercase">{year}</span>
                       <button
-                        onClick={() => setSelectedPeriods([])}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                          selectedPeriods.length === 0 ? 'bg-violet-100 text-violet-700 font-medium' : 'hover:bg-slate-50'
-                        }`}
+                        onClick={() => {
+                          const allYearSelected = yearPeriods.every(p => selectedPeriods.includes(p));
+                          if (allYearSelected) {
+                            setSelectedPeriods(selectedPeriods.filter(p => !yearPeriods.includes(p)));
+                          } else {
+                            setSelectedPeriods([...new Set([...selectedPeriods, ...yearPeriods])]);
+                          }
+                        }}
+                        className="text-xs text-violet-600 hover:text-violet-700"
                       >
-                        ✓ Toutes les périodes
+                        {yearPeriods.every(p => selectedPeriods.includes(p)) ? 'Désél.' : 'Tout'}
                       </button>
                     </div>
-                    
-                    {(() => {
-                      const grouped = periods.reduce((acc, p) => {
-                        const year = p.substring(0, 4);
-                        if (!acc[year]) acc[year] = [];
-                        acc[year].push(p);
-                        return acc;
-                      }, {});
-                      
-                      return Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => (
-                        <div key={year} className="p-2">
-                          <div className="flex items-center justify-between px-2 mb-1">
-                            <span className="text-xs font-semibold text-slate-500 uppercase">{year}</span>
-                            <button
-                              onClick={() => {
-                                const allYearSelected = yearPeriods.every(p => selectedPeriods.includes(p));
-                                if (allYearSelected) {
-                                  setSelectedPeriods(selectedPeriods.filter(p => !yearPeriods.includes(p)));
-                                } else {
-                                  setSelectedPeriods([...new Set([...selectedPeriods, ...yearPeriods])]);
-                                }
-                              }}
-                              className="text-xs text-violet-600 hover:text-violet-700"
-                            >
-                              {yearPeriods.every(p => selectedPeriods.includes(p)) ? 'Désél.' : 'Tout'}
-                            </button>
-                          </div>
-                          {yearPeriods.sort().reverse().map(p => (
-                            <label
-                              key={p}
-                              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedPeriods.includes(p)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedPeriods([...selectedPeriods, p]);
-                                  } else {
-                                    setSelectedPeriods(selectedPeriods.filter(sp => sp !== p));
-                                  }
-                                }}
-                                className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                              />
-                              <span className="text-sm">{formatPeriod(p)}</span>
-                            </label>
-                          ))}
-                        </div>
-                      ));
-                    })()}
+                    {yearPeriods.sort().reverse().map(p => (
+                      <label
+                        key={p}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPeriods.includes(p)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedPeriods([...selectedPeriods, p]);
+                            } else {
+                              setSelectedPeriods(selectedPeriods.filter(sp => sp !== p));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                        />
+                        <span className="text-sm">{formatPeriod(p)}</span>
+                      </label>
+                    ))}
                   </div>
-                </>
-              )}
+                ));
+              })()}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         {/* Data Manager Modal */}
         {showDataManager && (
