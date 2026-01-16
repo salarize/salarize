@@ -1972,6 +1972,28 @@ function AppContent() {
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false); // For period multi-select
   const [showAuthModal, setShowAuthModal] = useState(false); // For auth modal
   
+  // === NOUVEAUX ÉTATS PRIORITÉ HAUTE ===
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [budgets, setBudgets] = useState({}); // { companyName: { monthly: number, alertThreshold: number } }
+  const [periodFilter, setPeriodFilter] = useState('all'); // 'all', '3m', '6m', '12m', 'ytd'
+  const [alerts, setAlerts] = useState([]); // [{ type, message, dept, variation }]
+  const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+  
+  // === NOUVEAUX ÉTATS PRIORITÉ MOYENNE ===
+  const [drillDownDept, setDrillDownDept] = useState(null); // Département sélectionné pour drill-down
+  const [showYearComparison, setShowYearComparison] = useState(false); // Toggle graphique comparatif
+  const [showKpiSettings, setShowKpiSettings] = useState(false); // Modal KPIs
+  const [visibleKpis, setVisibleKpis] = useState({
+    totalCost: true,
+    employees: true,
+    departments: true,
+    avgCost: true,
+    comparison: true,
+    deptBreakdown: true
+  });
+  const [activityLog, setActivityLog] = useState([]); // Historique des modifications
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
   const [empDeptFilter, setEmpDeptFilter] = useState('all');
@@ -2393,7 +2415,7 @@ function AppContent() {
     setLastSaved(new Date());
   };
 
-  // Export Excel amélioré
+  // Export Excel amélioré avec comparaisons
   const exportToExcel = () => {
     if (!activeCompany || employees.length === 0) return;
     
@@ -2402,31 +2424,61 @@ function AppContent() {
       ? employees 
       : employees.filter(e => selectedPeriods.includes(e.period));
     
-    // Feuille 1 : Résumé
-    const deptData = {};
-    filteredData.forEach(e => {
-      const dept = e.department || departmentMapping[e.name] || 'Non assigné';
-      if (!deptData[dept]) deptData[dept] = { count: 0, cost: 0 };
-      deptData[dept].count++;
-      deptData[dept].cost += e.totalCost;
-    });
+    // Feuille 1 : Résumé avec comparaisons
+    const summaryRows = [];
     
-    const summaryData = Object.entries(deptData).map(([dept, data]) => ({
-      'Département': dept,
-      'Nombre d\'employés': data.count,
-      'Coût total (€)': Math.round(data.cost * 100) / 100,
-      'Coût moyen (€)': Math.round((data.cost / data.count) * 100) / 100
-    }));
+    // En-tête du rapport
+    summaryRows.push({ 'Rapport': `Analyse Salariale - ${activeCompany}` });
+    summaryRows.push({ 'Rapport': `Généré le ${new Date().toLocaleDateString('fr-BE')}` });
+    summaryRows.push({});
     
+    // Stats globales
     const totalCostExport = filteredData.reduce((sum, e) => sum + e.totalCost, 0);
-    summaryData.push({
-      'Département': 'TOTAL',
-      'Nombre d\'employés': filteredData.length,
-      'Coût total (€)': Math.round(totalCostExport * 100) / 100,
-      'Coût moyen (€)': Math.round((totalCostExport / filteredData.length) * 100) / 100
-    });
+    summaryRows.push({ 'Indicateur': 'Coût Total', 'Valeur': `€${totalCostExport.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}` });
+    summaryRows.push({ 'Indicateur': 'Nombre d\'employés', 'Valeur': new Set(filteredData.map(e => e.name)).size });
+    summaryRows.push({ 'Indicateur': 'Périodes analysées', 'Valeur': periods.length });
     
-    // Feuille 2 : Détail employés
+    // Comparaisons si disponibles
+    if (comparisonData) {
+      summaryRows.push({});
+      summaryRows.push({ 'Indicateur': '=== COMPARAISONS ===' });
+      if (comparisonData.prevMonth) {
+        summaryRows.push({ 
+          'Indicateur': 'vs Mois précédent', 
+          'Valeur': `${comparisonData.variationVsPrevMonth >= 0 ? '+' : ''}${comparisonData.variationVsPrevMonth.toFixed(2)}%`,
+          'Détail': `€${comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`
+        });
+      }
+      if (comparisonData.sameMonthLastYear) {
+        summaryRows.push({ 
+          'Indicateur': 'vs Même mois N-1', 
+          'Valeur': `${comparisonData.variationVsLastYear >= 0 ? '+' : ''}${comparisonData.variationVsLastYear.toFixed(2)}%`,
+          'Détail': `€${comparisonData.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`
+        });
+      }
+    }
+    summaryRows.push({});
+    
+    // Feuille 2 : Départements avec comparaisons
+    const deptRows = [
+      { 'Département': 'DÉPARTEMENT', 'Coût Actuel': 'COÛT ACTUEL', 'vs M-1 (%)': 'VS M-1 (%)', 'vs M-1 (€)': 'VS M-1 (€)', 'vs N-1 (%)': 'VS N-1 (%)', 'vs N-1 (€)': 'VS N-1 (€)', 'Employés': 'EMPLOYÉS' }
+    ];
+    
+    Object.entries(deptStatsWithComparison)
+      .sort((a, b) => b[1].current - a[1].current)
+      .forEach(([dept, data]) => {
+        deptRows.push({
+          'Département': dept,
+          'Coût Actuel': `€${data.current.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
+          'vs M-1 (%)': data.variationVsPrevMonth !== null ? `${data.variationVsPrevMonth >= 0 ? '+' : ''}${data.variationVsPrevMonth.toFixed(1)}%` : '-',
+          'vs M-1 (€)': data.diffVsPrevMonth ? `€${data.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : '-',
+          'vs N-1 (%)': data.variationVsLastYear !== null ? `${data.variationVsLastYear >= 0 ? '+' : ''}${data.variationVsLastYear.toFixed(1)}%` : '-',
+          'vs N-1 (€)': data.diffVsLastYear ? `€${data.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : '-',
+          'Employés': data.currentCount
+        });
+      });
+    
+    // Feuille 3 : Détail employés
     const detailData = filteredData.map(e => ({
       'Nom': e.name,
       'Département': e.department || departmentMapping[e.name] || 'Non assigné',
@@ -2437,11 +2489,13 @@ function AppContent() {
     
     // Créer le workbook
     const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.json_to_sheet(summaryData);
-    const ws2 = XLSX.utils.json_to_sheet(detailData);
+    const ws1 = XLSX.utils.json_to_sheet(summaryRows);
+    const ws2 = XLSX.utils.json_to_sheet(deptRows);
+    const ws3 = XLSX.utils.json_to_sheet(detailData);
     
-    XLSX.utils.book_append_sheet(wb, ws1, 'Résumé par département');
-    XLSX.utils.book_append_sheet(wb, ws2, 'Détail employés');
+    XLSX.utils.book_append_sheet(wb, ws1, 'Résumé');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Comparaison Départements');
+    XLSX.utils.book_append_sheet(wb, ws3, 'Détail employés');
     
     // Télécharger
     const periodStr = selectedPeriods.length === 0 ? 'Complet' : selectedPeriods.map(formatPeriod).join('_');
@@ -3959,6 +4013,97 @@ L'équipe Salarize`;
     [...new Set(chartData.map(d => d.year))].sort(),
     [chartData]
   );
+
+  // === NOUVELLES COMPARAISONS AVANCÉES ===
+  
+  // Période actuelle et périodes de comparaison
+  const comparisonData = useMemo(() => {
+    if (chartData.length === 0) return null;
+    
+    const sortedPeriods = [...chartData].sort((a, b) => b.period.localeCompare(a.period));
+    const current = sortedPeriods[0];
+    const currentMonth = current.period.substring(5);
+    const currentYear = parseInt(current.period.substring(0, 4));
+    
+    // Mois précédent
+    const prevMonth = sortedPeriods[1] || null;
+    
+    // Même mois année précédente
+    const sameMonthLastYear = chartData.find(d => {
+      const month = d.period.substring(5);
+      const year = parseInt(d.period.substring(0, 4));
+      return month === currentMonth && year === currentYear - 1;
+    }) || null;
+    
+    // Calculs de variation
+    const calcVariation = (current, previous) => {
+      if (!previous || previous.total === 0) return null;
+      return ((current.total - previous.total) / previous.total) * 100;
+    };
+    
+    return {
+      current,
+      prevMonth,
+      sameMonthLastYear,
+      variationVsPrevMonth: prevMonth ? calcVariation(current, prevMonth) : null,
+      variationVsLastYear: sameMonthLastYear ? calcVariation(current, sameMonthLastYear) : null,
+      diffVsPrevMonth: prevMonth ? current.total - prevMonth.total : null,
+      diffVsLastYear: sameMonthLastYear ? current.total - sameMonthLastYear.total : null
+    };
+  }, [chartData]);
+
+  // Stats par département avec comparaisons
+  const deptStatsWithComparison = useMemo(() => {
+    if (chartData.length === 0) return {};
+    
+    const sortedPeriods = [...chartData].sort((a, b) => b.period.localeCompare(a.period));
+    const currentPeriod = sortedPeriods[0]?.period;
+    const prevPeriod = sortedPeriods[1]?.period;
+    const currentMonth = currentPeriod?.substring(5);
+    const currentYear = parseInt(currentPeriod?.substring(0, 4));
+    const sameMonthLastYearPeriod = `${currentYear - 1}-${currentMonth}`;
+    
+    const stats = {};
+    
+    // Calculer pour chaque département
+    employees.forEach(e => {
+      const d = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (!stats[d]) {
+        stats[d] = {
+          current: 0,
+          prevMonth: 0,
+          sameMonthLastYear: 0,
+          currentCount: 0,
+          prevMonthCount: 0,
+          lastYearCount: 0
+        };
+      }
+      
+      if (e.period === currentPeriod) {
+        stats[d].current += e.totalCost;
+        stats[d].currentCount++;
+      }
+      if (e.period === prevPeriod) {
+        stats[d].prevMonth += e.totalCost;
+        stats[d].prevMonthCount++;
+      }
+      if (e.period === sameMonthLastYearPeriod) {
+        stats[d].sameMonthLastYear += e.totalCost;
+        stats[d].lastYearCount++;
+      }
+    });
+    
+    // Calculer les variations
+    Object.keys(stats).forEach(dept => {
+      const s = stats[dept];
+      s.variationVsPrevMonth = s.prevMonth > 0 ? ((s.current - s.prevMonth) / s.prevMonth) * 100 : null;
+      s.variationVsLastYear = s.sameMonthLastYear > 0 ? ((s.current - s.sameMonthLastYear) / s.sameMonthLastYear) * 100 : null;
+      s.diffVsPrevMonth = s.current - s.prevMonth;
+      s.diffVsLastYear = s.current - s.sameMonthLastYear;
+    });
+    
+    return stats;
+  }, [employees, chartData, departmentMapping]);
   
   const deptStats = useMemo(() => {
     const stats = {};
@@ -3994,6 +4139,147 @@ L'équipe Salarize`;
     Object.values(empAgg).sort((a, b) => b.cost - a.cost),
     [empAgg]
   );
+
+  // === FILTRAGE PÉRIODES DYNAMIQUE ===
+  const filteredPeriodsByRange = useMemo(() => {
+    if (periodFilter === 'all' || periods.length === 0) return periods;
+    
+    const sortedPeriods = [...periods].sort((a, b) => b.localeCompare(a));
+    const latestPeriod = sortedPeriods[0];
+    const latestYear = parseInt(latestPeriod.substring(0, 4));
+    const latestMonth = parseInt(latestPeriod.substring(5, 7));
+    
+    const getMonthsAgo = (months) => {
+      const result = [];
+      for (let i = 0; i < months && i < sortedPeriods.length; i++) {
+        result.push(sortedPeriods[i]);
+      }
+      return result;
+    };
+    
+    switch (periodFilter) {
+      case '3m':
+        return getMonthsAgo(3);
+      case '6m':
+        return getMonthsAgo(6);
+      case '12m':
+        return getMonthsAgo(12);
+      case 'ytd':
+        return periods.filter(p => p.startsWith(latestYear.toString()));
+      default:
+        return periods;
+    }
+  }, [periods, periodFilter]);
+
+  // === GÉNÉRATION AUTOMATIQUE DES ALERTES ===
+  const generatedAlerts = useMemo(() => {
+    const alertsList = [];
+    const budget = budgets[activeCompany];
+    const alertThreshold = budget?.alertThreshold || 10; // 10% par défaut
+    
+    // Alertes sur les départements
+    Object.entries(deptStatsWithComparison).forEach(([dept, data]) => {
+      if (data.variationVsPrevMonth !== null && Math.abs(data.variationVsPrevMonth) >= alertThreshold) {
+        alertsList.push({
+          type: data.variationVsPrevMonth > 0 ? 'warning' : 'success',
+          category: 'department',
+          dept,
+          message: data.variationVsPrevMonth > 0 
+            ? `${dept}: +${data.variationVsPrevMonth.toFixed(1)}% vs mois précédent`
+            : `${dept}: ${data.variationVsPrevMonth.toFixed(1)}% vs mois précédent`,
+          variation: data.variationVsPrevMonth,
+          diff: data.diffVsPrevMonth
+        });
+      }
+    });
+    
+    // Alerte budget global
+    if (budget?.monthly && comparisonData?.current) {
+      const budgetVariation = ((comparisonData.current.total - budget.monthly) / budget.monthly) * 100;
+      if (budgetVariation > 0) {
+        alertsList.push({
+          type: 'danger',
+          category: 'budget',
+          message: `Budget dépassé de ${budgetVariation.toFixed(1)}% (€${(comparisonData.current.total - budget.monthly).toLocaleString('fr-BE', { minimumFractionDigits: 2 })})`,
+          variation: budgetVariation,
+          diff: comparisonData.current.total - budget.monthly
+        });
+      } else if (budgetVariation > -10) {
+        alertsList.push({
+          type: 'warning',
+          category: 'budget',
+          message: `Budget presque atteint: ${(100 + budgetVariation).toFixed(1)}% utilisé`,
+          variation: budgetVariation
+        });
+      }
+    }
+    
+    // Trier par gravité
+    return alertsList.sort((a, b) => {
+      const priority = { danger: 0, warning: 1, success: 2 };
+      return priority[a.type] - priority[b.type];
+    });
+  }, [deptStatsWithComparison, budgets, activeCompany, comparisonData]);
+
+  // === DONNÉES GRAPHIQUE COMPARATIF ANNÉE SUR ANNÉE ===
+  const yearComparisonData = useMemo(() => {
+    if (chartData.length === 0) return [];
+    
+    const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+    const yearlyData = {};
+    
+    // Grouper par année
+    chartData.forEach(d => {
+      const year = d.period.substring(0, 4);
+      const month = parseInt(d.period.substring(5, 7), 10);
+      if (!yearlyData[year]) yearlyData[year] = {};
+      yearlyData[year][month] = d.total;
+    });
+    
+    // Créer les données pour chaque mois
+    const result = months.map((monthName, idx) => {
+      const monthNum = idx + 1;
+      const row = { month: monthName };
+      Object.keys(yearlyData).sort().forEach(year => {
+        row[year] = yearlyData[year][monthNum] || null;
+      });
+      return row;
+    });
+    
+    return result;
+  }, [chartData]);
+
+  // === EMPLOYÉS PAR DÉPARTEMENT (DRILL-DOWN) ===
+  const drillDownEmployees = useMemo(() => {
+    if (!drillDownDept) return [];
+    
+    const deptEmployees = {};
+    employees.forEach(e => {
+      const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (dept === drillDownDept) {
+        if (!deptEmployees[e.name]) {
+          deptEmployees[e.name] = { name: e.name, total: 0, periods: [] };
+        }
+        deptEmployees[e.name].total += e.totalCost;
+        deptEmployees[e.name].periods.push({ period: e.period, cost: e.totalCost });
+      }
+    });
+    
+    return Object.values(deptEmployees).sort((a, b) => b.total - a.total);
+  }, [drillDownDept, employees, departmentMapping]);
+
+  // === FONCTION LOG ACTIVITÉ ===
+  const logActivity = useCallback((action, details) => {
+    const entry = {
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      action,
+      details,
+      user: user?.name || 'Anonyme',
+      company: activeCompany
+    };
+    setActivityLog(prev => [entry, ...prev].slice(0, 100)); // Garder 100 dernières entrées
+  }, [user, activeCompany]);
 
   // Loading screen
   if (isLoading) {
@@ -5293,6 +5579,72 @@ L'équipe Salarize`;
             Partager
           </button>
           
+          {/* Bouton Alertes */}
+          <button
+            onClick={() => setShowAlertsPanel(!showAlertsPanel)}
+            className={`relative flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium border ${
+              generatedAlerts.length > 0 
+                ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' 
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            Alertes
+            {generatedAlerts.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                {generatedAlerts.length}
+              </span>
+            )}
+          </button>
+          
+          {/* Bouton Budget */}
+          <button
+            onClick={() => setShowBudgetModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-sm font-medium text-blue-700 border border-blue-200"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            Budget
+          </button>
+          
+          {/* Filtre Période Rapide */}
+          <select
+            value={periodFilter}
+            onChange={e => setPeriodFilter(e.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm hover:border-slate-300 transition-colors"
+          >
+            <option value="all">Toutes périodes</option>
+            <option value="3m">3 derniers mois</option>
+            <option value="6m">6 derniers mois</option>
+            <option value="12m">12 derniers mois</option>
+            <option value="ytd">Année en cours (YTD)</option>
+          </select>
+          
+          {/* Bouton KPI Settings */}
+          <button
+            onClick={() => setShowKpiSettings(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm text-slate-600"
+            title="Personnaliser le dashboard"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </button>
+          
+          {/* Bouton Historique */}
+          <button
+            onClick={() => setShowActivityLog(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm text-slate-600"
+            title="Historique des modifications"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+          
           {periods.length > 1 && (
             <div className="relative">
               <button
@@ -5593,81 +5945,260 @@ L'équipe Salarize`;
           </div>
         )}
 
-        {/* Stats */}
+        {/* Stats Cards - Version Améliorée */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Coût Total avec comparaison */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Coût Total</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-slate-400 text-sm">Coût Total</p>
+              {comparisonData?.variationVsPrevMonth !== null && (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                  comparisonData.variationVsPrevMonth >= 0 
+                    ? 'bg-red-50 text-red-600' 
+                    : 'bg-emerald-50 text-emerald-600'
+                }`}>
+                  {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(1)}%
+                </span>
+              )}
+            </div>
             <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
+            {comparisonData?.diffVsPrevMonth !== null && (
+              <p className={`text-xs mt-1 ${comparisonData.diffVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                {comparisonData.diffVsPrevMonth >= 0 ? '+' : ''}€{comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })} vs mois préc.
+              </p>
+            )}
           </div>
+          
+          {/* Employés */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
             <p className="text-slate-400 text-sm">Employés</p>
             <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
+            <p className="text-xs text-slate-400 mt-1">Actifs sur la période</p>
           </div>
+          
+          {/* Départements */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
             <p className="text-slate-400 text-sm">Départements</p>
             <p className="text-2xl font-bold text-slate-800">{Object.keys(deptStats).length}</p>
+            <p className="text-xs text-slate-400 mt-1">{sortedDepts[0]?.[0] || '-'} en tête</p>
           </div>
+          
+          {/* Coût Moyen avec comparaison */}
           <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Coût Moyen</p>
+            <p className="text-slate-400 text-sm">Coût Moyen / Employé</p>
             <p className="text-2xl font-bold text-slate-800">€{(totalCost / (uniqueNames || 1)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="text-xs text-slate-400 mt-1">Par employé</p>
           </div>
         </div>
+
+        {/* Cartes de Comparaison Détaillées */}
+        {comparisonData && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            {/* Comparaison vs Mois Précédent */}
+            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 text-white">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold">vs Mois Précédent</h3>
+                  <p className="text-slate-400 text-xs">{comparisonData.prevMonth ? formatPeriod(comparisonData.prevMonth.period) : 'N/A'}</p>
+                </div>
+              </div>
+              
+              {comparisonData.prevMonth ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-300">Mois actuel</span>
+                    <span className="font-bold">€{comparisonData.current.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-300">Mois précédent</span>
+                    <span className="font-bold">€{comparisonData.prevMonth.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="border-t border-slate-700 pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-300">Différence</span>
+                      <span className={`font-bold text-lg ${comparisonData.diffVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {comparisonData.diffVsPrevMonth >= 0 ? '+' : ''}€{comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-slate-400 text-sm">Variation</span>
+                      <span className={`font-semibold ${comparisonData.variationVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-slate-400 text-sm">Pas de données du mois précédent</p>
+              )}
+            </div>
+
+            {/* Comparaison vs Même Mois Année Précédente */}
+            <div className="bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl p-6 text-white">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold">vs Même Mois N-1</h3>
+                  <p className="text-violet-200 text-xs">{comparisonData.sameMonthLastYear ? formatPeriod(comparisonData.sameMonthLastYear.period) : 'N/A'}</p>
+                </div>
+              </div>
+              
+              {comparisonData.sameMonthLastYear ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-violet-200">Cette année</span>
+                    <span className="font-bold">€{comparisonData.current.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-violet-200">Année précédente</span>
+                    <span className="font-bold">€{comparisonData.sameMonthLastYear.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="border-t border-violet-500/50 pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-violet-200">Différence</span>
+                      <span className={`font-bold text-lg ${comparisonData.diffVsLastYear >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                        {comparisonData.diffVsLastYear >= 0 ? '+' : ''}€{comparisonData.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-violet-300 text-sm">Variation annuelle</span>
+                      <span className={`font-semibold ${comparisonData.variationVsLastYear >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                        {comparisonData.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsLastYear).toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-violet-200 text-sm">Pas de données de l'année précédente pour ce mois</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Evolution Chart */}
         {chartData.length >= 1 && (
           <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-slate-800">📊 Évolution des coûts salariaux</h2>
-              {years.length > 1 && (
-                <select
-                  value={selectedYear}
-                  onChange={e => setSelectedYear(e.target.value)}
-                  className="px-3 py-1 border border-slate-200 rounded-lg bg-white text-sm"
-                >
-                  <option value="all">Toutes les années</option>
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              )}
+              <div className="flex items-center gap-3">
+                {/* Toggle comparaison année */}
+                {years.length > 1 && (
+                  <button
+                    onClick={() => setShowYearComparison(!showYearComparison)}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                      showYearComparison 
+                        ? 'bg-violet-100 text-violet-700 border border-violet-200' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    📈 Comparaison N/N-1
+                  </button>
+                )}
+                {years.length > 1 && !showYearComparison && (
+                  <select
+                    value={selectedYear}
+                    onChange={e => setSelectedYear(e.target.value)}
+                    className="px-3 py-1 border border-slate-200 rounded-lg bg-white text-sm"
+                  >
+                    <option value="all">Toutes les années</option>
+                    {years.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                )}
+              </div>
             </div>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="period" 
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    tickLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => {
-                      const month = parseInt(value.substring(5), 10);
-                      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-                      const year = value.substring(2, 4);
-                      return `${monthNames[month - 1]} '${year}`;
-                    }}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip 
-                    formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût total']}
-                    labelFormatter={(label) => formatPeriod(label)}
-                    contentStyle={{ 
-                      backgroundColor: '#1e293b', 
-                      border: 'none', 
-                      borderRadius: '8px',
-                      color: '#fff'
-                    }}
-                    labelStyle={{ color: '#94a3b8' }}
-                  />
-                  <Bar 
-                    dataKey="total" 
-                    fill={`rgb(${getBrandColor()})`}
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            
+            {/* Graphique Comparatif Année sur Année */}
+            {showYearComparison && years.length > 1 ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={yearComparisonData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: '#64748b' }}
+                      tickFormatter={(value) => value ? `€${(value / 1000).toFixed(0)}k` : ''}
+                    />
+                    <Tooltip 
+                      formatter={(value, name) => [value ? `€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}` : 'N/A', name]}
+                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                    />
+                    <Legend />
+                    {years.map((year, idx) => (
+                      <Line 
+                        key={year}
+                        type="monotone"
+                        dataKey={year}
+                        name={year}
+                        stroke={idx === years.length - 1 ? '#8B5CF6' : idx === years.length - 2 ? '#06B6D4' : '#94A3B8'}
+                        strokeWidth={idx === years.length - 1 ? 3 : 2}
+                        dot={{ r: idx === years.length - 1 ? 4 : 3 }}
+                        strokeDasharray={idx < years.length - 1 ? '5 5' : '0'}
+                        connectNulls
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="flex justify-center gap-4 mt-3">
+                  {years.slice(-2).map((year, idx) => (
+                    <div key={year} className="flex items-center gap-2">
+                      <div className={`w-4 h-1 rounded ${idx === 1 ? 'bg-violet-500' : 'bg-cyan-500'}`} 
+                           style={{ borderStyle: idx === 0 ? 'dashed' : 'solid' }} />
+                      <span className="text-sm text-slate-600">{year}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Graphique Standard */
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis 
+                      dataKey="period" 
+                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      tickLine={{ stroke: '#e2e8f0' }}
+                      tickFormatter={(value) => {
+                        const month = parseInt(value.substring(5), 10);
+                        const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                        const year = value.substring(2, 4);
+                        return `${monthNames[month - 1]} '${year}`;
+                      }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: '#64748b' }}
+                      tickLine={{ stroke: '#e2e8f0' }}
+                      tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût total']}
+                      labelFormatter={(label) => formatPeriod(label)}
+                      contentStyle={{ 
+                        backgroundColor: '#1e293b', 
+                        border: 'none', 
+                        borderRadius: '8px',
+                        color: '#fff'
+                      }}
+                      labelStyle={{ color: '#94a3b8' }}
+                    />
+                    <Bar 
+                      dataKey="total" 
+                      fill={`rgb(${getBrandColor()})`}
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
             
             {chartData.length >= 2 && (
               <div className="mt-4 flex gap-4 justify-center text-sm flex-wrap">
@@ -5735,26 +6266,154 @@ L'équipe Salarize`;
           </div>
         )}
 
-        {/* Departments */}
+        {/* Departments - Version Améliorée avec Comparaisons et Drill-down */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
-          <h2 className="font-bold text-slate-800 mb-4">Répartition par Département</h2>
-          <div className="space-y-3">
-            {sortedDepts.map(([dept, data]) => (
-              <div key={dept} className="flex items-center gap-4">
-                <span className="w-28 font-medium text-sm truncate text-slate-700">{dept}</span>
-                <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full rounded-full transition-all duration-500" 
-                    style={{ 
-                      width: `${(data.total / maxCost) * 100}%`,
-                      backgroundColor: `rgb(${getBrandColor()})`
-                    }} 
-                  />
-                </div>
-                <span className="w-32 text-right font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-slate-800">📊 Répartition par Département</h2>
+            <div className="flex gap-2">
+              <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">vs M-1</span>
+              <span className="text-xs bg-violet-100 px-2 py-1 rounded text-violet-600">vs N-1</span>
+              <span className="text-xs bg-cyan-100 px-2 py-1 rounded text-cyan-600">Cliquez pour détails</span>
+            </div>
           </div>
+          
+          <div className="space-y-4">
+            {sortedDepts.map(([dept, data]) => {
+              const comparison = deptStatsWithComparison[dept] || {};
+              const isExpanded = drillDownDept === dept;
+              return (
+                <div key={dept}>
+                  <div 
+                    className={`border rounded-lg p-4 transition-all cursor-pointer ${
+                      isExpanded 
+                        ? 'border-violet-300 bg-violet-50' 
+                        : 'border-slate-100 hover:border-slate-200'
+                    }`}
+                    onClick={() => setDrillDownDept(isExpanded ? null : dept)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="font-medium text-slate-700">{dept}</span>
+                      </div>
+                      <span className="font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    
+                    {/* Barre de progression */}
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3 ml-6">
+                      <div 
+                        className="h-full rounded-full transition-all duration-500" 
+                        style={{ 
+                          width: `${(data.total / maxCost) * 100}%`,
+                          backgroundColor: `rgb(${getBrandColor()})`
+                        }} 
+                      />
+                    </div>
+                    
+                    {/* Comparaisons */}
+                    <div className="flex flex-wrap gap-3 text-sm ml-6">
+                      {/* vs Mois Précédent */}
+                      {comparison.prevMonth > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400 text-xs">vs M-1:</span>
+                          <span className={`font-medium text-xs ${comparison.variationVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                            {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparison.variationVsPrevMonth).toFixed(1)}%
+                          </span>
+                          <span className={`text-xs ${comparison.diffVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                            ({comparison.diffVsPrevMonth >= 0 ? '+' : ''}€{comparison.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* vs Même Mois N-1 */}
+                      {comparison.sameMonthLastYear > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-violet-400 text-xs">vs N-1:</span>
+                          <span className={`font-medium text-xs ${comparison.variationVsLastYear >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                            {comparison.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparison.variationVsLastYear).toFixed(1)}%
+                          </span>
+                          <span className={`text-xs ${comparison.diffVsLastYear >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                            ({comparison.diffVsLastYear >= 0 ? '+' : ''}€{comparison.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Nombre d'employés */}
+                      <div className="flex items-center gap-1 ml-auto">
+                        <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span className="text-xs text-slate-500">{data.count} emp.</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Drill-down: Liste des employés du département */}
+                  {isExpanded && drillDownEmployees.length > 0 && (
+                    <div className="mt-2 ml-6 bg-slate-50 rounded-lg p-4 border border-slate-200">
+                      <h4 className="text-sm font-medium text-slate-700 mb-3">👥 Employés du département {dept}</h4>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {drillDownEmployees.map((emp, idx) => (
+                          <div key={emp.name} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-slate-100">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-400 w-5">{idx + 1}.</span>
+                              <span className="font-medium text-slate-700">{emp.name}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-slate-400">{emp.periods.length} période{emp.periods.length > 1 ? 's' : ''}</span>
+                              <span className="font-bold text-slate-800">€{emp.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-sm">
+                        <span className="text-slate-500">Total {dept}</span>
+                        <span className="font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Résumé des tendances */}
+          {Object.keys(deptStatsWithComparison).length > 0 && (
+            <div className="mt-6 pt-4 border-t border-slate-100">
+              <h3 className="text-sm font-medium text-slate-600 mb-3">📈 Tendances départements</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Plus forte hausse */}
+                {(() => {
+                  const sorted = Object.entries(deptStatsWithComparison)
+                    .filter(([, d]) => d.variationVsPrevMonth !== null)
+                    .sort((a, b) => (b[1].variationVsPrevMonth || 0) - (a[1].variationVsPrevMonth || 0));
+                  const highest = sorted[0];
+                  const lowest = sorted[sorted.length - 1];
+                  
+                  return (
+                    <>
+                      {highest && highest[1].variationVsPrevMonth > 0 && (
+                        <div className="bg-red-50 rounded-lg p-3">
+                          <p className="text-xs text-red-600 font-medium">🔺 Plus forte hausse</p>
+                          <p className="font-semibold text-red-700">{highest[0]}</p>
+                          <p className="text-sm text-red-600">+{highest[1].variationVsPrevMonth.toFixed(1)}% vs mois préc.</p>
+                        </div>
+                      )}
+                      {lowest && lowest[1].variationVsPrevMonth < 0 && (
+                        <div className="bg-emerald-50 rounded-lg p-3">
+                          <p className="text-xs text-emerald-600 font-medium">🔻 Plus forte baisse</p>
+                          <p className="font-semibold text-emerald-700">{lowest[0]}</p>
+                          <p className="text-sm text-emerald-600">{lowest[1].variationVsPrevMonth.toFixed(1)}% vs mois préc.</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Employee Detail Section */}
@@ -6259,7 +6918,7 @@ L'équipe Salarize`;
         {/* Share Modal */}
         {showShareModal && (
           <div 
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
             onClick={(e) => { if (e.target === e.currentTarget) setShowShareModal(false); }}
           >
             <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
@@ -6372,6 +7031,455 @@ L'équipe Salarize`;
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Panneau Alertes */}
+        {showAlertsPanel && (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowAlertsPanel(false); }}
+          >
+            <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Alertes & Notifications</h2>
+                      <p className="text-amber-100 text-sm">{generatedAlerts.length} alerte{generatedAlerts.length > 1 ? 's' : ''} active{generatedAlerts.length > 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowAlertsPanel(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {generatedAlerts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-slate-800 mb-2">Tout est en ordre !</h3>
+                    <p className="text-slate-500 text-sm">Aucune variation significative détectée sur vos coûts salariaux.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {generatedAlerts.map((alert, idx) => (
+                      <div 
+                        key={idx}
+                        className={`p-4 rounded-xl border ${
+                          alert.type === 'danger' ? 'bg-red-50 border-red-200' :
+                          alert.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                          'bg-emerald-50 border-emerald-200'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            alert.type === 'danger' ? 'bg-red-100' :
+                            alert.type === 'warning' ? 'bg-amber-100' :
+                            'bg-emerald-100'
+                          }`}>
+                            {alert.type === 'danger' && (
+                              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                              </svg>
+                            )}
+                            {alert.type === 'warning' && (
+                              <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                              </svg>
+                            )}
+                            {alert.type === 'success' && (
+                              <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`font-medium ${
+                              alert.type === 'danger' ? 'text-red-800' :
+                              alert.type === 'warning' ? 'text-amber-800' :
+                              'text-emerald-800'
+                            }`}>
+                              {alert.message}
+                            </p>
+                            {alert.diff && (
+                              <p className={`text-sm mt-1 ${
+                                alert.type === 'danger' ? 'text-red-600' :
+                                alert.type === 'warning' ? 'text-amber-600' :
+                                'text-emerald-600'
+                              }`}>
+                                {alert.diff >= 0 ? '+' : ''}€{alert.diff.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Configuration seuil alertes */}
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  <p className="text-sm text-slate-500 mb-2">Les alertes se déclenchent à partir d'une variation de :</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={budgets[activeCompany]?.alertThreshold || 10}
+                      onChange={(e) => setBudgets(prev => ({
+                        ...prev,
+                        [activeCompany]: {
+                          ...prev[activeCompany],
+                          alertThreshold: Math.max(1, parseInt(e.target.value) || 10)
+                        }
+                      }))}
+                      className="w-20 px-3 py-2 border border-slate-200 rounded-lg text-center"
+                      min="1"
+                      max="100"
+                    />
+                    <span className="text-slate-600">%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Modal Budget */}
+        {showBudgetModal && (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowBudgetModal(false); }}
+          >
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Budget Mensuel</h2>
+                      <p className="text-blue-100 text-sm">{activeCompany}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowBudgetModal(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <p className="text-slate-600 text-sm mb-6">
+                  Définissez un budget mensuel pour suivre vos coûts salariaux et recevoir des alertes en cas de dépassement.
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-2">
+                      Budget mensuel (€)
+                    </label>
+                    <input
+                      type="number"
+                      value={budgets[activeCompany]?.monthly || ''}
+                      onChange={(e) => setBudgets(prev => ({
+                        ...prev,
+                        [activeCompany]: {
+                          ...prev[activeCompany],
+                          monthly: parseFloat(e.target.value) || 0
+                        }
+                      }))}
+                      placeholder="Ex: 50000"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-2">
+                      Seuil d'alerte (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={budgets[activeCompany]?.alertThreshold || 10}
+                      onChange={(e) => setBudgets(prev => ({
+                        ...prev,
+                        [activeCompany]: {
+                          ...prev[activeCompany],
+                          alertThreshold: Math.max(1, parseInt(e.target.value) || 10)
+                        }
+                      }))}
+                      placeholder="10"
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:border-blue-500 outline-none"
+                      min="1"
+                      max="100"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Alerte si variation département &gt; ce seuil</p>
+                  </div>
+                </div>
+                
+                {/* Prévisualisation */}
+                {budgets[activeCompany]?.monthly > 0 && comparisonData?.current && (
+                  <div className="mt-6 p-4 bg-slate-50 rounded-xl">
+                    <h4 className="font-medium text-slate-700 mb-3">📊 Situation actuelle</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Budget défini</span>
+                        <span className="font-medium">€{budgets[activeCompany].monthly.toLocaleString('fr-BE')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Coût actuel</span>
+                        <span className="font-medium">€{comparisonData.current.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-slate-200">
+                        <span className="text-slate-500">Écart</span>
+                        <span className={`font-bold ${comparisonData.current.total > budgets[activeCompany].monthly ? 'text-red-500' : 'text-emerald-500'}`}>
+                          {comparisonData.current.total > budgets[activeCompany].monthly ? '+' : ''}
+                          €{(comparisonData.current.total - budgets[activeCompany].monthly).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <div className="flex justify-between text-xs text-slate-500 mb-1">
+                          <span>Utilisation budget</span>
+                          <span>{((comparisonData.current.total / budgets[activeCompany].monthly) * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              comparisonData.current.total > budgets[activeCompany].monthly ? 'bg-red-500' :
+                              comparisonData.current.total > budgets[activeCompany].monthly * 0.9 ? 'bg-amber-500' :
+                              'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, (comparisonData.current.total / budgets[activeCompany].monthly) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <button
+                  onClick={() => {
+                    setShowBudgetModal(false);
+                    toast.success('Budget enregistré');
+                  }}
+                  className="w-full mt-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-medium hover:from-blue-600 hover:to-cyan-600 transition-all"
+                >
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Modal KPI Settings */}
+        {showKpiSettings && (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowKpiSettings(false); }}
+          >
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+              <div className="bg-gradient-to-r from-slate-700 to-slate-900 p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Personnaliser le Dashboard</h2>
+                      <p className="text-slate-300 text-sm">Choisissez les KPIs à afficher</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowKpiSettings(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="space-y-4">
+                  {[
+                    { key: 'totalCost', label: 'Coût Total', desc: 'Afficher le coût total avec variation' },
+                    { key: 'employees', label: 'Nombre d\'employés', desc: 'Compteur d\'employés actifs' },
+                    { key: 'departments', label: 'Départements', desc: 'Nombre de départements' },
+                    { key: 'avgCost', label: 'Coût Moyen', desc: 'Coût moyen par employé' },
+                    { key: 'comparison', label: 'Cartes Comparaison', desc: 'Comparaisons vs M-1 et N-1' },
+                    { key: 'deptBreakdown', label: 'Répartition Départements', desc: 'Graphique par département' }
+                  ].map(item => (
+                    <label key={item.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                      <div>
+                        <p className="font-medium text-slate-700">{item.label}</p>
+                        <p className="text-xs text-slate-500">{item.desc}</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={visibleKpis[item.key]}
+                        onChange={(e) => setVisibleKpis(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                        className="w-5 h-5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                      />
+                    </label>
+                  ))}
+                </div>
+                
+                <div className="mt-6 flex gap-3">
+                  <button
+                    onClick={() => setVisibleKpis({
+                      totalCost: true, employees: true, departments: true,
+                      avgCost: true, comparison: true, deptBreakdown: true
+                    })}
+                    className="flex-1 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50"
+                  >
+                    Tout afficher
+                  </button>
+                  <button
+                    onClick={() => setShowKpiSettings(false)}
+                    className="flex-1 py-2 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700"
+                  >
+                    Appliquer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Modal Historique des Modifications */}
+        {showActivityLog && (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowActivityLog(false); }}
+          >
+            <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Historique des Modifications</h2>
+                      <p className="text-emerald-100 text-sm">{activityLog.length} entrée{activityLog.length > 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowActivityLog(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {activityLog.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-slate-800 mb-2">Aucune activité</h3>
+                    <p className="text-slate-500 text-sm">L'historique des modifications apparaîtra ici</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {activityLog.map(log => (
+                      <div key={log.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                              log.action.includes('Import') ? 'bg-blue-100 text-blue-600' :
+                              log.action.includes('Suppression') ? 'bg-red-100 text-red-600' :
+                              log.action.includes('Modification') ? 'bg-amber-100 text-amber-600' :
+                              'bg-emerald-100 text-emerald-600'
+                            }`}>
+                              {log.action.includes('Import') && (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                              )}
+                              {log.action.includes('Suppression') && (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              )}
+                              {log.action.includes('Modification') && (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              )}
+                              {!log.action.includes('Import') && !log.action.includes('Suppression') && !log.action.includes('Modification') && (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-slate-700">{log.action}</p>
+                              <p className="text-xs text-slate-500">{log.details}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-400">
+                            {new Date(log.timestamp).toLocaleString('fr-BE', { 
+                              day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                        {log.company && (
+                          <div className="mt-2 pt-2 border-t border-slate-200 flex justify-between text-xs">
+                            <span className="text-slate-400">Société: {log.company}</span>
+                            <span className="text-slate-400">Par: {log.user}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {activityLog.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setActivityLog([]);
+                      toast.success('Historique effacé');
+                    }}
+                    className="w-full mt-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50"
+                  >
+                    Effacer l'historique
+                  </button>
+                )}
               </div>
             </div>
           </div>
