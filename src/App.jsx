@@ -8,10 +8,9 @@ const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P9GYtRaIr5DOIqIP_fh-BYR9Jo';
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    flowType: 'pkce',
+    flowType: 'implicit',
     detectSessionInUrl: true,
     persistSession: true,
-    storageKey: 'salarize-auth',
     autoRefreshToken: true,
   }
 });
@@ -2036,36 +2035,13 @@ function AppContent() {
     let mounted = true;
     
     const initAuth = async () => {
-      // Avec PKCE, Supabase gère automatiquement le code dans l'URL
-      // On doit juste attendre que ça se fasse
-      
-      // Vérifier s'il y a un code dans l'URL (PKCE flow)
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      
-      if (code) {
-        // Laisser Supabase échanger le code contre une session
-        // Cela se fait automatiquement via detectSessionInUrl
-        // Attendre un peu pour laisser le temps
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
+      // Gérer le hash (flow implicite) - le token est dans l'URL
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        // Supabase détecte automatiquement le token avec detectSessionInUrl
+        // Attendre un peu pour que Supabase traite le token
+        await new Promise(resolve => setTimeout(resolve, 500));
         // Nettoyer l'URL
         window.history.replaceState(null, '', window.location.pathname);
-      }
-      
-      // Aussi gérer le hash (ancien flow implicite) au cas où
-      if (window.location.hash && window.location.hash.includes('access_token')) {
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-          window.history.replaceState(null, '', window.location.pathname);
-        }
       }
       
       // Récupérer la session
