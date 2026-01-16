@@ -2195,7 +2195,7 @@ function AppContent() {
   const [bulkAssignDept, setBulkAssignDept] = useState(''); // Target department for bulk assign
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingData, setIsLoadingData] = useState(true); // Chargement des données Supabase
+  const [isLoadingData, setIsLoadingData] = useState(false); // Chargement des données Supabase
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -5745,8 +5745,8 @@ L'équipe Salarize`;
       )}
       
       <main className="lg:ml-64 mt-16 flex-1 p-4 lg:p-6">
-        {/* Skeleton de chargement pendant le chargement des données */}
-        {isLoadingData ? (
+        {/* Skeleton de chargement seulement si pas de données */}
+        {isLoadingData && employees.length === 0 ? (
           <DashboardSkeleton />
         ) : (
         <>
@@ -6260,51 +6260,59 @@ L'équipe Salarize`;
         {/* Stats Cards - Version Améliorée */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {/* Coût Total avec comparaison */}
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-slate-400 text-sm">Coût Total</p>
-              {comparisonData && comparisonData.variationVsPrevMonth !== null && (
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  comparisonData.variationVsPrevMonth >= 0 
-                    ? 'bg-red-50 text-red-600' 
-                    : 'bg-emerald-50 text-emerald-600'
-                }`}>
-                  {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(1)}%
-                </span>
+          {visibleKpis.totalCost && (
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-slate-400 text-sm">Coût Total</p>
+                {comparisonData && comparisonData.variationVsPrevMonth !== null && (
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    comparisonData.variationVsPrevMonth >= 0 
+                      ? 'bg-red-50 text-red-600' 
+                      : 'bg-emerald-50 text-emerald-600'
+                  }`}>
+                    {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
+              {comparisonData && comparisonData.diffVsPrevMonth !== null && (
+                <p className={`text-xs mt-1 ${comparisonData.diffVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                  {comparisonData.diffVsPrevMonth >= 0 ? '+' : ''}€{comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })} vs mois préc.
+                </p>
               )}
             </div>
-            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
-            {comparisonData && comparisonData.diffVsPrevMonth !== null && (
-              <p className={`text-xs mt-1 ${comparisonData.diffVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                {comparisonData.diffVsPrevMonth >= 0 ? '+' : ''}€{comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })} vs mois préc.
-              </p>
-            )}
-          </div>
+          )}
           
           {/* Employés */}
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Employés</p>
-            <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
-            <p className="text-xs text-slate-400 mt-1">Actifs sur la période</p>
-          </div>
+          {visibleKpis.employees && (
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+              <p className="text-slate-400 text-sm">Employés</p>
+              <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
+              <p className="text-xs text-slate-400 mt-1">Actifs sur la période</p>
+            </div>
+          )}
           
           {/* Départements */}
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Départements</p>
-            <p className="text-2xl font-bold text-slate-800">{Object.keys(deptStats).length}</p>
-            <p className="text-xs text-slate-400 mt-1">{sortedDepts[0]?.[0] || '-'} en tête</p>
-          </div>
+          {visibleKpis.departments && (
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+              <p className="text-slate-400 text-sm">Départements</p>
+              <p className="text-2xl font-bold text-slate-800">{Object.keys(deptStats).length}</p>
+              <p className="text-xs text-slate-400 mt-1">{sortedDepts[0]?.[0] || '-'} en tête</p>
+            </div>
+          )}
           
           {/* Coût Moyen avec comparaison */}
-          <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-            <p className="text-slate-400 text-sm">Coût Moyen / Employé</p>
-            <p className="text-2xl font-bold text-slate-800">€{(totalCost / (uniqueNames || 1)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            <p className="text-xs text-slate-400 mt-1">Par employé</p>
-          </div>
+          {visibleKpis.avgCost && (
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
+              <p className="text-slate-400 text-sm">Coût Moyen / Employé</p>
+              <p className="text-2xl font-bold text-slate-800">€{(totalCost / (uniqueNames || 1)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-slate-400 mt-1">Par employé</p>
+            </div>
+          )}
         </div>
 
         {/* Cartes de Comparaison Détaillées */}
-        {comparisonData && (
+        {visibleKpis.comparison && comparisonData && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Comparaison vs Mois Précédent */}
             <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 text-white">
@@ -6583,6 +6591,7 @@ L'équipe Salarize`;
         )}
 
         {/* Departments - Version Compacte avec Drill-down */}
+        {visibleKpis.deptBreakdown && (
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
@@ -6691,6 +6700,7 @@ L'équipe Salarize`;
             ) : null;
           })()}
         </div>
+        )}
 
         {/* Employee Detail Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100">
