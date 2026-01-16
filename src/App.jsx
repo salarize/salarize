@@ -1741,10 +1741,10 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
       <div className={`w-64 bg-slate-900 text-white fixed top-0 left-0 bottom-0 flex flex-col z-50 transition-transform duration-300 lg:translate-x-0 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-b border-slate-700">
           <button 
             onClick={() => setCurrentPage && setCurrentPage('home')}
-            className="flex-1 p-6 border-b border-slate-700 flex items-center gap-3 hover:bg-slate-800 transition-colors"
+            className="flex-1 p-5 flex items-center gap-3 hover:bg-slate-800 transition-colors"
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
               <span className="text-white font-black text-lg">S</span>
@@ -1755,7 +1755,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
           {/* Close button mobile */}
           <button 
             onClick={onClose}
-            className="p-4 border-b border-slate-700 lg:hidden hover:bg-slate-800 transition-colors"
+            className="p-5 lg:hidden hover:bg-slate-800 transition-colors"
           >
             <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -6327,97 +6327,62 @@ L'équipe Salarize`;
           </div>
         )}
 
-        {/* Departments - Version Améliorée avec Comparaisons et Drill-down */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-slate-800">📊 Répartition par Département</h2>
-            <div className="flex gap-2">
-              <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">vs M-1</span>
-              <span className="text-xs bg-violet-100 px-2 py-1 rounded text-violet-600">vs An-1</span>
-              <span className="text-xs bg-cyan-100 px-2 py-1 rounded text-cyan-600">Cliquez pour détails</span>
-            </div>
+        {/* Departments - Version Compacte avec Drill-down */}
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
+            <span className="text-xs text-slate-400 hidden sm:block">Cliquez pour détails</span>
           </div>
           
-          <div className="space-y-4">
+          <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto" style={{ willChange: 'scroll-position' }}>
             {sortedDepts.map(([dept, data]) => {
               const comparison = deptStatsWithComparison[dept] || {};
               const isExpanded = drillDownDept === dept;
+              const pct = ((data.total / totalCost) * 100).toFixed(1);
               return (
-                <div key={dept}>
+                <div key={dept} style={{ contain: 'layout style paint' }}>
                   <div 
-                    className={`border rounded-lg p-4 transition-all cursor-pointer ${
-                      isExpanded 
-                        ? 'border-violet-300 bg-violet-50' 
-                        : 'border-slate-100 hover:border-slate-200'
+                    className={`py-2.5 px-2 -mx-2 rounded-lg cursor-pointer transition-colors ${
+                      isExpanded ? 'bg-violet-50' : 'hover:bg-slate-50'
                     }`}
                     onClick={() => setDrillDownDept(isExpanded ? null : dept)}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <span className="font-medium text-slate-700">{dept}</span>
+                    {/* Ligne principale */}
+                    <div className="flex items-center gap-2">
+                      <svg className={`w-3 h-3 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      
+                      <span className="font-medium text-slate-700 text-sm truncate flex-1">{dept}</span>
+                      
+                      {/* Comparaisons inline */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {comparison.variationVsPrevMonth !== null && (
+                          <span className={`text-xs font-medium ${comparison.variationVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                            {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-400">{data.count} emp.</span>
+                        <span className="text-xs text-slate-400 w-10 text-right">{pct}%</span>
+                        <span className="font-semibold text-slate-800 text-sm w-24 text-right">€{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</span>
                       </div>
-                      <span className="font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
                     </div>
                     
-                    {/* Barre de progression */}
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3 ml-6">
+                    {/* Barre de progression fine */}
+                    <div className="h-1 bg-slate-100 rounded-full overflow-hidden mt-1.5 ml-5">
                       <div 
-                        className="h-full rounded-full transition-all duration-500" 
+                        className="h-full rounded-full" 
                         style={{ 
                           width: `${(data.total / maxCost) * 100}%`,
                           backgroundColor: `rgb(${getBrandColor()})`
                         }} 
                       />
                     </div>
-                    
-                    {/* Comparaisons */}
-                    <div className="flex flex-wrap gap-3 text-sm ml-6">
-                      {/* vs Mois Précédent */}
-                      {comparison.prevMonth > 0 && comparison.variationVsPrevMonth !== null && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-400 text-xs">vs M-1:</span>
-                          <span className={`font-medium text-xs ${comparison.variationVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                            {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparison.variationVsPrevMonth).toFixed(1)}%
-                          </span>
-                          {comparison.diffVsPrevMonth !== null && (
-                            <span className={`text-xs ${comparison.diffVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                              ({comparison.diffVsPrevMonth >= 0 ? '+' : ''}€{comparison.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* vs Année Précédente */}
-                      {comparison.sameMonthLastYear > 0 && comparison.variationVsLastYear !== null && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-violet-400 text-xs">vs An-1:</span>
-                          <span className={`font-medium text-xs ${comparison.variationVsLastYear >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                            {comparison.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparison.variationVsLastYear).toFixed(1)}%
-                          </span>
-                          {comparison.diffVsLastYear !== null && (
-                            <span className={`text-xs ${comparison.diffVsLastYear >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                              ({comparison.diffVsLastYear >= 0 ? '+' : ''}€{comparison.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Nombre d'employés */}
-                      <div className="flex items-center gap-1 ml-auto">
-                        <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <span className="text-xs text-slate-500">{data.count} emp.</span>
-                      </div>
-                    </div>
                   </div>
                   
                   {/* Drill-down: Liste des employés du département */}
                   {isExpanded && drillDownEmployees.length > 0 && (
-                    <div className="mt-2 ml-6 bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <div className="ml-5 mb-2 bg-slate-50 rounded-lg p-3 border border-slate-200">
                       <h4 className="text-sm font-medium text-slate-700 mb-3">👥 Employés du département {dept}</h4>
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {drillDownEmployees.map((emp, idx) => (
@@ -6444,41 +6409,32 @@ L'équipe Salarize`;
             })}
           </div>
           
-          {/* Résumé des tendances */}
-          {Object.keys(deptStatsWithComparison).length > 0 && (
-            <div className="mt-6 pt-4 border-t border-slate-100">
-              <h3 className="text-sm font-medium text-slate-600 mb-3">📈 Tendances départements</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Plus forte hausse */}
-                {(() => {
-                  const sorted = Object.entries(deptStatsWithComparison)
-                    .filter(([, d]) => d.variationVsPrevMonth !== null)
-                    .sort((a, b) => (b[1].variationVsPrevMonth || 0) - (a[1].variationVsPrevMonth || 0));
-                  const highest = sorted[0];
-                  const lowest = sorted[sorted.length - 1];
-                  
-                  return (
-                    <>
-                      {highest && highest[1].variationVsPrevMonth > 0 && (
-                        <div className="bg-red-50 rounded-lg p-3">
-                          <p className="text-xs text-red-600 font-medium">🔺 Plus forte hausse</p>
-                          <p className="font-semibold text-red-700">{highest[0]}</p>
-                          <p className="text-sm text-red-600">+{highest[1].variationVsPrevMonth.toFixed(1)}% vs mois préc.</p>
-                        </div>
-                      )}
-                      {lowest && lowest[1].variationVsPrevMonth < 0 && (
-                        <div className="bg-emerald-50 rounded-lg p-3">
-                          <p className="text-xs text-emerald-600 font-medium">🔻 Plus forte baisse</p>
-                          <p className="font-semibold text-emerald-700">{lowest[0]}</p>
-                          <p className="text-sm text-emerald-600">{lowest[1].variationVsPrevMonth.toFixed(1)}% vs mois préc.</p>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
+          {/* Résumé des tendances - Plus compact */}
+          {Object.keys(deptStatsWithComparison).length > 0 && (() => {
+            const sorted = Object.entries(deptStatsWithComparison)
+              .filter(([, d]) => d.variationVsPrevMonth !== null)
+              .sort((a, b) => (b[1].variationVsPrevMonth || 0) - (a[1].variationVsPrevMonth || 0));
+            const highest = sorted[0];
+            const lowest = sorted[sorted.length - 1];
+            const hasData = (highest && highest[1].variationVsPrevMonth > 0) || (lowest && lowest[1].variationVsPrevMonth < 0);
+            
+            return hasData ? (
+              <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-4 text-xs">
+                {highest && highest[1].variationVsPrevMonth > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">🔺 Hausse:</span>
+                    <span className="font-medium text-red-600">{highest[0]} (+{highest[1].variationVsPrevMonth.toFixed(0)}%)</span>
+                  </div>
+                )}
+                {lowest && lowest[1].variationVsPrevMonth < 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">🔻 Baisse:</span>
+                    <span className="font-medium text-emerald-600">{lowest[0]} ({lowest[1].variationVsPrevMonth.toFixed(0)}%)</span>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            ) : null;
+          })()}
         </div>
 
         {/* Employee Detail Section */}
@@ -7553,7 +7509,7 @@ L'équipe Salarize`;
         {/* Modal Onboarding / Tutorial */}
         {showOnboarding && (
           <div 
-            className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-16 sm:pt-24 overflow-y-auto"
             onClick={(e) => { if (e.target === e.currentTarget) { setShowOnboarding(false); setOnboardingStep(0); }}}
           >
             <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
@@ -7566,14 +7522,14 @@ L'équipe Salarize`;
               </div>
               
               {/* Content */}
-              <div className="p-8">
+              <div className="p-6 sm:p-8">
                 {onboardingStep === 0 && (
                   <div className="text-center">
-                    <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                      <span className="text-4xl">👋</span>
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
+                      <span className="text-3xl sm:text-4xl">👋</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800 mb-3">Bienvenue sur Salarize !</h2>
-                    <p className="text-slate-500 mb-6">
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-3">Bienvenue sur Salarize !</h2>
+                    <p className="text-slate-500 mb-4 sm:mb-6 text-sm sm:text-base">
                       Votre outil d'analyse des coûts salariaux. Découvrons ensemble les fonctionnalités principales.
                     </p>
                   </div>
@@ -7581,7 +7537,7 @@ L'équipe Salarize`;
                 
                 {onboardingStep === 1 && (
                   <div className="text-center">
-                    <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6">
                       <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
