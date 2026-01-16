@@ -2455,7 +2455,7 @@ function AppContent() {
       }
       if (comparisonData.sameMonthLastYear && comparisonData.variationVsLastYear !== null) {
         summaryRows.push({ 
-          'Indicateur': 'vs Même mois N-1', 
+          'Indicateur': 'vs Année précédente', 
           'Valeur': `${comparisonData.variationVsLastYear >= 0 ? '+' : ''}${comparisonData.variationVsLastYear.toFixed(2)}%`,
           'Détail': `€${comparisonData.diffVsLastYear?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}`
         });
@@ -2465,7 +2465,7 @@ function AppContent() {
     
     // Feuille 2 : Départements avec comparaisons
     const deptRows = [
-      { 'Département': 'DÉPARTEMENT', 'Coût Actuel': 'COÛT ACTUEL', 'vs M-1 (%)': 'VS M-1 (%)', 'vs M-1 (€)': 'VS M-1 (€)', 'vs N-1 (%)': 'VS N-1 (%)', 'vs N-1 (€)': 'VS N-1 (€)', 'Employés': 'EMPLOYÉS' }
+      { 'Département': 'DÉPARTEMENT', 'Coût Actuel': 'COÛT ACTUEL', 'vs M-1 (%)': 'VS M-1 (%)', 'vs M-1 (€)': 'VS M-1 (€)', 'vs An-1 (%)': 'VS N-1 (%)', 'vs An-1 (€)': 'VS N-1 (€)', 'Employés': 'EMPLOYÉS' }
     ];
     
     Object.entries(deptStatsWithComparison)
@@ -2476,8 +2476,8 @@ function AppContent() {
           'Coût Actuel': `€${data.current.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
           'vs M-1 (%)': data.variationVsPrevMonth !== null ? `${data.variationVsPrevMonth >= 0 ? '+' : ''}${data.variationVsPrevMonth.toFixed(1)}%` : '-',
           'vs M-1 (€)': data.diffVsPrevMonth ? `€${data.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : '-',
-          'vs N-1 (%)': data.variationVsLastYear !== null ? `${data.variationVsLastYear >= 0 ? '+' : ''}${data.variationVsLastYear.toFixed(1)}%` : '-',
-          'vs N-1 (€)': data.diffVsLastYear ? `€${data.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : '-',
+          'vs An-1 (%)': data.variationVsLastYear !== null ? `${data.variationVsLastYear >= 0 ? '+' : ''}${data.variationVsLastYear.toFixed(1)}%` : '-',
+          'vs An-1 (€)': data.diffVsLastYear ? `€${data.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : '-',
           'Employés': data.currentCount
         });
       });
@@ -6065,7 +6065,7 @@ L'équipe Salarize`;
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold">vs Même Mois N-1</h3>
+                  <h3 className="font-semibold">vs Année Précédente</h3>
                   <p className="text-violet-200 text-xs">{comparisonData.sameMonthLastYear ? formatPeriod(comparisonData.sameMonthLastYear.period) : 'N/A'}</p>
                 </div>
               </div>
@@ -6120,7 +6120,7 @@ L'équipe Salarize`;
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    📈 Comparaison N/N-1
+                    📈 Comparaison Année sur Année
                   </button>
                 )}
                 {years.length > 1 && !showYearComparison && (
@@ -6292,7 +6292,7 @@ L'équipe Salarize`;
             <h2 className="font-bold text-slate-800">📊 Répartition par Département</h2>
             <div className="flex gap-2">
               <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">vs M-1</span>
-              <span className="text-xs bg-violet-100 px-2 py-1 rounded text-violet-600">vs N-1</span>
+              <span className="text-xs bg-violet-100 px-2 py-1 rounded text-violet-600">vs An-1</span>
               <span className="text-xs bg-cyan-100 px-2 py-1 rounded text-cyan-600">Cliquez pour détails</span>
             </div>
           </div>
@@ -6349,10 +6349,10 @@ L'équipe Salarize`;
                         </div>
                       )}
                       
-                      {/* vs Même Mois N-1 */}
+                      {/* vs Année Précédente */}
                       {comparison.sameMonthLastYear > 0 && comparison.variationVsLastYear !== null && (
                         <div className="flex items-center gap-1">
-                          <span className="text-violet-400 text-xs">vs N-1:</span>
+                          <span className="text-violet-400 text-xs">vs An-1:</span>
                           <span className={`font-medium text-xs ${comparison.variationVsLastYear >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                             {comparison.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparison.variationVsLastYear).toFixed(1)}%
                           </span>
