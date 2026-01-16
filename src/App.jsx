@@ -6,7 +6,13 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase configuration
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: sessionStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+  }
+});
 
 // Helper pour obtenir une session valide
 const getValidSession = async () => {
@@ -1165,7 +1171,7 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
         
         {/* Modal confirmation suppression */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/70 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
             <div className="bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-700">
               <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1647,7 +1653,7 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
   const companyNames = Object.keys(companies);
   
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
       <div className="bg-white rounded-2xl p-6 max-w-md w-full">
         <h2 className="text-xl font-bold mb-4">📊 Importer vers quelle société ?</h2>
         
@@ -4137,7 +4143,7 @@ L'équipe Salarize`;
           />
         )}
         {pendingPeriodSelection && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
             <div className="bg-white rounded-2xl p-6 max-w-md w-full">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold">📅 Quelle période importez-vous ?</h2>
@@ -4324,7 +4330,7 @@ L'équipe Salarize`;
         />
       )}
       {showNewCompanyModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">🏢 Nouvelle société</h2>
             <p className="text-slate-500 text-sm mb-4">Créez une société vide pour commencer à importer des données</p>
@@ -4358,7 +4364,7 @@ L'équipe Salarize`;
       
       {/* Company Settings Modal */}
       {showCompanySettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold">🎨 Paramètres de {activeCompany}</h2>
@@ -4478,7 +4484,7 @@ L'équipe Salarize`;
       
       {/* Import Modal with Drag & Drop */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">📁 Importer des données</h2>
@@ -4604,7 +4610,7 @@ L'équipe Salarize`;
       
       {/* Period Selection Modal */}
       {pendingPeriodSelection && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">📅 Quelle période importez-vous ?</h2>
@@ -5378,8 +5384,8 @@ L'équipe Salarize`;
 
         {/* Data Manager Modal */}
         {showDataManager && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
+            <div className="bg-white rounded-2xl p-6 max-w-lg w-full relative">
               
               {/* Confirmation overlay */}
               {confirmAction && (
@@ -5970,7 +5976,7 @@ L'équipe Salarize`;
         
         {/* Modal de comparaison */}
         {showCompareModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
             <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
               <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="text-xl font-bold">📊 Comparer deux périodes</h2>
