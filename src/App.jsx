@@ -2177,6 +2177,7 @@ function AppContent() {
       }
     } catch (e) { console.error(e); }
     setIsLoading(false);
+    setIsLoadingData(false);
   };
 
   // Load data from Supabase
