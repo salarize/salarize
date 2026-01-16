@@ -2443,21 +2443,21 @@ function AppContent() {
     summaryRows.push({ 'Indicateur': 'Périodes analysées', 'Valeur': periods.length });
     
     // Comparaisons si disponibles
-    if (comparisonData) {
+    if (comparisonData && comparisonData.current) {
       summaryRows.push({});
       summaryRows.push({ 'Indicateur': '=== COMPARAISONS ===' });
-      if (comparisonData.prevMonth) {
+      if (comparisonData.prevMonth && comparisonData.variationVsPrevMonth !== null) {
         summaryRows.push({ 
           'Indicateur': 'vs Mois précédent', 
           'Valeur': `${comparisonData.variationVsPrevMonth >= 0 ? '+' : ''}${comparisonData.variationVsPrevMonth.toFixed(2)}%`,
-          'Détail': `€${comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`
+          'Détail': `€${comparisonData.diffVsPrevMonth?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}`
         });
       }
-      if (comparisonData.sameMonthLastYear) {
+      if (comparisonData.sameMonthLastYear && comparisonData.variationVsLastYear !== null) {
         summaryRows.push({ 
           'Indicateur': 'vs Même mois N-1', 
           'Valeur': `${comparisonData.variationVsLastYear >= 0 ? '+' : ''}${comparisonData.variationVsLastYear.toFixed(2)}%`,
-          'Détail': `€${comparisonData.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`
+          'Détail': `€${comparisonData.diffVsLastYear?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}`
         });
       }
     }
@@ -4022,10 +4022,13 @@ L'équipe Salarize`;
   
   // Période actuelle et périodes de comparaison
   const comparisonData = useMemo(() => {
-    if (chartData.length === 0) return null;
+    if (!chartData || chartData.length === 0) return null;
     
     const sortedPeriods = [...chartData].sort((a, b) => b.period.localeCompare(a.period));
     const current = sortedPeriods[0];
+    
+    if (!current || !current.period) return null;
+    
     const currentMonth = current.period.substring(5);
     const currentYear = parseInt(current.period.substring(0, 4));
     
@@ -4058,14 +4061,19 @@ L'équipe Salarize`;
 
   // Stats par département avec comparaisons
   const deptStatsWithComparison = useMemo(() => {
-    if (chartData.length === 0) return {};
+    if (!chartData || chartData.length === 0 || !employees || employees.length === 0) return {};
     
     const sortedPeriods = [...chartData].sort((a, b) => b.period.localeCompare(a.period));
+    if (sortedPeriods.length === 0) return {};
+    
     const currentPeriod = sortedPeriods[0]?.period;
     const prevPeriod = sortedPeriods[1]?.period;
-    const currentMonth = currentPeriod?.substring(5);
-    const currentYear = parseInt(currentPeriod?.substring(0, 4));
-    const sameMonthLastYearPeriod = `${currentYear - 1}-${currentMonth}`;
+    
+    if (!currentPeriod) return {};
+    
+    const currentMonth = currentPeriod.substring(5);
+    const currentYear = parseInt(currentPeriod.substring(0, 4));
+    const sameMonthLastYearPeriod = currentMonth ? `${currentYear - 1}-${currentMonth}` : null;
     
     const stats = {};
     
@@ -4087,11 +4095,11 @@ L'équipe Salarize`;
         stats[d].current += e.totalCost;
         stats[d].currentCount++;
       }
-      if (e.period === prevPeriod) {
+      if (prevPeriod && e.period === prevPeriod) {
         stats[d].prevMonth += e.totalCost;
         stats[d].prevMonthCount++;
       }
-      if (e.period === sameMonthLastYearPeriod) {
+      if (sameMonthLastYearPeriod && e.period === sameMonthLastYearPeriod) {
         stats[d].sameMonthLastYear += e.totalCost;
         stats[d].lastYearCount++;
       }
@@ -4102,8 +4110,8 @@ L'équipe Salarize`;
       const s = stats[dept];
       s.variationVsPrevMonth = s.prevMonth > 0 ? ((s.current - s.prevMonth) / s.prevMonth) * 100 : null;
       s.variationVsLastYear = s.sameMonthLastYear > 0 ? ((s.current - s.sameMonthLastYear) / s.sameMonthLastYear) * 100 : null;
-      s.diffVsPrevMonth = s.current - s.prevMonth;
-      s.diffVsLastYear = s.current - s.sameMonthLastYear;
+      s.diffVsPrevMonth = s.prevMonth > 0 ? s.current - s.prevMonth : null;
+      s.diffVsLastYear = s.sameMonthLastYear > 0 ? s.current - s.sameMonthLastYear : null;
     });
     
     return stats;
@@ -6323,28 +6331,32 @@ L'équipe Salarize`;
                     {/* Comparaisons */}
                     <div className="flex flex-wrap gap-3 text-sm ml-6">
                       {/* vs Mois Précédent */}
-                      {comparison.prevMonth > 0 && (
+                      {comparison.prevMonth > 0 && comparison.variationVsPrevMonth !== null && (
                         <div className="flex items-center gap-1">
                           <span className="text-slate-400 text-xs">vs M-1:</span>
                           <span className={`font-medium text-xs ${comparison.variationVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                             {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparison.variationVsPrevMonth).toFixed(1)}%
                           </span>
-                          <span className={`text-xs ${comparison.diffVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                            ({comparison.diffVsPrevMonth >= 0 ? '+' : ''}€{comparison.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
-                          </span>
+                          {comparison.diffVsPrevMonth !== null && (
+                            <span className={`text-xs ${comparison.diffVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                              ({comparison.diffVsPrevMonth >= 0 ? '+' : ''}€{comparison.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                            </span>
+                          )}
                         </div>
                       )}
                       
                       {/* vs Même Mois N-1 */}
-                      {comparison.sameMonthLastYear > 0 && (
+                      {comparison.sameMonthLastYear > 0 && comparison.variationVsLastYear !== null && (
                         <div className="flex items-center gap-1">
                           <span className="text-violet-400 text-xs">vs N-1:</span>
                           <span className={`font-medium text-xs ${comparison.variationVsLastYear >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                             {comparison.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparison.variationVsLastYear).toFixed(1)}%
                           </span>
-                          <span className={`text-xs ${comparison.diffVsLastYear >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                            ({comparison.diffVsLastYear >= 0 ? '+' : ''}€{comparison.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
-                          </span>
+                          {comparison.diffVsLastYear !== null && (
+                            <span className={`text-xs ${comparison.diffVsLastYear >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                              ({comparison.diffVsLastYear >= 0 ? '+' : ''}€{comparison.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+                            </span>
+                          )}
                         </div>
                       )}
                       
