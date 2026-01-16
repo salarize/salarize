@@ -1738,7 +1738,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         />
       )}
       
-      <div className={`w-64 bg-slate-900 text-white fixed h-screen flex flex-col z-50 transition-transform duration-300 lg:translate-x-0 ${
+      <div className={`w-64 bg-slate-900 text-white fixed top-0 left-0 bottom-0 flex flex-col z-50 transition-transform duration-300 lg:translate-x-0 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex items-center justify-between">
@@ -1956,6 +1956,7 @@ function AppContent() {
   const [bulkAssignDept, setBulkAssignDept] = useState(''); // Target department for bulk assign
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true); // Chargement des données Supabase
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -2181,6 +2182,7 @@ function AppContent() {
   // Load data from Supabase
   const loadFromSupabase = async (userId) => {
     setIsLoading(true);
+    setIsLoadingData(true);
     try {
       // Load companies
       const { data: companiesData, error: companiesError } = await supabase
@@ -2242,6 +2244,7 @@ function AppContent() {
       console.error('Error loading from Supabase:', e);
     }
     setIsLoading(false);
+    setIsLoadingData(false);
   };
 
   // Save to Supabase - Optimized with upsert
@@ -4370,8 +4373,8 @@ L'équipe Salarize`;
     );
   }
 
-  // Upload screen (connected but no companies yet)
-  if (Object.keys(companies).length === 0 && view === 'upload') {
+  // Upload screen (connected but no companies yet AND data is loaded)
+  if (Object.keys(companies).length === 0 && view === 'upload' && !isLoadingData) {
     return (
       <PageTransition key="upload">
         <div className="min-h-screen bg-slate-950">
@@ -5311,8 +5314,8 @@ L'équipe Salarize`;
                 </div>
               </div>
               
-              {/* Employee list */}
-              <div className="divide-y divide-slate-100">
+              {/* Employee list - Optimisé avec limite d'affichage */}
+              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto" style={{ willChange: 'scroll-position' }}>
                 {(() => {
                   const allDepts = [...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort();
                   
@@ -5378,7 +5381,11 @@ L'équipe Salarize`;
                       </div>
                       
                       {uniqueEmps.map((emp, idx) => (
-                        <div key={emp.name} className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}>
+                        <div 
+                          key={emp.name} 
+                          className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}
+                          style={{ contain: 'layout style paint' }}
+                        >
                           {/* Checkbox */}
                           <input
                             type="checkbox"
