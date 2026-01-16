@@ -1991,6 +1991,10 @@ function AppContent() {
   const [activityLog, setActivityLog] = useState([]); // Historique des modifications
   const [showActivityLog, setShowActivityLog] = useState(false);
   
+  // Onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  
   // Employee detail section states
   const [empSearchTerm, setEmpSearchTerm] = useState('');
   const [empDeptFilter, setEmpDeptFilter] = useState('all');
@@ -2006,12 +2010,24 @@ function AppContent() {
     setEmpCurrentPage(1);
   }, [debouncedEmpSearch, empDeptFilter, empSortBy]);
 
+  // Auto-show onboarding for new users
+  useEffect(() => {
+    if (!isLoading && !isLoadingData && user && !localStorage.getItem('salarize_onboarding_done')) {
+      // Petit délai pour laisser le dashboard se charger
+      const timer = setTimeout(() => {
+        setShowOnboarding(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isLoadingData, user]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Escape - fermer les modals
       if (e.key === 'Escape') {
-        if (showExportModal) setShowExportModal(false);
+        if (showOnboarding) { setShowOnboarding(false); setOnboardingStep(0); }
+        else if (showExportModal) setShowExportModal(false);
         else if (showDataManager) { setShowDataManager(false); setConfirmAction(null); }
         else if (showDeptManager) { setShowDeptManager(false); setSelectedEmployees(new Set()); }
         else if (showCompanySettings) setShowCompanySettings(false);
@@ -5531,12 +5547,12 @@ L'équipe Salarize`;
                 </>
               )}
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-800">{activeCompany}</h1>
+                <h1 className="text-lg sm:text-2xl font-bold text-slate-800 truncate">{activeCompany}</h1>
                 <button
                   onClick={() => setShowCompanySettings(true)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors flex-shrink-0"
                   title="Paramètres société"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5549,7 +5565,7 @@ L'équipe Salarize`;
                   href={companies[activeCompany].website.startsWith('http') ? companies[activeCompany].website : `https://${companies[activeCompany].website}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm hover:underline"
+                  className="text-sm hover:underline hidden sm:block truncate"
                   style={{ color: `rgb(${getBrandColor()})` }}
                 >
                   {companies[activeCompany].website.replace(/^https?:\/\//, '')}
@@ -5561,15 +5577,15 @@ L'équipe Salarize`;
           </div>
           <div className="flex-1" />
           
-          {/* Barre d'actions regroupée */}
-          <div className="flex items-center gap-2">
-            {/* Groupe Export */}
-            <div className="relative group">
-              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700 shadow-sm">
+          {/* Barre d'actions regroupée - Responsive */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Groupe Export - Caché sur très petit écran */}
+            <div className="relative group hidden sm:block">
+              <button className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700 shadow-sm">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Exporter
+                <span className="hidden md:inline">Exporter</span>
                 <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -5606,34 +5622,34 @@ L'équipe Salarize`;
               </div>
             </div>
             
-            {/* Bouton Partager */}
+            {/* Bouton Partager - Compact sur mobile */}
             <button
               onClick={() => setShowShareModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors text-sm font-medium text-white shadow-sm"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-violet-500 hover:bg-violet-600 rounded-lg transition-colors text-sm font-medium text-white shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
-              Partager
+              <span className="hidden sm:inline">Partager</span>
             </button>
             
-            {/* Séparateur */}
-            <div className="w-px h-8 bg-slate-200 mx-1"></div>
+            {/* Séparateur - Caché sur mobile */}
+            <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
             
-            {/* Filtre Période */}
+            {/* Filtre Période - Compact sur mobile */}
             <select
               value={periodFilter}
               onChange={e => setPeriodFilter(e.target.value)}
-              className="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm hover:border-slate-300 transition-colors cursor-pointer"
+              className="px-2 sm:px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm hover:border-slate-300 transition-colors cursor-pointer max-w-[120px] sm:max-w-none"
             >
-              <option value="all">Toutes périodes</option>
-              <option value="3m">3 derniers mois</option>
-              <option value="6m">6 derniers mois</option>
-              <option value="12m">12 derniers mois</option>
-              <option value="ytd">Année en cours</option>
+              <option value="all">Tout</option>
+              <option value="3m">3 mois</option>
+              <option value="6m">6 mois</option>
+              <option value="12m">12 mois</option>
+              <option value="ytd">YTD</option>
             </select>
             
-            {/* Menu Plus (...) */}
+            {/* Menu Plus (...) - Contient plus d'options sur mobile */}
             <div className="relative group">
               <button className="flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-500">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5641,14 +5657,35 @@ L'équipe Salarize`;
                 </svg>
               </button>
               <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                {/* Export options pour mobile */}
+                <div className="sm:hidden border-b border-slate-100">
+                  <button
+                    onClick={exportToExcel}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-sm text-slate-700">Exporter Excel</span>
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="text-sm text-slate-700">Exporter PDF</span>
+                  </button>
+                </div>
                 <button
                   onClick={() => setShowKpiSettings(true)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left rounded-t-xl"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left sm:rounded-t-xl"
                 >
                   <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                   </svg>
-                  <span className="text-sm text-slate-700">Personnaliser le dashboard</span>
+                  <span className="text-sm text-slate-700">Personnaliser</span>
                 </button>
                 <button
                   onClick={() => setShowActivityLog(true)}
@@ -5657,19 +5694,28 @@ L'équipe Salarize`;
                   <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-sm text-slate-700">Historique des modifications</span>
+                  <span className="text-sm text-slate-700">Historique</span>
                 </button>
                 {periods.length > 1 && (
                   <button
                     onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-t border-slate-100 rounded-b-xl"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-t border-slate-100"
                   >
                     <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="text-sm text-slate-700">Sélection périodes</span>
+                    <span className="text-sm text-slate-700">Périodes</span>
                   </button>
                 )}
+                <button
+                  onClick={() => setShowOnboarding(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-t border-slate-100 rounded-b-xl"
+                >
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm text-slate-700">Aide / Tutorial</span>
+                </button>
               </div>
             </div>
           </div>
@@ -7499,6 +7545,169 @@ L'équipe Salarize`;
                     Effacer l'historique
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Modal Onboarding / Tutorial */}
+        {showOnboarding && (
+          <div 
+            className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowOnboarding(false); setOnboardingStep(0); }}}
+          >
+            <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+              {/* Progress bar */}
+              <div className="h-1 bg-slate-100">
+                <div 
+                  className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-300"
+                  style={{ width: `${((onboardingStep + 1) / 5) * 100}%` }}
+                />
+              </div>
+              
+              {/* Content */}
+              <div className="p-8">
+                {onboardingStep === 0 && (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <span className="text-4xl">👋</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">Bienvenue sur Salarize !</h2>
+                    <p className="text-slate-500 mb-6">
+                      Votre outil d'analyse des coûts salariaux. Découvrons ensemble les fonctionnalités principales.
+                    </p>
+                  </div>
+                )}
+                
+                {onboardingStep === 1 && (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">1. Importez vos données</h2>
+                    <p className="text-slate-500 mb-6">
+                      Cliquez sur <strong>+ Actions</strong> en bas à gauche puis <strong>Importer des données</strong>. 
+                      Salarize accepte les fichiers Excel (.xlsx) exportés d'Acerta ou d'autres systèmes de paie.
+                    </p>
+                    <div className="bg-slate-50 rounded-xl p-4 text-left">
+                      <p className="text-sm text-slate-600">
+                        💡 <strong>Astuce :</strong> Vous pouvez importer plusieurs périodes pour voir l'évolution dans le temps.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {onboardingStep === 2 && (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">2. Organisez par département</h2>
+                    <p className="text-slate-500 mb-6">
+                      Assignez vos employés à des départements pour une analyse plus fine. 
+                      Cliquez sur <strong>Gérer les départements</strong> dans le menu Actions.
+                    </p>
+                    <div className="bg-slate-50 rounded-xl p-4 text-left">
+                      <p className="text-sm text-slate-600">
+                        💡 <strong>Astuce :</strong> Sélectionnez plusieurs employés et assignez-les en masse !
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {onboardingStep === 3 && (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <svg className="w-10 h-10 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">3. Analysez vos données</h2>
+                    <p className="text-slate-500 mb-6">
+                      Le dashboard affiche vos KPIs en temps réel : coût total, évolution, comparaisons avec le mois précédent 
+                      et l'année précédente.
+                    </p>
+                    <div className="bg-slate-50 rounded-xl p-4 text-left">
+                      <p className="text-sm text-slate-600">
+                        💡 <strong>Astuce :</strong> Cliquez sur un département pour voir le détail des employés.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {onboardingStep === 4 && (
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-fuchsia-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <svg className="w-10 h-10 text-fuchsia-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">4. Partagez vos rapports</h2>
+                    <p className="text-slate-500 mb-6">
+                      Exportez en Excel ou PDF, ou partagez directement par email avec vos collaborateurs. 
+                      Vos données sont synchronisées dans le cloud.
+                    </p>
+                    <div className="bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl p-4 text-white text-left">
+                      <p className="text-sm">
+                        🎉 <strong>C'est parti !</strong> Vous êtes prêt à analyser vos coûts salariaux comme un pro.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Footer */}
+              <div className="px-8 pb-8 flex items-center justify-between">
+                <button
+                  onClick={() => { setShowOnboarding(false); setOnboardingStep(0); }}
+                  className="text-slate-400 hover:text-slate-600 text-sm"
+                >
+                  Passer
+                </button>
+                
+                <div className="flex items-center gap-2">
+                  {/* Dots */}
+                  <div className="flex gap-1 mr-4">
+                    {[0, 1, 2, 3, 4].map(i => (
+                      <button
+                        key={i}
+                        onClick={() => setOnboardingStep(i)}
+                        className={`w-2 h-2 rounded-full transition-colors ${
+                          i === onboardingStep ? 'bg-violet-500' : 'bg-slate-200 hover:bg-slate-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  
+                  {onboardingStep > 0 && (
+                    <button
+                      onClick={() => setOnboardingStep(s => s - 1)}
+                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      Précédent
+                    </button>
+                  )}
+                  
+                  {onboardingStep < 4 ? (
+                    <button
+                      onClick={() => setOnboardingStep(s => s + 1)}
+                      className="px-6 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Suivant
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setShowOnboarding(false); setOnboardingStep(0); localStorage.setItem('salarize_onboarding_done', 'true'); }}
+                      className="px-6 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white rounded-lg font-medium transition-colors"
+                    >
+                      Commencer 🚀
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
