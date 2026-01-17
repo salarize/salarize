@@ -8562,6 +8562,7 @@ L'équipe Salarize`;
             ) : null;
           })()}
         </div>
+        )}
 
         {/* Employee Detail Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100">
