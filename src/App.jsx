@@ -1099,14 +1099,15 @@ function Footer({ setCurrentPage }) {
             <p className="text-slate-400 text-sm mb-4">
               La solution belge pour analyser et optimiser vos coûts salariaux.
             </p>
-            <div className="flex gap-3">
-              <a href="#" className="w-9 h-9 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
-              </a>
-              <a href="#" className="w-9 h-9 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-              </a>
-            </div>
+            <a 
+              href="mailto:elabdounimohamed144@gmail.com" 
+              className="inline-flex items-center gap-2 text-violet-400 hover:text-violet-300 text-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              elabdounimohamed144@gmail.com
+            </a>
           </div>
           
           {/* Product */}
@@ -1119,13 +1120,16 @@ function Footer({ setCurrentPage }) {
             </ul>
           </div>
           
-          {/* Company */}
+          {/* Support */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Entreprise</h4>
+            <h4 className="text-white font-semibold mb-4">Support</h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">À propos</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">Contact</a></li>
-              <li><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">Blog</a></li>
+              <li>
+                <a href="mailto:elabdounimohamed144@gmail.com" className="text-slate-400 hover:text-white text-sm transition-colors">
+                  Nous contacter
+                </a>
+              </li>
+              <li><button onClick={() => setCurrentPage('demo')} className="text-slate-400 hover:text-white text-sm transition-colors">Guide de démarrage</button></li>
             </ul>
           </div>
           
@@ -1136,6 +1140,7 @@ function Footer({ setCurrentPage }) {
               <li><button onClick={() => setCurrentPage('privacy')} className="text-slate-400 hover:text-white text-sm transition-colors">Politique de confidentialité</button></li>
               <li><button onClick={() => setCurrentPage('terms')} className="text-slate-400 hover:text-white text-sm transition-colors">Conditions générales</button></li>
               <li><button onClick={() => setCurrentPage('legal')} className="text-slate-400 hover:text-white text-sm transition-colors">Mentions légales</button></li>
+              <li><button onClick={() => setCurrentPage('cookies')} className="text-slate-400 hover:text-white text-sm transition-colors">Politique cookies</button></li>
             </ul>
           </div>
         </div>
@@ -1145,10 +1150,8 @@ function Footer({ setCurrentPage }) {
           <p className="text-slate-500 text-sm">
             © {new Date().getFullYear()} Salarize. Tous droits réservés. Made with ❤️ in Belgium 🇧🇪
           </p>
-          <div className="flex items-center gap-4">
-            <span className="text-slate-500 text-xs">TVA: BE0xxx.xxx.xxx</span>
-            <span className="text-slate-500 text-xs">•</span>
-            <span className="text-slate-500 text-xs">Bruxelles, Belgique</span>
+          <div className="flex items-center gap-4 text-slate-500 text-xs">
+            <span>Belgique</span>
           </div>
         </div>
       </div>
@@ -1301,49 +1304,73 @@ function LegalPage({ setCurrentPage }) {
           Retour
         </button>
         
-        <h1 className="text-4xl font-bold text-white mb-8">Mentions Légales</h1>
+        <h1 className="text-4xl font-bold text-white mb-4">Mentions Légales</h1>
+        <p className="text-slate-400 mb-8">Conformément à la loi belge du 11 mars 2003</p>
         
-        <div className="prose prose-invert prose-slate max-w-none">
-          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700 mb-8">
-            <h2 className="text-xl font-bold text-white mb-4">Éditeur du site</h2>
-            <p className="text-slate-300 mb-2"><strong>Salarize</strong></p>
+        <div className="space-y-6">
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">1. Éditeur du site</h2>
             <p className="text-slate-400 text-sm">
-              Société à responsabilité limitée (SPRL/BV)<br />
-              Siège social : Rue de la Loi 1, 1000 Bruxelles, Belgique<br />
-              Numéro d'entreprise : BE0xxx.xxx.xxx<br />
-              TVA : BE0xxx.xxx.xxx<br />
-              Email : contact@salarize.be<br />
-              Téléphone : +32 2 xxx xx xx
-            </p>
-          </div>
-          
-          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700 mb-8">
-            <h2 className="text-xl font-bold text-white mb-4">Hébergement</h2>
-            <p className="text-slate-400 text-sm">
-              Ce site est hébergé par :<br />
-              <strong className="text-slate-300">Vercel Inc.</strong><br />
-              440 N Barranca Ave #4133, Covina, CA 91723, USA<br />
-              <br />
-              Base de données hébergée par :<br />
-              <strong className="text-slate-300">Supabase Inc.</strong><br />
-              970 Toa Payoh North #07-04, Singapore 318992
-            </p>
-          </div>
-          
-          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700 mb-8">
-            <h2 className="text-xl font-bold text-white mb-4">Propriété intellectuelle</h2>
-            <p className="text-slate-400 text-sm">
-              L'ensemble du contenu de ce site (textes, images, logos, graphismes, icônes, logiciels) est la propriété exclusive de Salarize ou de ses partenaires et est protégé par les lois belges et internationales relatives à la propriété intellectuelle.
-            </p>
-            <p className="text-slate-400 text-sm mt-4">
-              Toute reproduction, représentation, modification, publication, transmission ou dénaturation, totale ou partielle, du site ou de son contenu, par quelque procédé que ce soit, sans l'autorisation préalable écrite de Salarize, est interdite.
+              <strong className="text-slate-300">Salarize</strong><br /><br />
+              Responsable de la publication : Mohamed El Abdouni<br />
+              Email : <a href="mailto:elabdounimohamed144@gmail.com" className="text-violet-400 hover:text-violet-300">elabdounimohamed144@gmail.com</a><br /><br />
+              Salarize est un projet personnel développé en Belgique.
             </p>
           </div>
           
           <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
-            <h2 className="text-xl font-bold text-white mb-4">Droit applicable</h2>
+            <h2 className="text-xl font-bold text-white mb-4">2. Hébergement</h2>
             <p className="text-slate-400 text-sm">
-              Les présentes mentions légales sont soumises au droit belge. En cas de litige, les tribunaux de Bruxelles seront seuls compétents.
+              <strong className="text-slate-300">Hébergeur du site web :</strong><br />
+              Vercel Inc.<br />
+              440 N Barranca Ave #4133<br />
+              Covina, CA 91723, États-Unis<br />
+              <a href="https://vercel.com" className="text-violet-400 hover:text-violet-300">https://vercel.com</a><br /><br />
+              
+              <strong className="text-slate-300">Hébergeur de la base de données :</strong><br />
+              Supabase Inc.<br />
+              970 Toa Payoh North #07-04<br />
+              Singapore 318992<br />
+              <a href="https://supabase.com" className="text-violet-400 hover:text-violet-300">https://supabase.com</a>
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">3. Propriété intellectuelle</h2>
+            <p className="text-slate-400 text-sm">
+              L'ensemble des éléments constituant le site Salarize (textes, graphismes, logiciels, photographies, images, vidéos, sons, plans, noms, logos, marques, créations et œuvres protégeables diverses, bases de données, etc.) ainsi que le site lui-même, relèvent des législations belges et internationales sur le droit d'auteur et la propriété intellectuelle.<br /><br />
+              
+              Ces éléments sont la propriété exclusive de Salarize. La reproduction ou représentation, intégrale ou partielle, des pages, des données et de tout autre élément constitutif du site, par quelque procédé ou support que ce soit, est interdite et constitue, sans autorisation expresse et préalable de Salarize, une contrefaçon sanctionnée par les articles XI.293 et suivants du Code de droit économique belge.
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">4. Limitation de responsabilité</h2>
+            <p className="text-slate-400 text-sm">
+              Les informations contenues sur ce site sont aussi précises que possible et le site est périodiquement mis à jour, mais peut toutefois contenir des inexactitudes, des omissions ou des lacunes.<br /><br />
+              
+              Salarize ne pourra être tenu responsable des dommages directs ou indirects résultant de l'accès au site ou de l'utilisation du site et/ou des informations disponibles sur ce site, sauf en cas de faute intentionnelle ou de faute lourde.<br /><br />
+              
+              Les données importées par l'utilisateur restent sous sa responsabilité exclusive. Salarize n'est pas responsable de l'exactitude des données salariales importées.
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">5. Droit applicable et juridiction</h2>
+            <p className="text-slate-400 text-sm">
+              Les présentes mentions légales sont régies par le droit belge. En cas de litige et à défaut d'accord amiable, le litige sera porté devant les tribunaux belges conformément aux règles de compétence en vigueur.<br /><br />
+              
+              <strong className="text-slate-300">Pour les consommateurs résidant dans l'UE :</strong><br />
+              Conformément à l'article 14 du Règlement (UE) n°524/2013, la Commission Européenne met à disposition une plateforme de Règlement en Ligne des Litiges :<br />
+              <a href="https://ec.europa.eu/consumers/odr" className="text-violet-400 hover:text-violet-300">https://ec.europa.eu/consumers/odr</a>
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">6. Contact</h2>
+            <p className="text-slate-400 text-sm">
+              Pour toute question relative aux présentes mentions légales ou pour toute demande concernant le site, vous pouvez nous contacter :<br /><br />
+              Email : <a href="mailto:elabdounimohamed144@gmail.com" className="text-violet-400 hover:text-violet-300">elabdounimohamed144@gmail.com</a>
             </p>
           </div>
         </div>
@@ -1371,7 +1398,8 @@ function PrivacyPage({ setCurrentPage }) {
           <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
             <h2 className="text-xl font-bold text-white mb-4">1. Responsable du traitement</h2>
             <p className="text-slate-400 text-sm">
-              Salarize, dont le siège social est situé Rue de la Loi 1, 1000 Bruxelles, Belgique, est responsable du traitement de vos données personnelles conformément au Règlement Général sur la Protection des Données (RGPD) et à la loi belge du 30 juillet 2018.
+              Mohamed El Abdouni, responsable du projet Salarize, est responsable du traitement de vos données personnelles conformément au Règlement Général sur la Protection des Données (RGPD - Règlement UE 2016/679) et à la loi belge du 30 juillet 2018 relative à la protection des personnes physiques à l'égard des traitements de données à caractère personnel.<br /><br />
+              Contact : <a href="mailto:elabdounimohamed144@gmail.com" className="text-violet-400 hover:text-violet-300">elabdounimohamed144@gmail.com</a>
             </p>
           </section>
           
@@ -1457,7 +1485,7 @@ function PrivacyPage({ setCurrentPage }) {
               </li>
             </ul>
             <p className="text-slate-400 text-sm mt-4">
-              Pour exercer vos droits : <a href="mailto:privacy@salarize.be" className="text-violet-400 hover:text-violet-300">privacy@salarize.be</a>
+              Pour exercer vos droits : <a href="mailto:elabdounimohamed144@gmail.com" className="text-violet-400 hover:text-violet-300">elabdounimohamed144@gmail.com</a>
             </p>
           </section>
           
@@ -1545,6 +1573,174 @@ function TermsPage({ setCurrentPage }) {
             <h2 className="text-xl font-bold text-white mb-4">Article 8 - Droit applicable</h2>
             <p className="text-slate-400 text-sm">
               Les présentes CGU sont soumises au droit belge. Tout litige relatif à l'interprétation ou à l'exécution des présentes sera soumis aux tribunaux de Bruxelles.
+            </p>
+          </section>
+        </div>
+      </div>
+      <Footer setCurrentPage={setCurrentPage} />
+    </div>
+  );
+}
+
+// ============================================
+// COOKIES PAGE
+// ============================================
+function CookiesPage({ setCurrentPage }) {
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <div className="max-w-4xl mx-auto px-6 pt-32 pb-20">
+        <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Retour
+        </button>
+        
+        <h1 className="text-4xl font-bold text-white mb-4">Politique de Cookies</h1>
+        <p className="text-slate-400 mb-8">Dernière mise à jour : {new Date().toLocaleDateString('fr-BE')}</p>
+        
+        <div className="space-y-6">
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">1. Qu'est-ce qu'un cookie ?</h2>
+            <p className="text-slate-400 text-sm">
+              Un cookie est un petit fichier texte déposé sur votre terminal (ordinateur, tablette, smartphone) lors de la visite d'un site web. Il permet au site de mémoriser des informations sur votre visite, comme votre langue préférée et d'autres paramètres. Cela peut faciliter votre prochaine visite et rendre le site plus utile pour vous.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">2. Les cookies que nous utilisons</h2>
+            <p className="text-slate-400 text-sm mb-4">Salarize utilise les catégories de cookies suivantes :</p>
+            
+            <div className="space-y-4">
+              <div className="bg-slate-700/30 rounded-xl p-4">
+                <h3 className="text-slate-200 font-semibold mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full"></span>
+                  Cookies strictement nécessaires
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Ces cookies sont indispensables pour naviguer sur le site et utiliser ses fonctionnalités. Ils permettent notamment de maintenir votre session de connexion active. Sans ces cookies, le site ne peut pas fonctionner correctement.
+                </p>
+                <p className="text-slate-500 text-xs mt-2">Exemple : cookie de session d'authentification (Supabase)</p>
+              </div>
+              
+              <div className="bg-slate-700/30 rounded-xl p-4">
+                <h3 className="text-slate-200 font-semibold mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                  Cookies de fonctionnalité
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Ces cookies permettent de mémoriser vos préférences (société active, affichage du dashboard, filtres sélectionnés) pour personnaliser votre expérience sur le site.
+                </p>
+                <p className="text-slate-500 text-xs mt-2">Exemple : préférences d'affichage, tutoriel vu</p>
+              </div>
+              
+              <div className="bg-slate-700/30 rounded-xl p-4">
+                <h3 className="text-slate-200 font-semibold mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-slate-400 rounded-full"></span>
+                  Cookies analytiques (optionnels)
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Actuellement, Salarize n'utilise pas de cookies analytiques ou de tracking tiers. Nous ne partageons aucune donnée avec des services d'analyse externes.
+                </p>
+              </div>
+            </div>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">3. Durée de conservation</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-600">
+                    <th className="text-left py-3 text-slate-300">Cookie</th>
+                    <th className="text-left py-3 text-slate-300">Finalité</th>
+                    <th className="text-left py-3 text-slate-300">Durée</th>
+                  </tr>
+                </thead>
+                <tbody className="text-slate-400">
+                  <tr className="border-b border-slate-700">
+                    <td className="py-3">sb-*-auth-token</td>
+                    <td className="py-3">Authentification</td>
+                    <td className="py-3">Session</td>
+                  </tr>
+                  <tr className="border-b border-slate-700">
+                    <td className="py-3">salarize_onboarding_done</td>
+                    <td className="py-3">Tutoriel complété</td>
+                    <td className="py-3">Permanent</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3">salarize_preferences</td>
+                    <td className="py-3">Préférences utilisateur</td>
+                    <td className="py-3">1 an</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">4. Gestion des cookies</h2>
+            <p className="text-slate-400 text-sm mb-4">
+              Vous pouvez à tout moment modifier vos préférences en matière de cookies. La plupart des navigateurs vous permettent de :
+            </p>
+            <ul className="text-slate-400 text-sm space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>Voir les cookies stockés et les supprimer individuellement</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>Bloquer les cookies tiers</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>Bloquer tous les cookies d'un site particulier</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>Supprimer tous les cookies à la fermeture du navigateur</span>
+              </li>
+            </ul>
+            <p className="text-slate-400 text-sm mt-4">
+              <strong className="text-slate-300">Attention :</strong> Si vous désactivez les cookies nécessaires, certaines fonctionnalités du site pourraient ne plus être disponibles (notamment la connexion à votre compte).
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">5. Comment gérer les cookies dans votre navigateur</h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-colors">
+                <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">C</span>
+                </div>
+                <span className="text-slate-300 text-sm">Google Chrome</span>
+              </a>
+              <a href="https://support.mozilla.org/fr/kb/cookies-informations-sites-enregistrent" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-colors">
+                <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">F</span>
+                </div>
+                <span className="text-slate-300 text-sm">Mozilla Firefox</span>
+              </a>
+              <a href="https://support.apple.com/fr-be/guide/safari/sfri11471/mac" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-colors">
+                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">S</span>
+                </div>
+                <span className="text-slate-300 text-sm">Safari</span>
+              </a>
+              <a href="https://support.microsoft.com/fr-fr/microsoft-edge/supprimer-les-cookies-dans-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg hover:bg-slate-700/50 transition-colors">
+                <div className="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">E</span>
+                </div>
+                <span className="text-slate-300 text-sm">Microsoft Edge</span>
+              </a>
+            </div>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">6. Contact</h2>
+            <p className="text-slate-400 text-sm">
+              Pour toute question relative à notre utilisation des cookies, vous pouvez nous contacter à :<br /><br />
+              <a href="mailto:elabdounimohamed144@gmail.com" className="text-violet-400 hover:text-violet-300">elabdounimohamed144@gmail.com</a>
             </p>
           </section>
         </div>
@@ -5551,6 +5747,21 @@ L'équipe Salarize`;
           setCurrentPage={setCurrentPage}
         />
         <TermsPage setCurrentPage={setCurrentPage} />
+      </PageTransition>
+    );
+  }
+
+  if (currentPage === 'cookies') {
+    return (
+      <PageTransition key="cookies">
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <CookiesPage setCurrentPage={setCurrentPage} />
       </PageTransition>
     );
   }
