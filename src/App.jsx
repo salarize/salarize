@@ -783,7 +783,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
                 onClick={() => setShowDropdown(!showDropdown)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
-                {user.picture ? (
+                {user.picture && user.provider === 'google' ? (
                   <img src={user.picture} alt="" className="w-7 h-7 rounded-full" />
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center">
@@ -2264,7 +2264,7 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
             <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
               <div className="bg-gradient-to-br from-violet-600/30 to-fuchsia-600/30 p-6 text-center">
                 <div className="relative inline-block group">
-                  {user?.picture ? (
+                  {user?.picture && user?.provider === 'google' ? (
                     <img 
                       src={user.picture} 
                       alt="" 
@@ -3003,7 +3003,7 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
             onClick={() => setShowDropdown(!showDropdown)}
             className="flex items-center gap-2 p-1.5 bg-white shadow-lg rounded-xl hover:bg-slate-50 transition-colors border border-slate-200"
           >
-            {user?.picture ? (
+            {user?.picture && user?.provider === 'google' ? (
               <img src={user.picture} alt="" className="w-8 h-8 rounded-lg" />
             ) : (
               <div className="w-8 h-8 rounded-lg bg-violet-500 flex items-center justify-center">
@@ -4726,93 +4726,102 @@ function AppContent() {
   };
 
   const parseFile = (file) => {
-    if (!file) return;
-    
-    setDebugMsg('Lecture...');
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: 'array' });
-        
-        setDebugMsg('Analyse...');
-        
-        // Find best sheet
-        let sheetName = wb.SheetNames[0];
-        for (const name of wb.SheetNames) {
-          const lower = name.toLowerCase();
-          if (lower.includes('données') && lower.includes('salaire')) {
-            sheetName = name;
-            break;
-          }
-        }
-        
-        const sheet = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        
-        // Détecter le type de fichier depuis le nom
-        const fileInfo = detectFileInfo(file.name);
-        console.log('File info detected:', fileInfo);
-        
-        // Try parse - Acerta FR first, then Acerta NL, then Securex, then generic
-        let result = parseAcerta(rows);
-        let detectedProvider = 'acerta';
-        
-        if (!result) {
-          result = parseAcertaNL(rows);
-          detectedProvider = 'acerta-nl';
-        }
-        if (!result) {
-          result = parseSecurex(rows, file.name);
-          detectedProvider = 'securex';
-        }
-        if (!result) {
-          result = parseGeneric(rows, file.name);
-          detectedProvider = 'generic';
-        }
-        
-        if (!result || result.employees.length === 0) {
-          setDebugMsg('Aucune donnée');
-          alert('Aucune donnée trouvée dans ce fichier. Formats supportés: Acerta, Securex, ou fichier avec colonnes Nom + Coût.');
-          return;
-        }
-        
-        // Analyse intelligente de la période
-        const periodAnalysis = analyzePeriodSuggestion(rows, file.name);
-        console.log('Period analysis:', periodAnalysis);
-        
-        // Appliquer la période suggérée si pas déjà définie
-        const suggestedPeriod = periodAnalysis.period;
-        if (result.periods[0] === 'Unknown' && suggestedPeriod) {
-          result.employees.forEach(e => e.period = suggestedPeriod);
-          result.periods = [suggestedPeriod];
-        }
-        
-        console.log('Parsed successfully:', result.employees.length, 'employees, provider:', detectedProvider);
-        setDebugMsg(`✓ ${result.employees.length} entrées (${detectedProvider})`);
-        
-        // Stocker les données avec la période suggérée et les infos de confiance
-        setPendingPeriodSelection({
-          employees: result.employees,
-          suggestedPeriod: result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod,
-          detectedProvider,
-          periodConfidence: periodAnalysis.confidence,
-          periodSource: periodAnalysis.source
-        });
-        setShowImportModal(false);
-        
-      } catch (err) {
-        console.error(err);
-        setDebugMsg('Erreur: ' + err.message);
+    return new Promise((resolve) => {
+      if (!file) {
+        resolve();
+        return;
       }
-    };
-    
-    reader.onerror = () => {
-      setDebugMsg('Erreur lecture');
-    };
-    
-    reader.readAsArrayBuffer(file);
+      
+      setDebugMsg('Lecture...');
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+          
+          setDebugMsg('Analyse...');
+          
+          // Find best sheet
+          let sheetName = wb.SheetNames[0];
+          for (const name of wb.SheetNames) {
+            const lower = name.toLowerCase();
+            if (lower.includes('données') && lower.includes('salaire')) {
+              sheetName = name;
+              break;
+            }
+          }
+          
+          const sheet = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          
+          // Détecter le type de fichier depuis le nom
+          const fileInfo = detectFileInfo(file.name);
+          console.log('File info detected:', fileInfo);
+          
+          // Try parse - Acerta FR first, then Acerta NL, then Securex, then generic
+          let result = parseAcerta(rows);
+          let detectedProvider = 'acerta';
+          
+          if (!result) {
+            result = parseAcertaNL(rows);
+            detectedProvider = 'acerta-nl';
+          }
+          if (!result) {
+            result = parseSecurex(rows, file.name);
+            detectedProvider = 'securex';
+          }
+          if (!result) {
+            result = parseGeneric(rows, file.name);
+            detectedProvider = 'generic';
+          }
+          
+          if (!result || result.employees.length === 0) {
+            setDebugMsg('Aucune donnée');
+            alert('Aucune donnée trouvée dans ce fichier. Formats supportés: Acerta, Securex, ou fichier avec colonnes Nom + Coût.');
+            resolve();
+            return;
+          }
+          
+          // Analyse intelligente de la période
+          const periodAnalysis = analyzePeriodSuggestion(rows, file.name);
+          console.log('Period analysis:', periodAnalysis);
+          
+          // Appliquer la période suggérée si pas déjà définie
+          const suggestedPeriod = periodAnalysis.period;
+          if (result.periods[0] === 'Unknown' && suggestedPeriod) {
+            result.employees.forEach(e => e.period = suggestedPeriod);
+            result.periods = [suggestedPeriod];
+          }
+          
+          console.log('Parsed successfully:', result.employees.length, 'employees, provider:', detectedProvider);
+          setDebugMsg(`✓ ${result.employees.length} entrées (${detectedProvider})`);
+          
+          // Stocker les données avec la période suggérée et les infos de confiance
+          setPendingPeriodSelection({
+            employees: result.employees,
+            suggestedPeriod: result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod,
+            detectedProvider,
+            periodConfidence: periodAnalysis.confidence,
+            periodSource: periodAnalysis.source
+          });
+          setShowImportModal(false);
+          resolve();
+          
+        } catch (err) {
+          console.error(err);
+          setDebugMsg('Erreur: ' + err.message);
+          resolve();
+        }
+      };
+      
+      reader.onerror = () => {
+        setDebugMsg('Erreur lecture');
+        resolve();
+      };
+      
+      reader.readAsArrayBuffer(file);
+    });
   };
 
   const parseAcerta = (rows) => {
@@ -5123,9 +5132,14 @@ function AppContent() {
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) parseFile(file);
+  const handleFileChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    // Traiter chaque fichier séquentiellement
+    for (const file of files) {
+      await parseFile(file);
+    }
     e.target.value = '';
   };
 
@@ -6572,7 +6586,8 @@ L'équipe Salarize`;
                   type="file" 
                   id="file-upload"
                   name="file"
-                  accept=".xlsx,.xls" 
+                  accept=".xlsx,.xls"
+                  multiple
                   onChange={handleFileChange}
                   className="hidden" 
                 />
@@ -6926,7 +6941,8 @@ L'équipe Salarize`;
                   type="file"
                   id="import-file"
                   name="importFile" 
-                  accept=".xlsx,.xls" 
+                  accept=".xlsx,.xls"
+                  multiple
                   onChange={(e) => {
                     handleFileChange(e);
                     setShowImportModal(false);
@@ -8260,7 +8276,8 @@ L'équipe Salarize`;
                   </div>
                   <input 
                     type="file" 
-                    accept=".xlsx,.xls" 
+                    accept=".xlsx,.xls"
+                    multiple
                     onChange={(e) => { handleFileChange(e); setShowDataManager(false); }}
                     className="hidden" 
                   />
