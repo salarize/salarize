@@ -3159,17 +3159,15 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
 // Modal des paramètres de société avec état local
 function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiveCompany, getBrandColor, handleBrandColorChange, onClose, saveAll }) {
   const [localWebsite, setLocalWebsite] = useState(companies[activeCompany]?.website || '');
-  const [localName, setLocalName] = useState(activeCompany);
-  const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   
-  // Détecter les changements
-  useEffect(() => {
-    const websiteChanged = localWebsite !== (companies[activeCompany]?.website || '');
-    setHasChanges(websiteChanged);
-  }, [localWebsite, companies, activeCompany]);
+  // Détecter si quelque chose a changé
+  const originalWebsite = companies[activeCompany]?.website || '';
+  const hasChanges = localWebsite !== originalWebsite;
   
   const handleSave = async () => {
+    if (!hasChanges) return;
+    
     setSaving(true);
     
     const newCompanies = {
@@ -3184,28 +3182,7 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
     await saveAll(newCompanies, activeCompany);
     
     setSaving(false);
-    setHasChanges(false);
-  };
-  
-  const handleRename = () => {
-    const newName = localName.trim();
-    if (!newName || newName === activeCompany) return;
-    if (companies[newName]) {
-      alert('Une société avec ce nom existe déjà');
-      return;
-    }
-    
-    // Renommer la société
-    const newCompanies = { ...companies };
-    newCompanies[newName] = newCompanies[activeCompany];
-    delete newCompanies[activeCompany];
-    
-    setCompanies(newCompanies);
-    setActiveCompany(newName);
-    
-    // Mettre à jour localStorage
-    localStorage.setItem('salarize_companies', JSON.stringify(newCompanies));
-    localStorage.setItem('salarize_active', newName);
+    onClose();
   };
   
   const brandColor = getBrandColor();
@@ -3226,26 +3203,6 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
         </div>
         
         <div className="space-y-4">
-          {/* Company Name */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Nom de la société</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={localName}
-                onChange={e => setLocalName(e.target.value)}
-                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
-              />
-              <button
-                onClick={handleRename}
-                disabled={!localName.trim() || localName === activeCompany}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Renommer
-              </button>
-            </div>
-          </div>
-          
           {/* Website */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Site web</label>
@@ -3298,20 +3255,12 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
           </div>
         </div>
         
-        <div className="mt-6 pt-4 border-t border-slate-200 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
-          >
-            Fermer
-          </button>
+        <div className="mt-6 pt-4 border-t border-slate-200">
           <button
             onClick={handleSave}
-            disabled={!hasChanges || saving}
-            className={`flex-1 py-2.5 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-              !hasChanges ? 'bg-slate-300 cursor-not-allowed' : 'hover:opacity-90'
-            }`}
-            style={hasChanges ? { backgroundColor: `rgb(${brandColor})` } : undefined}
+            disabled={saving}
+            className="w-full py-3 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+            style={{ backgroundColor: hasChanges ? `rgb(${brandColor})` : '#cbd5e1' }}
           >
             {saving ? (
               <>
@@ -3321,13 +3270,15 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
                 </svg>
                 Enregistrement...
               </>
-            ) : (
+            ) : hasChanges ? (
               <>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                Enregistrer
+                Enregistrer les modifications
               </>
+            ) : (
+              'Aucune modification'
             )}
           </button>
         </div>
