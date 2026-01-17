@@ -2820,49 +2820,34 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
 function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
   const [showDropdown, setShowDropdown] = useState(false);
   
+  // Header minimaliste - visible seulement sur mobile pour le menu
   return (
-    <header className="fixed top-0 right-0 left-0 lg:left-64 h-14 bg-white/80 backdrop-blur-sm border-b border-slate-200/80 flex items-center justify-between px-4 lg:px-6 z-30">
-      {/* Left side - Menu button (mobile only) */}
-      <div className="flex items-center gap-3">
-        {/* Menu hamburger mobile */}
+    <header className="fixed top-0 right-0 left-0 lg:left-64 h-0 lg:h-0 flex items-center justify-between px-4 z-30 lg:hidden">
+      {/* Mobile only - floating buttons */}
+      <div className="fixed top-4 left-4 z-50 lg:hidden">
         <button 
           onClick={onMenuClick}
-          className="p-2 -ml-2 lg:hidden hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2.5 bg-white shadow-lg rounded-xl hover:bg-slate-50 transition-colors border border-slate-200"
         >
-          <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        
-        {/* Logo visible seulement sur mobile */}
-        <button 
-          onClick={() => setCurrentPage('home')}
-          className="flex items-center gap-2 lg:hidden"
-        >
-          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">S</span>
-          </div>
-        </button>
       </div>
       
-      {/* Right side - Profile only */}
-      <div className="flex items-center">
+      <div className="fixed top-4 right-4 z-50 lg:hidden">
         <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+            className="flex items-center gap-2 p-1.5 bg-white shadow-lg rounded-xl hover:bg-slate-50 transition-colors border border-slate-200"
           >
             {user?.picture ? (
-              <img src={user.picture} alt="" className="w-8 h-8 rounded-full" />
+              <img src={user.picture} alt="" className="w-8 h-8 rounded-lg" />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-medium text-sm">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-medium text-sm">
                 {user?.name?.charAt(0) || 'U'}
               </div>
             )}
-            <span className="text-slate-700 text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
-            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
           </button>
           {showDropdown && (
             <>
@@ -3046,21 +3031,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                   onClick={() => setShowActions(false)}
                 />
                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-20">
-                  <button
-                    onClick={() => { onAddCompany(); setShowActions(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <div className="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-medium text-white text-sm">Nouvelle société</p>
-                      <p className="text-slate-400 text-xs">Créer une société vide</p>
-                    </div>
-                  </button>
-                  
+                  {/* 1. Importer des données - Action principale */}
                   <button
                     onClick={() => { onImportClick(); setShowActions(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
@@ -3076,6 +3047,41 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                     </div>
                   </button>
                   
+                  {/* 2. Départements - Si société active */}
+                  {activeCompany && (
+                    <button
+                      onClick={() => { onManageDepts(); setShowActions(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                        <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-medium text-white text-sm">Départements</p>
+                        <p className="text-slate-400 text-xs">Réassigner, renommer, fusionner</p>
+                      </div>
+                    </button>
+                  )}
+                  
+                  {/* 3. Nouvelle société */}
+                  <button
+                    onClick={() => { onAddCompany(); setShowActions(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center">
+                      <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-white text-sm">Nouvelle société</p>
+                      <p className="text-slate-400 text-xs">Créer une société vide</p>
+                    </div>
+                  </button>
+                  
+                  {/* 4. Séparateur + Gérer société - Si société active */}
                   {activeCompany && (
                     <button
                       onClick={() => { onManageData(); setShowActions(false); }}
@@ -3089,24 +3095,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                       </div>
                       <div>
                         <p className="font-medium text-white text-sm">Gérer {activeCompany}</p>
-                        <p className="text-slate-400 text-xs">Données, périodes, supprimer</p>
-                      </div>
-                    </button>
-                  )}
-                  
-                  {activeCompany && (
-                    <button
-                      onClick={() => { onManageDepts(); setShowActions(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
-                    >
-                      <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                        <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-white text-sm">Gérer les départements</p>
-                        <p className="text-slate-400 text-xs">Réassigner, renommer, fusionner</p>
+                        <p className="text-slate-400 text-xs">Périodes, données, supprimer</p>
                       </div>
                     </button>
                   )}
@@ -6883,109 +6872,119 @@ L'équipe Salarize`;
         </div>
       )}
       
-      <main className="lg:ml-64 mt-14 flex-1 p-4 lg:p-6">
+      <main className="lg:ml-64 pt-4 lg:pt-6 flex-1 p-4 lg:p-6">
         {/* Skeleton de chargement seulement si pas de données */}
         {isLoadingData && employees.length === 0 ? (
           <DashboardSkeleton />
         ) : (
         <>
-        {/* Header Card - Design unifié */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6 overflow-hidden">
-          {/* Top Section - Company Info + Actions */}
-          <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-            {/* Company Info */}
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className="relative group flex-shrink-0">
-                {companies[activeCompany]?.logo ? (
-                  <img src={companies[activeCompany].logo} alt="" className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover" />
-                ) : (
-                  <div 
-                    className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-white text-lg sm:text-xl font-bold"
-                    style={{ background: `linear-gradient(135deg, rgb(${getBrandColor()}), rgb(${getBrandColor().split(',').map((c, i) => Math.max(0, parseInt(c) - 40)).join(',')}))` }}
-                  >
-                    {activeCompany?.charAt(0)?.toUpperCase()}
-                  </div>
-                )}
-                <button
-                  onClick={() => setShowLogoMenu(!showLogoMenu)}
-                  className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+        {/* Company Header Card */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 mb-6 relative overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl"></div>
+          
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
+            {/* Company Logo */}
+            <div className="relative group flex-shrink-0">
+              {companies[activeCompany]?.logo ? (
+                <img src={companies[activeCompany].logo} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-4 ring-white/10" />
+              ) : (
+                <div 
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white text-2xl sm:text-3xl font-bold ring-4 ring-white/10"
+                  style={{ background: `linear-gradient(135deg, rgb(${getBrandColor()}), rgb(${getBrandColor().split(',').map((c, i) => Math.max(0, parseInt(c) - 40)).join(',')}))` }}
                 >
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  {activeCompany?.charAt(0)?.toUpperCase()}
+                </div>
+              )}
+              <button
+                onClick={() => setShowLogoMenu(!showLogoMenu)}
+                className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+              >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+              
+              {showLogoMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowLogoMenu(false)} />
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-20">
+                    <label className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {companies[activeCompany]?.logo ? 'Modifier le logo' : 'Ajouter un logo'}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => { handleLogoChange(e); setShowLogoMenu(false); }}
+                        className="hidden" 
+                      />
+                    </label>
+                    {companies[activeCompany]?.logo && (
+                      <button
+                        onClick={() => { handleLogoDelete(); setShowLogoMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Supprimer le logo
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Company Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{activeCompany}</h1>
+                <button
+                  onClick={() => setShowCompanySettings(true)}
+                  className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                  title="Paramètres société"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </button>
-                
-                {showLogoMenu && (
+              </div>
+              <div className="flex items-center gap-3 text-sm text-white/60">
+                {companies[activeCompany]?.website && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowLogoMenu(false)} />
-                    <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-20">
-                      <label className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
-                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        {companies[activeCompany]?.logo ? 'Modifier le logo' : 'Ajouter un logo'}
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={(e) => { handleLogoChange(e); setShowLogoMenu(false); }}
-                          className="hidden" 
-                        />
-                      </label>
-                      {companies[activeCompany]?.logo && (
-                        <button
-                          onClick={() => { handleLogoDelete(); setShowLogoMenu(false); }}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Supprimer le logo
-                        </button>
-                      )}
-                    </div>
+                    <a 
+                      href={companies[activeCompany].website.startsWith('http') ? companies[activeCompany].website : `https://${companies[activeCompany].website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-white transition-colors flex items-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                      <span className="truncate max-w-[150px]">{companies[activeCompany].website.replace(/^https?:\/\//, '')}</span>
+                    </a>
+                    <span className="text-white/30">•</span>
                   </>
                 )}
-              </div>
-              
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg sm:text-xl font-bold text-slate-800 truncate">{activeCompany}</h1>
-                  <button
-                    onClick={() => setShowCompanySettings(true)}
-                    className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
-                    title="Paramètres société"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  {companies[activeCompany]?.website && (
-                    <>
-                      <a 
-                        href={companies[activeCompany].website.startsWith('http') ? companies[activeCompany].website : `https://${companies[activeCompany].website}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline hidden sm:inline truncate max-w-[200px]"
-                        style={{ color: `rgb(${getBrandColor()})` }}
-                      >
-                        {companies[activeCompany].website.replace(/^https?:\/\//, '')}
-                      </a>
-                      <span className="text-slate-300 hidden sm:inline">•</span>
-                    </>
-                  )}
-                  <span>{periods.length} période{periods.length > 1 ? 's' : ''}</span>
-                </div>
+                <span className="flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {periods.length} période{periods.length > 1 ? 's' : ''}
+                </span>
               </div>
             </div>
             
             {/* Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               {/* Export Dropdown */}
               <div className="relative group">
-                <button className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-sm font-medium text-slate-700">
+                <button className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-sm font-medium text-white border border-white/10">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
@@ -7028,7 +7027,7 @@ L'équipe Salarize`;
               {/* Share Button */}
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -7036,22 +7035,9 @@ L'équipe Salarize`;
                 <span className="hidden sm:inline">Partager</span>
               </button>
               
-              {/* Period Filter */}
-              <select
-                value={periodFilter}
-                onChange={e => setPeriodFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg bg-white text-sm hover:border-slate-300 transition-colors cursor-pointer font-medium text-slate-700"
-              >
-                <option value="all">Tout</option>
-                <option value="3m">3 mois</option>
-                <option value="6m">6 mois</option>
-                <option value="12m">12 mois</option>
-                <option value="ytd">YTD</option>
-              </select>
-              
               {/* Settings Menu */}
               <div className="relative group">
-                <button className="flex items-center justify-center w-9 h-9 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors text-slate-500">
+                <button className="flex items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-white border border-white/10">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                   </svg>
@@ -7102,59 +7088,92 @@ L'équipe Salarize`;
               </div>
             </div>
           </div>
-          
-          {/* Bottom Section - KPIs intégrés dans le header */}
-          <div className="border-t border-slate-100 bg-slate-50/50 px-4 sm:px-5 py-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">Coût Total</p>
-                  <p className="text-lg font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 2})}</p>
-                </div>
+        </div>
+        
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">Employés</p>
-                  <p className="text-lg font-bold text-slate-800">{uniqueNames}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">Départements</p>
-                  <p className="text-lg font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-medium">Coût Moyen</p>
-                  <p className="text-lg font-bold text-slate-800">€{uniqueNames > 0 ? (totalCost / uniqueNames).toLocaleString('fr-BE', {minimumFractionDigits: 2}) : '0,00'}</p>
-                </div>
-              </div>
+              <span className="text-sm font-medium text-slate-500">Coût Total</span>
             </div>
+            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 2})}</p>
           </div>
+          
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-slate-500">Employés</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
+            <p className="text-xs text-slate-400 mt-1">Actifs sur la période</p>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-slate-500">Départements</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
+            <p className="text-xs text-slate-400 mt-1">{[...new Set(filtered.map(e => e.department).filter(Boolean))][0] || 'Aucun'} en tête</p>
+          </div>
+          
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-slate-500">Coût Moyen</span>
+            </div>
+            <p className="text-2xl font-bold text-slate-800">€{uniqueNames > 0 ? (totalCost / uniqueNames).toLocaleString('fr-BE', {minimumFractionDigits: 2}) : '0,00'}</p>
+            <p className="text-xs text-slate-400 mt-1">Par employé</p>
+          </div>
+        </div>
+        
+        {/* Period Filter Bar */}
+        <div className="flex items-center gap-3 mb-6">
+          <select
+            value={periodFilter}
+            onChange={e => setPeriodFilter(e.target.value)}
+            className="px-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm hover:border-slate-300 transition-colors cursor-pointer font-medium text-slate-700 shadow-sm"
+          >
+            <option value="all">Toutes les périodes</option>
+            <option value="3m">3 derniers mois</option>
+            <option value="6m">6 derniers mois</option>
+            <option value="12m">12 derniers mois</option>
+            <option value="ytd">Année en cours</option>
+          </select>
+          
+          {periods.length > 1 && (
+            <button
+              onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+              className="px-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm hover:border-slate-300 transition-colors font-medium text-slate-700 shadow-sm flex items-center gap-2"
+            >
+              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Sélectionner périodes
+              {selectedPeriods.length > 0 && (
+                <span className="px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-xs font-semibold">
+                  {selectedPeriods.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Period Multi-Select Dropdown - Moved to floating panel */}
