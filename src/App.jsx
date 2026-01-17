@@ -6098,7 +6098,7 @@ L'équipe Salarize`;
   );
   
   const maxCost = useMemo(() => 
-    Math.max(...sortedDepts.map(([, d]) => d.total), 1),
+    Math.max(...sortedDepts.map(([_name, d]) => d.total), 1),
     [sortedDepts]
   );
 
@@ -8528,7 +8528,7 @@ L'équipe Salarize`;
           {/* Résumé des tendances - Plus visible */}
           {Object.keys(deptStatsWithComparison).length > 0 && (() => {
             const sorted = Object.entries(deptStatsWithComparison)
-              .filter(([, d]) => d.variationVsPrevMonth !== null && d.variationVsPrevMonth !== 0)
+              .filter(([_dept, d]) => d.variationVsPrevMonth !== null && d.variationVsPrevMonth !== 0)
               .sort((a, b) => (b[1].variationVsPrevMonth || 0) - (a[1].variationVsPrevMonth || 0));
             const highest = sorted[0];
             const lowest = sorted[sorted.length - 1];
