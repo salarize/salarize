@@ -6,9 +6,21 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase configuration
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
+
+// Storage personnalisé : localStorage pour partager entre onglets, 
+// mais on nettoie au démarrage si le navigateur a été fermé
+const SESSION_KEY = 'salarize_browser_session';
+
+// Vérifier si c'est une nouvelle session de navigateur
+if (!sessionStorage.getItem(SESSION_KEY)) {
+  // Nouveau navigateur ouvert = supprimer l'ancienne session auth
+  localStorage.removeItem('sb-dbqlyxeorexihuitejvq-auth-token');
+  sessionStorage.setItem(SESSION_KEY, Date.now().toString());
+}
+
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: sessionStorage,
+    storage: localStorage,
     autoRefreshToken: true,
     persistSession: true,
   }
