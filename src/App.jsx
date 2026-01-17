@@ -4102,14 +4102,6 @@ function AppContent() {
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.cost - a.cost);
     
-    // Top 10 employés
-    const empAgg = {};
-    filteredData.forEach(e => {
-      if (!empAgg[e.name]) empAgg[e.name] = { name: e.name, dept: e.department || departmentMapping[e.name] || 'Non assigné', cost: 0 };
-      empAgg[e.name].cost += e.totalCost;
-    });
-    const topEmployees = Object.values(empAgg).sort((a, b) => b.cost - a.cost).slice(0, 10);
-    
     // Charger jsPDF dynamiquement
     const jsPDFModule = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     const { jsPDF } = jsPDFModule.default || window.jspdf;
@@ -4195,44 +4187,6 @@ function AppContent() {
       y += 8;
     });
     
-    y += 15;
-    
-    // Top 10 employés
-    if (y > 200) {
-      doc.addPage();
-      y = 20;
-    }
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Top 10 employés par coût', 20, y);
-    y += 10;
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
-    // Table header
-    doc.setFillColor(139, 92, 246);
-    doc.setTextColor(255, 255, 255);
-    doc.rect(20, y, pageWidth - 40, 8, 'F');
-    doc.text('#', 25, y + 6);
-    doc.text('Nom', 35, y + 6);
-    doc.text('Département', 100, y + 6);
-    doc.text('Coût', 155, y + 6);
-    y += 8;
-    
-    doc.setTextColor(0, 0, 0);
-    topEmployees.forEach((emp, i) => {
-      const bgColor = i % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
-      doc.setFillColor(...bgColor);
-      doc.rect(20, y, pageWidth - 40, 8, 'F');
-      doc.text(String(i + 1), 25, y + 6);
-      doc.text(emp.name.substring(0, 30), 35, y + 6);
-      doc.text(emp.dept.substring(0, 20), 100, y + 6);
-      doc.text(emp.cost.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €', 155, y + 6);
-      y += 8;
-    });
-    
     // Footer
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
@@ -4278,6 +4232,443 @@ function AppContent() {
     setView('dashboard');
   };
 
+  // Détection du type de fichier et de la période depuis le nom
+  const detectFileInfo = (filename) => {
+    const lower = filename.toLowerCase();
+    let provider = 'unknown';
+    let suggestedPeriod = null;
+    
+    // Détecter le fournisseur
+    if (lower.includes('acerta')) {
+      provider = 'acerta';
+    } else if (lower.includes('securex')) {
+      provider = 'securex';
+    } else if (lower.includes('sd worx') || lower.includes('sdworx')) {
+      provider = 'sdworx';
+    } else if (lower.includes('partena')) {
+      provider = 'partena';
+    }
+    
+    // Détecter la période depuis le nom du fichier
+    // Patterns: 2024-01, 01-2024, janvier_2024, jan2024, 202401, etc.
+    const patterns = [
+      /(\d{4})[-_]?(\d{2})/, // 2024-01 ou 202401
+      /(\d{2})[-_](\d{4})/, // 01-2024
+      /(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)[-_\s]?(\d{4})/i,
+      /(jan|fev|feb|mar|avr|apr|mai|may|jun|jul|aou|aug|sep|oct|nov|dec)[-_\s]?(\d{4})/i,
+    ];
+    
+    const monthNames = {
+      'janvier': '01', 'jan': '01', 'février': '02', 'fevrier': '02', 'fev': '02', 'feb': '02',
+      'mars': '03', 'mar': '03', 'avril': '04', 'avr': '04', 'apr': '04', 'mai': '05', 'may': '05',
+      'juin': '06', 'jun': '06', 'juillet': '07', 'jul': '07', 'août': '08', 'aout': '08', 'aou': '08', 'aug': '08',
+      'septembre': '09', 'sep': '09', 'octobre': '10', 'oct': '10', 'novembre': '11', 'nov': '11',
+      'décembre': '12', 'decembre': '12', 'dec': '12'
+    };
+    
+    for (const pattern of patterns) {
+      const match = lower.match(pattern);
+      if (match) {
+        if (match[1].length === 4) {
+          // Format YYYY-MM
+          const year = match[1];
+          const month = match[2].length === 2 ? match[2] : monthNames[match[2].toLowerCase()];
+          if (month) {
+            suggestedPeriod = `${year}-${month}`;
+            break;
+          }
+        } else if (match[2].length === 4) {
+          // Format MM-YYYY ou mois-YYYY
+          const year = match[2];
+          const month = match[1].length === 2 ? match[1] : monthNames[match[1].toLowerCase()];
+          if (month) {
+            suggestedPeriod = `${year}-${month}`;
+            break;
+          }
+        }
+      }
+    }
+    
+    return { provider, suggestedPeriod };
+  };
+
+  // ========== SYSTÈME DE DÉTECTION AUTOMATIQUE MULTI-FORMAT ==========
+  
+  // Détection intelligente de la période depuis les données du fichier
+  const detectPeriodFromData = (rows, headerIdx = 0) => {
+    const monthNamesFR = {
+      'janvier': '01', 'février': '02', 'fevrier': '02', 'mars': '03', 'avril': '04',
+      'mai': '05', 'juin': '06', 'juillet': '07', 'août': '08', 'aout': '08',
+      'septembre': '09', 'octobre': '10', 'novembre': '11', 'décembre': '12', 'decembre': '12'
+    };
+    
+    const monthNamesNL = {
+      'januari': '01', 'februari': '02', 'maart': '03', 'april': '04',
+      'mei': '05', 'juni': '06', 'juli': '07', 'augustus': '08',
+      'september': '09', 'oktober': '10', 'november': '11', 'december': '12'
+    };
+    
+    // Chercher dans les lignes avant l'en-tête
+    for (let i = 0; i < Math.min(headerIdx + 5, rows.length); i++) {
+      const row = rows[i];
+      if (!row) continue;
+      
+      for (const cell of row) {
+        if (!cell) continue;
+        const cellStr = String(cell);
+        
+        // Pattern 1: "Période salariale: 01-03-2024" (Acerta)
+        const acertaMatch = cellStr.match(/Période salariale[:\s]+(\d{2})[-\/](\d{2})[-\/](\d{4})/i);
+        if (acertaMatch) {
+          return `${acertaMatch[3]}-${acertaMatch[2]}`;
+        }
+        
+        // Pattern 2: "Loonperiode: 03/2024" (Securex NL)
+        const securexNLMatch = cellStr.match(/Loonperiode[:\s]+(\d{2})[-\/](\d{4})/i);
+        if (securexNLMatch) {
+          return `${securexNLMatch[2]}-${securexNLMatch[1]}`;
+        }
+        
+        // Pattern 3: "Période: Mars 2024" ou "Période: 03/2024"
+        const periodMatch = cellStr.match(/Période[:\s]+(\w+)\s+(\d{4})/i);
+        if (periodMatch) {
+          const monthLower = periodMatch[1].toLowerCase();
+          const month = monthNamesFR[monthLower] || monthNamesNL[monthLower];
+          if (month) {
+            return `${periodMatch[2]}-${month}`;
+          }
+        }
+        
+        // Pattern 4: "03/2024" ou "2024/03"
+        const slashMatch = cellStr.match(/(\d{2})[-\/](\d{4})|(\d{4})[-\/](\d{2})/);
+        if (slashMatch) {
+          if (slashMatch[1] && slashMatch[2]) {
+            const month = parseInt(slashMatch[1]);
+            if (month >= 1 && month <= 12) {
+              return `${slashMatch[2]}-${slashMatch[1]}`;
+            }
+          } else if (slashMatch[3] && slashMatch[4]) {
+            const month = parseInt(slashMatch[4]);
+            if (month >= 1 && month <= 12) {
+              return `${slashMatch[3]}-${slashMatch[4]}`;
+            }
+          }
+        }
+        
+        // Pattern 5: Date Excel (nombre de jours depuis 1900)
+        if (typeof cell === 'number' && cell > 40000 && cell < 50000) {
+          const date = new Date((cell - 25569) * 86400 * 1000);
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          return `${year}-${month}`;
+        }
+      }
+    }
+    
+    return null;
+  };
+
+  // Analyse du fichier pour suggérer une période basée sur plusieurs indices
+  const analyzePeriodSuggestion = (rows, filename) => {
+    const suggestions = [];
+    
+    // 1. Depuis le nom du fichier
+    const fileInfo = detectFileInfo(filename);
+    if (fileInfo.suggestedPeriod) {
+      suggestions.push({ source: 'filename', period: fileInfo.suggestedPeriod, confidence: 0.9 });
+    }
+    
+    // 2. Depuis les données du fichier
+    const dataPeriod = detectPeriodFromData(rows);
+    if (dataPeriod) {
+      suggestions.push({ source: 'data', period: dataPeriod, confidence: 0.95 });
+    }
+    
+    // 3. Depuis la date de modification du fichier (si disponible)
+    // Note: file.lastModified peut être utilisé si on a accès à l'objet File
+    
+    // Retourner la suggestion avec la plus haute confiance
+    if (suggestions.length === 0) {
+      // Suggérer le mois précédent par défaut
+      const now = new Date();
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const year = prevMonth.getFullYear();
+      const month = String(prevMonth.getMonth() + 1).padStart(2, '0');
+      return {
+        period: `${year}-${month}`,
+        confidence: 0.3,
+        source: 'default',
+        allSuggestions: suggestions
+      };
+    }
+    
+    suggestions.sort((a, b) => b.confidence - a.confidence);
+    return {
+      period: suggestions[0].period,
+      confidence: suggestions[0].confidence,
+      source: suggestions[0].source,
+      allSuggestions: suggestions
+    };
+  };
+
+  // Parser Securex amélioré
+  const parseSecurex = (rows, filename) => {
+    if (!rows || rows.length === 0) return null;
+    
+    // Chercher des indices Securex
+    let isSecurex = false;
+    let headerIdx = -1;
+    
+    // Vérifier les premières lignes pour "Securex" ou des colonnes spécifiques
+    for (let i = 0; i < Math.min(15, rows.length); i++) {
+      const row = rows[i];
+      if (!row || !Array.isArray(row)) continue;
+      
+      const rowStr = row.join(' ').toLowerCase();
+      if (rowStr.includes('securex')) {
+        isSecurex = true;
+      }
+      
+      // Colonnes typiques Securex: Matricule, Nom, Prénom, Département, Coût total
+      const hasMatricule = row.some(c => c && String(c).toLowerCase() === 'matricule');
+      const hasNom = row.some(c => c && String(c).toLowerCase() === 'nom');
+      const hasCost = row.some(c => c && (
+        String(c).toLowerCase().includes('coût') || 
+        String(c).toLowerCase().includes('cout') ||
+        String(c).toLowerCase().includes('total')
+      ));
+      
+      if ((hasMatricule || hasNom) && hasCost) {
+        headerIdx = i;
+        break;
+      }
+    }
+    
+    if (headerIdx === -1) return null;
+    
+    console.log('Securex header found at row', headerIdx);
+    
+    const h = rows[headerIdx];
+    
+    // Trouver les colonnes
+    const findColIdx = (names) => {
+      for (let j = 0; j < h.length; j++) {
+        const cell = h[j];
+        if (!cell) continue;
+        const cellLower = String(cell).toLowerCase();
+        for (const name of names) {
+          if (cellLower === name.toLowerCase() || cellLower.includes(name.toLowerCase())) {
+            return j;
+          }
+        }
+      }
+      return -1;
+    };
+    
+    const cols = {
+      nom: findColIdx(['nom', 'name', 'werknemer']),
+      prenom: findColIdx(['prénom', 'prenom', 'voornaam', 'firstname']),
+      dept: findColIdx(['département', 'departement', 'department', 'centre de coût', 'centre de cout', 'afdeling']),
+      func: findColIdx(['fonction', 'functie', 'function']),
+      cost: findColIdx(['coût total', 'cout total', 'totale loonkost', 'total', 'coût', 'cout', 'loonkost'])
+    };
+    
+    console.log('Securex columns:', cols);
+    
+    if (cols.nom === -1 || cols.cost === -1) return null;
+    
+    // Détecter la période depuis le fichier ou les données
+    let period = 'Unknown';
+    const fileInfo = detectFileInfo(filename);
+    if (fileInfo.suggestedPeriod) {
+      period = fileInfo.suggestedPeriod;
+    } else {
+      // Chercher dans les premières lignes
+      for (let i = 0; i < Math.min(10, headerIdx); i++) {
+        const row = rows[i];
+        if (!row) continue;
+        const rowStr = row.join(' ');
+        // Chercher des patterns de date
+        const match = rowStr.match(/(\d{2})[-\/](\d{4})|(\d{4})[-\/](\d{2})/);
+        if (match) {
+          if (match[1] && match[2]) {
+            period = `${match[2]}-${match[1]}`;
+          } else if (match[3] && match[4]) {
+            period = `${match[3]}-${match[4]}`;
+          }
+          break;
+        }
+      }
+    }
+    
+    const emps = [];
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r) continue;
+      
+      const nomVal = r[cols.nom];
+      if (!nomVal) continue;
+      
+      const nom = String(nomVal).trim();
+      if (!nom || nom.toLowerCase() === 'nom' || nom.toLowerCase() === 'total') continue;
+      
+      const costVal = r[cols.cost];
+      const cost = parseFloat(String(costVal).replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0;
+      if (cost === 0) continue;
+      
+      // Combiner nom et prénom si disponible
+      let fullName = nom;
+      if (cols.prenom !== -1 && r[cols.prenom]) {
+        fullName = `${nom} ${String(r[cols.prenom]).trim()}`;
+      }
+      
+      emps.push({
+        name: fullName,
+        department: cols.dept !== -1 && r[cols.dept] ? String(r[cols.dept]).trim() : null,
+        function: cols.func !== -1 && r[cols.func] ? String(r[cols.func]).trim() : '',
+        totalCost: cost,
+        period
+      });
+    }
+    
+    console.log('Securex parsed', emps.length, 'employees');
+    return emps.length > 0 ? { employees: emps, periods: [period], provider: 'securex' } : null;
+  };
+
+  // Parser générique amélioré qui essaie de détecter le format automatiquement
+  const parseGeneric = (rows, filename) => {
+    if (!rows || rows.length === 0) return null;
+    
+    // Chercher la ligne d'en-tête la plus probable
+    let headerIdx = -1;
+    let bestScore = 0;
+    
+    const costKeywords = ['coût', 'cout', 'cost', 'loonkost', 'salaire', 'total', 'brut'];
+    const nameKeywords = ['nom', 'name', 'naam', 'werknemer', 'employé', 'employe'];
+    
+    for (let i = 0; i < Math.min(20, rows.length); i++) {
+      const row = rows[i];
+      if (!row || !Array.isArray(row)) continue;
+      
+      let score = 0;
+      const rowLower = row.map(c => String(c || '').toLowerCase());
+      
+      for (const cell of rowLower) {
+        if (costKeywords.some(k => cell.includes(k))) score += 2;
+        if (nameKeywords.some(k => cell.includes(k))) score += 2;
+        if (cell.includes('département') || cell.includes('department')) score += 1;
+        if (cell.includes('fonction') || cell.includes('function')) score += 1;
+      }
+      
+      if (score > bestScore) {
+        bestScore = score;
+        headerIdx = i;
+      }
+    }
+    
+    if (headerIdx === -1 || bestScore < 3) return null;
+    
+    console.log('Generic header found at row', headerIdx, 'score:', bestScore);
+    
+    const h = rows[headerIdx];
+    
+    // Trouver les colonnes
+    const findCol = (keywords) => {
+      for (let j = 0; j < h.length; j++) {
+        const cell = String(h[j] || '').toLowerCase();
+        for (const k of keywords) {
+          if (cell.includes(k)) return j;
+        }
+      }
+      return -1;
+    };
+    
+    const cols = {
+      nom: findCol(nameKeywords),
+      cost: findCol(costKeywords),
+      dept: findCol(['département', 'departement', 'department', 'centre', 'afdeling']),
+      func: findCol(['fonction', 'function', 'functie'])
+    };
+    
+    if (cols.nom === -1 || cols.cost === -1) return null;
+    
+    // Période depuis le nom du fichier
+    const fileInfo = detectFileInfo(filename);
+    let period = fileInfo.suggestedPeriod || 'Unknown';
+    
+    const emps = [];
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || !r[cols.nom]) continue;
+      
+      const nom = String(r[cols.nom]).trim();
+      if (!nom || nom.toLowerCase() === 'total') continue;
+      
+      const costVal = r[cols.cost];
+      const cost = parseFloat(String(costVal).replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0;
+      if (cost === 0) continue;
+      
+      emps.push({
+        name: nom,
+        department: cols.dept !== -1 && r[cols.dept] ? String(r[cols.dept]).trim() : null,
+        function: cols.func !== -1 && r[cols.func] ? String(r[cols.func]).trim() : '',
+        totalCost: cost,
+        period
+      });
+    }
+    
+    return emps.length > 0 ? { employees: emps, periods: [period], provider: 'generic' } : null;
+  };
+
+  // Multi-fichiers: parser plusieurs fichiers et combiner les résultats
+  const parseMultipleFiles = async (files) => {
+    const results = [];
+    
+    for (const file of files) {
+      try {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+        
+        let sheetName = wb.SheetNames[0];
+        for (const name of wb.SheetNames) {
+          const lower = name.toLowerCase();
+          if (lower.includes('données') || lower.includes('data') || lower.includes('salaire')) {
+            sheetName = name;
+            break;
+          }
+        }
+        
+        const sheet = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        
+        // Essayer tous les parsers
+        let result = parseAcerta(rows);
+        if (!result) result = parseAcertaNL(rows);
+        if (!result) result = parseSecurex(rows, file.name);
+        if (!result) result = parseGeneric(rows, file.name);
+        
+        if (result && result.employees.length > 0) {
+          // Utiliser la période suggérée depuis le nom du fichier si disponible
+          const fileInfo = detectFileInfo(file.name);
+          if (fileInfo.suggestedPeriod && result.periods[0] === 'Unknown') {
+            result.employees.forEach(e => e.period = fileInfo.suggestedPeriod);
+            result.periods = [fileInfo.suggestedPeriod];
+          }
+          
+          results.push({
+            filename: file.name,
+            ...result,
+            suggestedPeriod: fileInfo.suggestedPeriod
+          });
+        }
+      } catch (err) {
+        console.error('Error parsing', file.name, err);
+      }
+    }
+    
+    return results;
+  };
+
   const parseFile = (file) => {
     if (!file) return;
     
@@ -4304,27 +4695,54 @@ function AppContent() {
         const sheet = wb.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
         
-        // Try parse - Acerta FR first, then Acerta NL, then internal
+        // Détecter le type de fichier depuis le nom
+        const fileInfo = detectFileInfo(file.name);
+        console.log('File info detected:', fileInfo);
+        
+        // Try parse - Acerta FR first, then Acerta NL, then Securex, then generic
         let result = parseAcerta(rows);
+        let detectedProvider = 'acerta';
+        
         if (!result) {
           result = parseAcertaNL(rows);
+          detectedProvider = 'acerta-nl';
         }
         if (!result) {
-          result = parseInternal(rows);
+          result = parseSecurex(rows, file.name);
+          detectedProvider = 'securex';
+        }
+        if (!result) {
+          result = parseGeneric(rows, file.name);
+          detectedProvider = 'generic';
         }
         
         if (!result || result.employees.length === 0) {
           setDebugMsg('Aucune donnée');
-          alert('Aucune donnée trouvée dans ce fichier');
+          alert('Aucune donnée trouvée dans ce fichier. Formats supportés: Acerta, Securex, ou fichier avec colonnes Nom + Coût.');
           return;
         }
         
-        console.log('Parsed successfully:', result.employees.length, 'employees');
-        setDebugMsg(`✓ ${result.employees.length} entrées trouvées`);
+        // Analyse intelligente de la période
+        const periodAnalysis = analyzePeriodSuggestion(rows, file.name);
+        console.log('Period analysis:', periodAnalysis);
         
-        // Stocker les données et demander la période (sans importer encore)
+        // Appliquer la période suggérée si pas déjà définie
+        const suggestedPeriod = periodAnalysis.period;
+        if (result.periods[0] === 'Unknown' && suggestedPeriod) {
+          result.employees.forEach(e => e.period = suggestedPeriod);
+          result.periods = [suggestedPeriod];
+        }
+        
+        console.log('Parsed successfully:', result.employees.length, 'employees, provider:', detectedProvider);
+        setDebugMsg(`✓ ${result.employees.length} entrées (${detectedProvider})`);
+        
+        // Stocker les données avec la période suggérée et les infos de confiance
         setPendingPeriodSelection({
-          employees: result.employees
+          employees: result.employees,
+          suggestedPeriod: result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod,
+          detectedProvider,
+          periodConfidence: periodAnalysis.confidence,
+          periodSource: periodAnalysis.source
         });
         setShowImportModal(false);
         
@@ -4952,15 +5370,6 @@ function AppContent() {
       return prev === 0 ? '-' : (curr >= prev ? `+${pct}%` : `${pct}%`);
     };
 
-    // Top 10 employés par coût
-    const empCosts = {};
-    filtered.forEach(e => {
-      const name = e.name;
-      if (!empCosts[name]) empCosts[name] = { name, dept: e.department || departmentMapping[name] || 'Non assigné', cost: 0 };
-      empCosts[name].cost += e.totalCost;
-    });
-    const top10Employees = Object.values(empCosts).sort((a, b) => b.cost - a.cost).slice(0, 10);
-
     const logoHtml = companies[activeCompany]?.logo 
       ? `<img src="${companies[activeCompany].logo}" style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover;" />`
       : `<div style="width: 60px; height: 60px; border-radius: 12px; background: ${colors.hex}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 28px;">${activeCompany?.charAt(0) || 'S'}</div>`;
@@ -5298,29 +5707,6 @@ function AppContent() {
                   <td></td>
                   <td><strong>€${monthlyData.reduce((s, m) => s + m.total, 0).toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="section">
-            <div class="section-title">Top 10 employés</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Employé</th>
-                  <th>Coût</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${top10Employees.map((emp, idx) => `
-                  <tr>
-                    <td>
-                      <strong>${emp.name}</strong>
-                      <div style="font-size: 10px; color: #94A3B8;">${emp.dept}</div>
-                    </td>
-                    <td><strong>€${emp.cost.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
-                  </tr>
-                `).join('')}
               </tbody>
             </table>
           </div>
@@ -6380,6 +6766,14 @@ L'équipe Salarize`;
               </button>
             </div>
             
+            {/* Formats supportés */}
+            <div className="mb-4 flex flex-wrap gap-2">
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">✓ Acerta</span>
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">✓ Securex</span>
+              <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">SD Worx (bientôt)</span>
+              <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-medium">Partena (bientôt)</span>
+            </div>
+            
             {/* Info box */}
             <div className="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-xl">
               <div className="flex gap-3">
@@ -6389,12 +6783,11 @@ L'équipe Salarize`;
                   </svg>
                 </div>
                 <div className="text-sm">
-                  <p className="font-semibold text-blue-800 mb-1">Comment ça fonctionne ?</p>
+                  <p className="font-semibold text-blue-800 mb-1">Détection automatique</p>
                   <ul className="text-blue-700 space-y-1">
-                    <li>• <strong>Un fichier = une période</strong> (ex: janvier 2024)</li>
-                    <li>• Importez plusieurs fichiers pour avoir l'historique complet</li>
-                    <li>• Les données sont cumulées automatiquement</li>
-                    <li>• Vous pouvez supprimer des périodes dans "Gérer la société"</li>
+                    <li>• Le format du fichier est détecté automatiquement</li>
+                    <li>• La période est suggérée depuis le nom du fichier</li>
+                    <li>• Vous pouvez importer plusieurs fichiers à la fois</li>
                   </ul>
                 </div>
               </div>
@@ -6406,7 +6799,7 @@ L'équipe Salarize`;
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span className="text-sm text-violet-800">
-                  Vous importez votre fichier dans <strong>{activeCompany}</strong>
+                  Import vers <strong>{activeCompany}</strong>
                 </span>
               </div>
             )}
@@ -6497,7 +6890,7 @@ L'équipe Salarize`;
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">📅 Quelle période importez-vous ?</h2>
+              <h2 className="text-xl font-bold">📅 Confirmer l'import</h2>
               <button 
                 onClick={() => setPendingPeriodSelection(null)}
                 className="p-1 hover:bg-slate-100 rounded"
@@ -6516,32 +6909,83 @@ L'équipe Salarize`;
                   </svg>
                 </div>
                 <div className="text-sm">
-                  <p className="font-semibold text-violet-800 mb-1">Fichier prêt à importer</p>
+                  <p className="font-semibold text-violet-800 mb-1">Fichier analysé avec succès</p>
                   <p className="text-violet-700">
-                    <strong>{pendingPeriodSelection.employees.length} employés</strong> trouvés dans ce fichier.
+                    <strong>{pendingPeriodSelection.employees.length} employés</strong> détectés
+                    {pendingPeriodSelection.detectedProvider && (
+                      <span className="ml-2 px-2 py-0.5 bg-violet-200 text-violet-800 rounded-full text-xs font-medium">
+                        {pendingPeriodSelection.detectedProvider === 'acerta' ? 'Acerta FR' : 
+                         pendingPeriodSelection.detectedProvider === 'acerta-nl' ? 'Acerta NL' :
+                         pendingPeriodSelection.detectedProvider === 'securex' ? 'Securex' : 'Générique'}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
             </div>
             
+            {/* Période suggérée */}
+            {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' && (
+              <div className={`mb-4 p-3 border rounded-xl ${
+                pendingPeriodSelection.periodConfidence >= 0.8 
+                  ? 'bg-emerald-50 border-emerald-200' 
+                  : pendingPeriodSelection.periodConfidence >= 0.5
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div className={`flex items-center gap-2 text-sm ${
+                  pendingPeriodSelection.periodConfidence >= 0.8 
+                    ? 'text-emerald-700' 
+                    : pendingPeriodSelection.periodConfidence >= 0.5
+                      ? 'text-amber-700'
+                      : 'text-slate-600'
+                }`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  <div className="flex-1">
+                    <span>Période suggérée : <strong>{formatPeriod(pendingPeriodSelection.suggestedPeriod)}</strong></span>
+                    <span className="ml-2 text-xs opacity-75">
+                      ({pendingPeriodSelection.periodSource === 'data' ? 'détectée dans le fichier' : 
+                        pendingPeriodSelection.periodSource === 'filename' ? 'depuis le nom du fichier' : 
+                        'suggestion par défaut'})
+                    </span>
+                  </div>
+                  {pendingPeriodSelection.periodConfidence >= 0.8 && (
+                    <span className="text-xs px-2 py-0.5 bg-emerald-200 text-emerald-800 rounded-full">Haute confiance</span>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div className="mb-5">
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Sélectionnez la période de ce fichier
+                {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' 
+                  ? 'Confirmez ou modifiez la période' 
+                  : 'Sélectionnez la période de ce fichier'}
               </label>
               <div className="flex gap-2">
                 <select 
                   id="period-year"
                   className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none text-lg"
-                  defaultValue={new Date().getFullYear()}
+                  defaultValue={
+                    pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown'
+                      ? pendingPeriodSelection.suggestedPeriod.split('-')[0]
+                      : new Date().getFullYear()
+                  }
                 >
-                  {[2023, 2024, 2025, 2026].map(y => (
+                  {[2022, 2023, 2024, 2025, 2026, 2027].map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
                 <select 
                   id="period-month"
                   className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
-                  defaultValue={String(new Date().getMonth() + 1).padStart(2, '0')}
+                  defaultValue={
+                    pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown'
+                      ? pendingPeriodSelection.suggestedPeriod.split('-')[1]
+                      : String(new Date().getMonth() + 1).padStart(2, '0')
+                  }
                 >
                   {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
                     <option key={m} value={m}>
@@ -7354,55 +7798,145 @@ L'équipe Salarize`;
           </div>
         </div>
         
-        {/* Period Filter Bar */}
-        <div className="flex items-center gap-3 mb-6">
-          <select
-            value={periodFilter}
-            onChange={e => setPeriodFilter(e.target.value)}
-            className="px-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm hover:border-slate-300 transition-colors cursor-pointer font-medium text-slate-700 shadow-sm"
-          >
-            <option value="all">Toutes les périodes</option>
-            <option value="3m">3 derniers mois</option>
-            <option value="6m">6 derniers mois</option>
-            <option value="12m">12 derniers mois</option>
-            <option value="ytd">Année en cours</option>
-          </select>
-          
-          {periods.length > 1 && (
+        {/* Period Filter Bar - Unified */}
+        <div className="flex flex-wrap items-center gap-2 mb-6 bg-white rounded-xl p-2 border border-slate-200 shadow-sm">
+          {/* Quick filters */}
+          <div className="flex items-center gap-1 pr-3 border-r border-slate-200">
             <button
-              onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
-              className="px-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm hover:border-slate-300 transition-colors font-medium text-slate-700 shadow-sm flex items-center gap-2"
+              onClick={() => { setSelectedPeriods([]); setPeriodFilter('all'); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                selectedPeriods.length === 0 && periodFilter === 'all'
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
             >
-              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Sélectionner périodes
-              {selectedPeriods.length > 0 && (
-                <span className="px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-xs font-semibold">
-                  {selectedPeriods.length}
-                </span>
-              )}
+              Tout
             </button>
+            <button
+              onClick={() => { setPeriodFilter('3m'); setSelectedPeriods([]); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                periodFilter === '3m' && selectedPeriods.length === 0
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              3 mois
+            </button>
+            <button
+              onClick={() => { setPeriodFilter('6m'); setSelectedPeriods([]); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                periodFilter === '6m' && selectedPeriods.length === 0
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              6 mois
+            </button>
+            <button
+              onClick={() => { setPeriodFilter('12m'); setSelectedPeriods([]); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                periodFilter === '12m' && selectedPeriods.length === 0
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              12 mois
+            </button>
+            <button
+              onClick={() => { setPeriodFilter('ytd'); setSelectedPeriods([]); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                periodFilter === 'ytd' && selectedPeriods.length === 0
+                  ? 'bg-violet-100 text-violet-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {new Date().getFullYear()}
+            </button>
+          </div>
+          
+          {/* Custom period selector */}
+          {periods.length > 1 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  selectedPeriods.length > 0
+                    ? 'bg-violet-500 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {selectedPeriods.length > 0 ? (
+                  <span>{selectedPeriods.length} période{selectedPeriods.length > 1 ? 's' : ''}</span>
+                ) : (
+                  <span>Personnalisé</span>
+                )}
+                <svg className={`w-3 h-3 transition-transform ${showPeriodDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          )}
+          
+          {/* Selected periods pills */}
+          {selectedPeriods.length > 0 && selectedPeriods.length <= 4 && (
+            <div className="flex items-center gap-1 pl-2 border-l border-slate-200">
+              {selectedPeriods.sort().map(p => (
+                <span
+                  key={p}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-700 rounded-md text-xs font-medium"
+                >
+                  {formatPeriod(p)}
+                  <button
+                    onClick={() => setSelectedPeriods(selectedPeriods.filter(sp => sp !== p))}
+                    className="hover:text-violet-900"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+              <button
+                onClick={() => setSelectedPeriods([])}
+                className="text-xs text-slate-400 hover:text-slate-600 ml-1"
+              >
+                Effacer
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Period Multi-Select Dropdown - Moved to floating panel */}
+        {/* Period Multi-Select Dropdown */}
         {showPeriodDropdown && periods.length > 1 && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowPeriodDropdown(false)} />
-            <div className="fixed right-6 top-32 bg-white border border-slate-200 rounded-xl shadow-lg z-50 w-64 max-h-80 overflow-y-auto">
-              <div className="p-2 border-b border-slate-100 sticky top-0 bg-white">
-                <p className="text-xs font-semibold text-slate-500 uppercase px-2 mb-2">Sélection des périodes</p>
+            <div className="fixed right-6 top-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 w-72 max-h-96 overflow-hidden">
+              <div className="p-3 border-b border-slate-100 bg-slate-50 sticky top-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-slate-700">Sélectionner des périodes</span>
+                  <button
+                    onClick={() => setShowPeriodDropdown(false)}
+                    className="p-1 hover:bg-slate-200 rounded"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
                 <button
                   onClick={() => setSelectedPeriods([])}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                    selectedPeriods.length === 0 ? 'bg-violet-100 text-violet-700 font-medium' : 'hover:bg-slate-50'
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm mt-2 transition-colors ${
+                    selectedPeriods.length === 0 ? 'bg-violet-100 text-violet-700 font-medium' : 'hover:bg-slate-100 text-slate-600'
                   }`}
                 >
                   ✓ Toutes les périodes
                 </button>
               </div>
               
+              <div className="overflow-y-auto max-h-64 p-2">
               {(() => {
                 const grouped = periods.reduce((acc, p) => {
                   const year = p.substring(0, 4);
@@ -7412,9 +7946,9 @@ L'équipe Salarize`;
                 }, {});
                 
                 return Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => (
-                  <div key={year} className="p-2">
-                    <div className="flex items-center justify-between px-2 mb-1">
-                      <span className="text-xs font-semibold text-slate-500 uppercase">{year}</span>
+                  <div key={year} className="mb-2">
+                    <div className="flex items-center justify-between px-2 py-1 bg-slate-50 rounded-lg mb-1">
+                      <span className="text-xs font-bold text-slate-500">{year}</span>
                       <button
                         onClick={() => {
                           const allYearSelected = yearPeriods.every(p => selectedPeriods.includes(p));
@@ -7424,34 +7958,51 @@ L'équipe Salarize`;
                             setSelectedPeriods([...new Set([...selectedPeriods, ...yearPeriods])]);
                           }
                         }}
-                        className="text-xs text-violet-600 hover:text-violet-700"
+                        className="text-xs text-violet-600 hover:text-violet-700 font-medium"
                       >
-                        {yearPeriods.every(p => selectedPeriods.includes(p)) ? 'Désél.' : 'Tout'}
+                        {yearPeriods.every(p => selectedPeriods.includes(p)) ? 'Désélectionner' : 'Tout sélectionner'}
                       </button>
                     </div>
-                    {yearPeriods.sort().reverse().map(p => (
-                      <label
-                        key={p}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedPeriods.includes(p)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedPeriods([...selectedPeriods, p]);
-                            } else {
+                    <div className="grid grid-cols-3 gap-1">
+                    {yearPeriods.sort().reverse().map(p => {
+                      const isSelected = selectedPeriods.includes(p);
+                      const monthName = formatPeriod(p).split(' ')[0].substring(0, 3);
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => {
+                            if (isSelected) {
                               setSelectedPeriods(selectedPeriods.filter(sp => sp !== p));
+                            } else {
+                              setSelectedPeriods([...selectedPeriods, p]);
                             }
                           }}
-                          className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                        />
-                        <span className="text-sm">{formatPeriod(p)}</span>
-                      </label>
-                    ))}
+                          className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            isSelected
+                              ? 'bg-violet-500 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {monthName}
+                        </button>
+                      );
+                    })}
+                    </div>
                   </div>
                 ));
               })()}
+              </div>
+              
+              {selectedPeriods.length > 0 && (
+                <div className="p-3 border-t border-slate-100 bg-slate-50">
+                  <button
+                    onClick={() => setShowPeriodDropdown(false)}
+                    className="w-full py-2 bg-violet-500 text-white rounded-lg text-sm font-medium hover:bg-violet-600 transition-colors"
+                  >
+                    Appliquer ({selectedPeriods.length} période{selectedPeriods.length > 1 ? 's' : ''})
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -7879,148 +8430,94 @@ L'équipe Salarize`;
                 </ResponsiveContainer>
               </div>
             )}
-            
-            {chartData.length >= 2 && (
-              <div className="mt-4 flex gap-4 justify-center text-sm flex-wrap">
-                <div className="bg-slate-50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-500">Mois précédent: </span>
-                  <span className="font-bold text-slate-800">
-                    €{chartData[chartData.length - 2].total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="bg-slate-50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-500">Mois actuel: </span>
-                  <span className="font-bold text-slate-800">
-                    €{chartData[chartData.length - 1].total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="bg-slate-50 px-4 py-2 rounded-lg">
-                  <span className="text-slate-500">Variation: </span>
-                  <span className={`font-bold ${
-                    chartData[chartData.length - 1].total >= chartData[chartData.length - 2].total 
-                      ? 'text-red-500' 
-                      : 'text-violet-500'
-                  }`}>
-                    {chartData[chartData.length - 1].total >= chartData[chartData.length - 2].total ? '↑' : '↓'}
-                    {' '}
-                    {Math.abs(
-                      ((chartData[chartData.length - 1].total - chartData[chartData.length - 2].total) / 
-                      chartData[chartData.length - 2].total) * 100
-                    ).toFixed(1)}%
-                  </span>
-                </div>
-                {/* Même mois années précédentes */}
-                {(() => {
-                  const currentPeriod = chartData[chartData.length - 1].period;
-                  const currentMonth = currentPeriod.substring(5); // "03" par exemple
-                  const currentYear = parseInt(currentPeriod.substring(0, 4));
-                  
-                  const sameMonthPrevYears = chartData.filter(d => {
-                    const month = d.period.substring(5);
-                    const year = parseInt(d.period.substring(0, 4));
-                    return month === currentMonth && year < currentYear;
-                  }).sort((a, b) => b.period.localeCompare(a.period));
-                  
-                  if (sameMonthPrevYears.length === 0) return null;
-                  
-                  return sameMonthPrevYears.map((prev, idx) => {
-                    const variation = ((chartData[chartData.length - 1].total - prev.total) / prev.total * 100);
-                    const yearDiff = currentYear - parseInt(prev.period.substring(0, 4));
-                    const label = yearDiff === 1 ? 'Année préc. (même mois)' : `${prev.period.substring(0, 4)} (même mois)`;
-                    
-                    return (
-                      <div key={prev.period} className="bg-slate-50 px-4 py-2 rounded-lg">
-                        <span className="text-slate-500">{label}: </span>
-                        <span className="font-bold text-slate-800">
-                          €{prev.total.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                        <span className={`ml-2 text-xs font-medium ${variation >= 0 ? 'text-red-500' : 'text-violet-500'}`}>
-                          ({variation >= 0 ? '+' : ''}{variation.toFixed(1)}%)
-                        </span>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            )}
           </div>
         )}
 
         {/* Departments - Version Compacte avec Drill-down */}
         {visibleKpis.deptBreakdown && (
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
-            <span className="text-xs text-slate-400 hidden sm:block">Cliquez pour détails</span>
+            <span className="text-xs text-slate-400 hidden sm:block">Cliquez pour voir les employés</span>
           </div>
           
-          <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto" style={{ willChange: 'scroll-position' }}>
+          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1" style={{ willChange: 'scroll-position' }}>
             {sortedDepts.map(([dept, data]) => {
               const comparison = deptStatsWithComparison[dept] || {};
               const isExpanded = drillDownDept === dept;
               const pct = ((data.total / totalCost) * 100).toFixed(1);
+              const barWidth = Math.max(8, (data.total / maxCost) * 100);
+              
               return (
                 <div key={dept} style={{ contain: 'layout style paint' }}>
                   <div 
-                    className={`py-2.5 px-2 -mx-2 rounded-lg cursor-pointer transition-colors ${
-                      isExpanded ? 'bg-violet-50' : 'hover:bg-slate-50'
+                    className={`p-3 rounded-xl cursor-pointer transition-all ${
+                      isExpanded ? 'bg-violet-50 ring-2 ring-violet-200' : 'hover:bg-slate-50 bg-slate-50/50'
                     }`}
                     onClick={() => setDrillDownDept(isExpanded ? null : dept)}
                   >
-                    {/* Ligne principale */}
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <svg className={`w-3 h-3 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                      
-                      <span className="font-medium text-slate-700 text-sm w-24 sm:w-32 truncate">{dept}</span>
-                      
-                      {/* Barre de progression - plus large */}
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex-1 min-w-[80px] max-w-[300px]">
-                        <div 
-                          className="h-full rounded-full" 
-                          style={{ 
-                            width: `${(data.total / maxCost) * 100}%`,
-                            backgroundColor: `rgb(${getBrandColor()})`
-                          }} 
-                        />
+                    {/* Header avec nom et montant */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="font-semibold text-slate-800">{dept}</span>
+                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{data.count} emp.</span>
                       </div>
-                      
-                      {/* Comparaisons inline */}
-                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        {comparison.variationVsPrevMonth !== null && (
-                          <span className={`text-xs font-medium ${comparison.variationVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                            {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
+                      <div className="flex items-center gap-3">
+                        {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 && (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            comparison.variationVsPrevMonth >= 0 
+                              ? 'bg-red-100 text-red-700' 
+                              : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}
+                            {Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
                           </span>
                         )}
-                        <span className="text-xs text-slate-400 hidden sm:inline">{data.count} emp.</span>
-                        <span className="text-xs text-slate-400 w-10 text-right">{pct}%</span>
-                        <span className="font-semibold text-slate-800 text-sm w-20 sm:w-24 text-right">€{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</span>
+                        <span className="font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</span>
                       </div>
+                    </div>
+                    
+                    {/* Barre de progression - PLUS GRANDE */}
+                    <div className="relative">
+                      <div className="h-6 bg-slate-200 rounded-lg overflow-hidden">
+                        <div 
+                          className="h-full rounded-lg transition-all duration-500 flex items-center justify-end pr-2" 
+                          style={{ 
+                            width: `${barWidth}%`,
+                            background: `linear-gradient(90deg, rgb(${getBrandColor()}), rgb(${getBrandColor().split(',').map((c, i) => Math.min(255, parseInt(c) + 30)).join(',')}))`
+                          }} 
+                        >
+                          {barWidth > 15 && (
+                            <span className="text-white text-xs font-semibold">{pct}%</span>
+                          )}
+                        </div>
+                      </div>
+                      {barWidth <= 15 && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 text-xs font-semibold">{pct}%</span>
+                      )}
                     </div>
                   </div>
                   
                   {/* Drill-down: Liste des employés du département */}
                   {isExpanded && drillDownEmployees.length > 0 && (
-                    <div className="ml-5 mb-2 bg-slate-50 rounded-lg p-3 border border-slate-200">
-                      <h4 className="text-sm font-medium text-slate-700 mb-3">👥 Employés du département {dept}</h4>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                    <div className="ml-6 mt-2 mb-1 bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                        <span className="w-6 h-6 bg-violet-100 rounded-lg flex items-center justify-center text-xs">👥</span>
+                        Employés - {dept}
+                      </h4>
+                      <div className="space-y-1.5 max-h-64 overflow-y-auto">
                         {drillDownEmployees.map((emp, idx) => (
-                          <div key={emp.name} className="flex items-center justify-between py-2 px-3 bg-white rounded-lg border border-slate-100">
+                          <div key={emp.name} className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                             <div className="flex items-center gap-3">
                               <span className="text-xs text-slate-400 w-5">{idx + 1}.</span>
                               <span className="font-medium text-slate-700">{emp.name}</span>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-slate-400">{emp.periods.length} période{emp.periods.length > 1 ? 's' : ''}</span>
-                              <span className="font-bold text-slate-800">€{emp.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
-                            </div>
+                            <span className="font-bold text-slate-800">€{emp.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
                           </div>
                         ))}
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-sm">
-                        <span className="text-slate-500">Total {dept}</span>
-                        <span className="font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   )}
@@ -8029,34 +8526,43 @@ L'équipe Salarize`;
             })}
           </div>
           
-          {/* Résumé des tendances - Plus compact */}
+          {/* Résumé des tendances - Plus visible */}
           {Object.keys(deptStatsWithComparison).length > 0 && (() => {
             const sorted = Object.entries(deptStatsWithComparison)
-              .filter(([, d]) => d.variationVsPrevMonth !== null)
+              .filter(([, d]) => d.variationVsPrevMonth !== null && d.variationVsPrevMonth !== 0)
               .sort((a, b) => (b[1].variationVsPrevMonth || 0) - (a[1].variationVsPrevMonth || 0));
             const highest = sorted[0];
             const lowest = sorted[sorted.length - 1];
             const hasData = (highest && highest[1].variationVsPrevMonth > 0) || (lowest && lowest[1].variationVsPrevMonth < 0);
             
             return hasData ? (
-              <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-4 text-xs">
+              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
                 {highest && highest[1].variationVsPrevMonth > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400">🔺 Hausse:</span>
-                    <span className="font-medium text-red-600">{highest[0]} (+{highest[1].variationVsPrevMonth.toFixed(0)}%)</span>
+                  <div className="flex items-center gap-3 p-3 bg-red-50 rounded-xl">
+                    <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                      <span className="text-lg">📈</span>
+                    </div>
+                    <div>
+                      <p className="text-xs text-red-600 font-medium">Plus forte hausse</p>
+                      <p className="font-bold text-red-700">{highest[0]} <span className="text-sm">+{highest[1].variationVsPrevMonth.toFixed(0)}%</span></p>
+                    </div>
                   </div>
                 )}
                 {lowest && lowest[1].variationVsPrevMonth < 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400">🔻 Baisse:</span>
-                    <span className="font-medium text-emerald-600">{lowest[0]} ({lowest[1].variationVsPrevMonth.toFixed(0)}%)</span>
+                  <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                      <span className="text-lg">📉</span>
+                    </div>
+                    <div>
+                      <p className="text-xs text-emerald-600 font-medium">Plus forte baisse</p>
+                      <p className="font-bold text-emerald-700">{lowest[0]} <span className="text-sm">{lowest[1].variationVsPrevMonth.toFixed(0)}%</span></p>
+                    </div>
                   </div>
                 )}
               </div>
             ) : null;
           })()}
         </div>
-        )}
 
         {/* Employee Detail Section */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100">
