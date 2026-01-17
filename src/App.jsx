@@ -4805,7 +4805,8 @@ function AppContent() {
             suggestedPeriod: result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod,
             detectedProvider,
             periodConfidence: periodAnalysis.confidence,
-            periodSource: periodAnalysis.source
+            periodSource: periodAnalysis.source,
+            fileName: file.name
           });
           setShowImportModal(false);
           resolve();
@@ -7016,7 +7017,6 @@ L'équipe Salarize`;
               <div className="mb-4 p-3 bg-slate-100 rounded-xl">
                 <div className="flex items-center justify-between text-sm text-slate-600 mb-2">
                   <span className="font-medium">Fichier {currentFileIndex + 1} sur {fileQueue.length}</span>
-                  <span className="text-xs text-slate-400">{fileQueue[currentFileIndex]?.name}</span>
                 </div>
                 <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                   <div 
@@ -7026,6 +7026,23 @@ L'équipe Salarize`;
                 </div>
               </div>
             )}
+            
+            {/* Nom du fichier bien visible */}
+            <div className="mb-4 p-3 bg-slate-800 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-medium truncate">
+                    {pendingPeriodSelection.fileName || (fileQueue.length > 0 ? fileQueue[currentFileIndex]?.name : 'Fichier importé')}
+                  </p>
+                  <p className="text-slate-400 text-xs">Fichier Excel</p>
+                </div>
+              </div>
+            </div>
             
             <div className="mb-5 p-4 bg-violet-50 border border-violet-200 rounded-xl">
               <div className="flex gap-3">
@@ -7131,7 +7148,7 @@ L'équipe Salarize`;
                 }}
                 className="flex-1 py-2.5 border border-slate-200 rounded-lg hover:bg-slate-50"
               >
-                Annuler
+                Annuler tout
               </button>
               <button
                 onClick={async () => {
@@ -7180,35 +7197,37 @@ L'équipe Salarize`;
                 className="flex-1 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg font-medium hover:opacity-90"
               >
                 {fileQueue.length > 1 && currentFileIndex < fileQueue.length - 1 
-                  ? `Importer et suivant (${fileQueue.length - currentFileIndex - 1} restants)`
+                  ? `Importer et suivant`
                   : 'Importer'
                 }
               </button>
             </div>
             
-            {/* Skip button for multi-file */}
+            {/* Skip button for multi-file - séparé et discret */}
             {fileQueue.length > 1 && (
-              <button
-                onClick={async () => {
-                  // Passer au fichier suivant sans importer celui-ci
-                  if (currentFileIndex < fileQueue.length - 1) {
-                    const nextIndex = currentFileIndex + 1;
-                    setCurrentFileIndex(nextIndex);
-                    setPendingPeriodSelection(null);
-                    setTimeout(async () => {
-                      await parseFile(fileQueue[nextIndex]);
-                    }, 300);
-                  } else {
-                    // Fin de la file
-                    setPendingPeriodSelection(null);
-                    setFileQueue([]);
-                    setCurrentFileIndex(0);
-                  }
-                }}
-                className="w-full mt-2 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
-              >
-                Ignorer ce fichier
-              </button>
+              <div className="mt-6 pt-4 border-t border-slate-100">
+                <button
+                  onClick={async () => {
+                    // Passer au fichier suivant sans importer celui-ci
+                    if (currentFileIndex < fileQueue.length - 1) {
+                      const nextIndex = currentFileIndex + 1;
+                      setCurrentFileIndex(nextIndex);
+                      setPendingPeriodSelection(null);
+                      setTimeout(async () => {
+                        await parseFile(fileQueue[nextIndex]);
+                      }, 300);
+                    } else {
+                      // Fin de la file
+                      setPendingPeriodSelection(null);
+                      setFileQueue([]);
+                      setCurrentFileIndex(0);
+                    }
+                  }}
+                  className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Ignorer ce fichier et passer au suivant →
+                </button>
+              </div>
             )}
           </div>
         </div>
