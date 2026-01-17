@@ -7,49 +7,63 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
 
-// Storage persistant qui utilise localStorage pour conserver la session entre les visites
-// et synchronise automatiquement entre les onglets via l'event natif 'storage'
-const persistentStorage = {
+// Storage qui utilise sessionStorage pour la session (déconnexion à la fermeture)
+// mais synchronise entre les onglets via localStorage events
+const sessionSyncStorage = {
   getItem: (key) => {
     try {
-      return localStorage.getItem(key);
+      return sessionStorage.getItem(key);
     } catch (e) {
-      console.warn('localStorage not available:', e);
+      console.warn('sessionStorage not available:', e);
       return null;
     }
   },
   
   setItem: (key, value) => {
     try {
-      localStorage.setItem(key, value);
+      sessionStorage.setItem(key, value);
+      // Broadcaster aux autres onglets via localStorage
+      const broadcastKey = `__salarize_sync_${Date.now()}`;
+      localStorage.setItem(broadcastKey, JSON.stringify({ key, value }));
+      localStorage.removeItem(broadcastKey);
     } catch (e) {
-      console.warn('localStorage not available:', e);
+      console.warn('sessionStorage not available:', e);
     }
   },
   
   removeItem: (key) => {
     try {
-      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+      // Broadcaster la suppression aux autres onglets
+      const broadcastKey = `__salarize_sync_${Date.now()}`;
+      localStorage.setItem(broadcastKey, JSON.stringify({ key, value: null }));
+      localStorage.removeItem(broadcastKey);
     } catch (e) {
-      console.warn('localStorage not available:', e);
+      console.warn('sessionStorage not available:', e);
     }
   }
 };
 
-// Écouter les changements de storage pour synchroniser l'auth entre onglets
+// Écouter les changements pour synchroniser entre onglets
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
-    // Détecter les changements de session Supabase
-    if (e.key?.includes('supabase') && e.key?.includes('auth')) {
-      // Forcer un refresh de l'auth state dans cet onglet
-      window.dispatchEvent(new Event('salarize-auth-sync'));
+    if (e.key?.startsWith('__salarize_sync_') && e.newValue) {
+      try {
+        const { key, value } = JSON.parse(e.newValue);
+        if (value === null) {
+          sessionStorage.removeItem(key);
+        } else {
+          sessionStorage.setItem(key, value);
+        }
+        window.dispatchEvent(new Event('salarize-auth-sync'));
+      } catch (err) {}
     }
   });
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: persistentStorage,
+    storage: sessionSyncStorage,
     autoRefreshToken: true,
     persistSession: true,
   }
@@ -3752,6 +3766,7 @@ function AppContent() {
 
   // Load data from Supabase
   const loadFromSupabase = async (userId) => {
+    console.log('[Salarize] Loading data from Supabase for user:', userId);
     setIsLoadingData(true);
     try {
       // Load companies
@@ -3760,22 +3775,37 @@ function AppContent() {
         .select('*')
         .eq('user_id', userId);
 
-      if (companiesError) throw companiesError;
+      if (companiesError) {
+        console.error('[Salarize] Error loading companies:', companiesError);
+        throw companiesError;
+      }
+
+      console.log('[Salarize] Loaded companies:', companiesData?.length || 0);
 
       const loadedCompanies = {};
       
       for (const company of companiesData || []) {
+        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
+        
         // Load employees for this company
-        const { data: employeesData } = await supabase
+        const { data: employeesData, error: empError } = await supabase
           .from('employees')
           .select('*')
           .eq('company_id', company.id);
 
+        if (empError) {
+          console.error('[Salarize] Error loading employees:', empError);
+        }
+
         // Load mappings for this company
-        const { data: mappingsData } = await supabase
+        const { data: mappingsData, error: mapError } = await supabase
           .from('department_mappings')
           .select('*')
           .eq('company_id', company.id);
+
+        if (mapError) {
+          console.error('[Salarize] Error loading mappings:', mapError);
+        }
 
         const mapping = {};
         (mappingsData || []).forEach(m => {
@@ -3791,6 +3821,8 @@ function AppContent() {
         }));
 
         const periods = [...new Set(emps.map(e => e.period).filter(Boolean))].sort();
+
+        console.log(`[Salarize] Company ${company.name}: ${emps.length} employees, ${periods.length} periods`);
 
         loadedCompanies[company.name] = {
           id: company.id,
@@ -3808,29 +3840,36 @@ function AppContent() {
       // Load first company if exists
       const companyNames = Object.keys(loadedCompanies);
       if (companyNames.length > 0) {
+        console.log('[Salarize] Loading first company:', companyNames[0]);
         loadCompany(companyNames[0], loadedCompanies);
+        setCurrentPage('dashboard');
       }
     } catch (e) {
-      console.error('Error loading from Supabase:', e);
+      console.error('[Salarize] Error loading from Supabase:', e);
     }
     setIsLoadingData(false);
   };
 
-  // Save to Supabase - Optimized with upsert
+  // Save to Supabase - avec logging pour debug
   const saveToSupabase = async (newCompanies, activeCompanyName) => {
     if (!user?.id) {
+      console.log('[Salarize] No user ID, saving to localStorage');
       saveToLocalStorage(newCompanies, activeCompanyName);
       return;
     }
 
+    console.log('[Salarize] Saving to Supabase for user:', user.id);
     setIsSyncing(true);
+    
     try {
       for (const [companyName, companyData] of Object.entries(newCompanies)) {
         let companyId = companyData.id;
+        console.log(`[Salarize] Processing company: ${companyName}, existing ID: ${companyId}`);
 
-        // Create or update company with upsert
+        // Create or update company
         if (!companyId) {
           // New company - insert
+          console.log(`[Salarize] Creating new company: ${companyName}`);
           const { data: newCompany, error } = await supabase
             .from('companies')
             .insert({
@@ -3843,12 +3882,31 @@ function AppContent() {
             .select()
             .single();
 
-          if (error) throw error;
-          companyId = newCompany.id;
+          if (error) {
+            console.error('[Salarize] Error creating company:', error);
+            // Essayer de récupérer une company existante avec ce nom
+            const { data: existingCompany } = await supabase
+              .from('companies')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('name', companyName)
+              .single();
+            
+            if (existingCompany) {
+              companyId = existingCompany.id;
+              console.log(`[Salarize] Found existing company with ID: ${companyId}`);
+            } else {
+              throw error;
+            }
+          } else {
+            companyId = newCompany.id;
+            console.log(`[Salarize] Company created with ID: ${companyId}`);
+          }
           newCompanies[companyName].id = companyId;
         } else {
-          // Existing company - update (including name for renaming)
-          await supabase
+          // Existing company - update
+          console.log(`[Salarize] Updating company: ${companyName} (ID: ${companyId})`);
+          const { error } = await supabase
             .from('companies')
             .update({
               name: companyName,
@@ -3857,11 +3915,28 @@ function AppContent() {
               website: companyData.website || null
             })
             .eq('id', companyId);
+          
+          if (error) {
+            console.error('[Salarize] Error updating company:', error);
+          }
         }
 
-        // Sync employees - use upsert with composite key (company_id, name, period)
+        // Sync employees
         if (companyData.employees?.length > 0) {
-          const employeesToUpsert = companyData.employees.map(e => ({
+          console.log(`[Salarize] Syncing ${companyData.employees.length} employees for ${companyName}`);
+          
+          // D'abord supprimer tous les employés existants pour cette company
+          const { error: deleteError } = await supabase
+            .from('employees')
+            .delete()
+            .eq('company_id', companyId);
+          
+          if (deleteError) {
+            console.error('[Salarize] Error deleting old employees:', deleteError);
+          }
+          
+          // Puis insérer tous les employés
+          const employeesToInsert = companyData.employees.map(e => ({
             company_id: companyId,
             name: e.name,
             department: e.department || null,
@@ -3870,100 +3945,60 @@ function AppContent() {
             period: e.period
           }));
 
-          // Upsert in batches of 500 to avoid payload limits
+          // Insert in batches of 500
           const batchSize = 500;
-          for (let i = 0; i < employeesToUpsert.length; i += batchSize) {
-            const batch = employeesToUpsert.slice(i, i + batchSize);
-            const { error } = await supabase
+          for (let i = 0; i < employeesToInsert.length; i += batchSize) {
+            const batch = employeesToInsert.slice(i, i + batchSize);
+            const { error: insertError } = await supabase
               .from('employees')
-              .upsert(batch, { 
-                onConflict: 'company_id,name,period',
-                ignoreDuplicates: false 
-              });
-            if (error) {
-              // If upsert fails (no unique constraint), fall back to delete+insert for this batch
-              console.warn('Upsert failed, using fallback:', error.message);
-              await supabase.from('employees').delete().eq('company_id', companyId);
-              await supabase.from('employees').insert(employeesToUpsert);
-              break;
+              .insert(batch);
+            
+            if (insertError) {
+              console.error('[Salarize] Error inserting employees batch:', insertError);
+            } else {
+              console.log(`[Salarize] Inserted batch ${i / batchSize + 1}, ${batch.length} employees`);
             }
-          }
-
-          // Remove employees that no longer exist
-          const currentKeys = new Set(
-            companyData.employees.map(e => `${e.name}|${e.period}`)
-          );
-          
-          const { data: existingEmps } = await supabase
-            .from('employees')
-            .select('id, name, period')
-            .eq('company_id', companyId);
-          
-          const toDelete = (existingEmps || [])
-            .filter(e => !currentKeys.has(`${e.name}|${e.period}`))
-            .map(e => e.id);
-          
-          if (toDelete.length > 0) {
-            await supabase
-              .from('employees')
-              .delete()
-              .in('id', toDelete);
           }
         } else {
           // No employees - delete all
+          console.log(`[Salarize] No employees, deleting all for ${companyName}`);
           await supabase.from('employees').delete().eq('company_id', companyId);
         }
 
         // Sync department mappings
         const mappingEntries = Object.entries(companyData.mapping || {});
         if (mappingEntries.length > 0) {
-          const mappingsToUpsert = mappingEntries.map(([empName, dept]) => ({
+          console.log(`[Salarize] Syncing ${mappingEntries.length} mappings for ${companyName}`);
+          
+          // Supprimer les anciens mappings
+          await supabase.from('department_mappings').delete().eq('company_id', companyId);
+          
+          // Insérer les nouveaux
+          const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
             company_id: companyId,
             employee_name: empName,
             department: dept
           }));
 
-          const { error } = await supabase
+          const { error: mappingError } = await supabase
             .from('department_mappings')
-            .upsert(mappingsToUpsert, { 
-              onConflict: 'company_id,employee_name',
-              ignoreDuplicates: false 
-            });
+            .insert(mappingsToInsert);
           
-          if (error) {
-            // Fallback: delete and insert
-            console.warn('Mapping upsert failed, using fallback:', error.message);
-            await supabase.from('department_mappings').delete().eq('company_id', companyId);
-            await supabase.from('department_mappings').insert(mappingsToUpsert);
-          } else {
-            // Remove mappings that no longer exist
-            const currentMappedNames = new Set(mappingEntries.map(([name]) => name));
-            
-            const { data: existingMappings } = await supabase
-              .from('department_mappings')
-              .select('id, employee_name')
-              .eq('company_id', companyId);
-            
-            const mappingsToDelete = (existingMappings || [])
-              .filter(m => !currentMappedNames.has(m.employee_name))
-              .map(m => m.id);
-            
-            if (mappingsToDelete.length > 0) {
-              await supabase
-                .from('department_mappings')
-                .delete()
-                .in('id', mappingsToDelete);
-            }
+          if (mappingError) {
+            console.error('[Salarize] Error inserting mappings:', mappingError);
           }
         } else {
-          // No mappings - delete all
           await supabase.from('department_mappings').delete().eq('company_id', companyId);
         }
       }
 
+      console.log('[Salarize] Save completed successfully');
       setCompanies(newCompanies);
+      setLastSaved(new Date());
     } catch (e) {
-      console.error('Error saving to Supabase:', e);
+      console.error('[Salarize] Error saving to Supabase:', e);
+      // Fallback to localStorage
+      saveToLocalStorage(newCompanies, activeCompanyName);
     }
     setIsSyncing(false);
   };
@@ -5959,10 +5994,37 @@ L'équipe Salarize`;
     [periods]
   );
   
-  // Filter chart data by year
-  const chartData = useMemo(() => 
-    periods
-      .filter(period => selectedYear === 'all' || period.startsWith(selectedYear))
+  // Filter chart data by selected periods or quick filters
+  const chartData = useMemo(() => {
+    let filteredPeriods = periods;
+    
+    // Si des périodes spécifiques sont sélectionnées
+    if (selectedPeriods.length > 0) {
+      filteredPeriods = periods.filter(p => selectedPeriods.includes(p));
+    } 
+    // Sinon appliquer les filtres rapides
+    else if (periodFilter !== 'all') {
+      const sortedPeriods = [...periods].sort((a, b) => b.localeCompare(a));
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      
+      if (periodFilter === '3m') {
+        filteredPeriods = sortedPeriods.slice(0, 3);
+      } else if (periodFilter === '6m') {
+        filteredPeriods = sortedPeriods.slice(0, 6);
+      } else if (periodFilter === '12m') {
+        filteredPeriods = sortedPeriods.slice(0, 12);
+      } else if (periodFilter === 'ytd') {
+        filteredPeriods = periods.filter(p => p.startsWith(String(currentYear)));
+      }
+    }
+    
+    // Aussi filtrer par année si sélectionnée
+    if (selectedYear !== 'all') {
+      filteredPeriods = filteredPeriods.filter(p => p.startsWith(selectedYear));
+    }
+    
+    return filteredPeriods
       .map(period => {
         const periodEmps = employees.filter(e => e.period === period);
         const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
@@ -5972,9 +6034,8 @@ L'équipe Salarize`;
           total: Math.round(total * 100) / 100,
           year: year
         };
-      }).sort((a, b) => a.period.localeCompare(b.period)),
-    [periods, employees, selectedYear]
-  );
+      }).sort((a, b) => a.period.localeCompare(b.period));
+  }, [periods, employees, selectedYear, selectedPeriods, periodFilter]);
   
   // Années uniques pour les couleurs
   const uniqueYears = useMemo(() => 
@@ -8389,9 +8450,9 @@ L'équipe Salarize`;
               </div>
             ) : (
               /* Graphique Standard */
-              <div className="h-72">
+              <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis 
                       dataKey="period" 
@@ -8423,7 +8484,7 @@ L'équipe Salarize`;
                     <Bar 
                       dataKey="total" 
                       fill={`rgb(${getBrandColor()})`}
-                      radius={[4, 4, 0, 0]}
+                      radius={[6, 6, 0, 0]}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -8432,100 +8493,63 @@ L'équipe Salarize`;
           </div>
         )}
 
-        {/* Departments - Version Compacte avec Drill-down */}
+        {/* Departments - Version Simple sans scroll */}
         {visibleKpis.deptBreakdown && (
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
-            <span className="text-xs text-slate-400 hidden sm:block">Cliquez pour voir les employés</span>
+            <span className="text-xs text-slate-400">{sortedDepts.length} départements</span>
           </div>
           
-          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1" style={{ willChange: 'scroll-position' }}>
+          <div className="space-y-2">
             {sortedDepts.map(([dept, data]) => {
               const comparison = deptStatsWithComparison[dept] || {};
-              const isExpanded = drillDownDept === dept;
               const pct = ((data.total / totalCost) * 100).toFixed(1);
-              const barWidth = Math.max(8, (data.total / maxCost) * 100);
+              const barWidth = Math.max(5, (data.total / maxCost) * 100);
               
               return (
-                <div key={dept} style={{ contain: 'layout style paint' }}>
-                  <div 
-                    className={`p-3 rounded-xl cursor-pointer transition-all ${
-                      isExpanded ? 'bg-violet-50 ring-2 ring-violet-200' : 'hover:bg-slate-50 bg-slate-50/50'
-                    }`}
-                    onClick={() => setDrillDownDept(isExpanded ? null : dept)}
-                  >
-                    {/* Header avec nom et montant */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <svg className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <span className="font-semibold text-slate-800">{dept}</span>
-                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{data.count} emp.</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            comparison.variationVsPrevMonth >= 0 
-                              ? 'bg-red-100 text-red-700' 
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}
-                            {Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
-                          </span>
-                        )}
-                        <span className="font-bold text-slate-800">€{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Barre de progression - PLUS GRANDE */}
-                    <div className="relative">
-                      <div className="h-6 bg-slate-200 rounded-lg overflow-hidden">
-                        <div 
-                          className="h-full rounded-lg transition-all duration-500 flex items-center justify-end pr-2" 
-                          style={{ 
-                            width: `${barWidth}%`,
-                            background: `linear-gradient(90deg, rgb(${getBrandColor()}), rgb(${getBrandColor().split(',').map((c, i) => Math.min(255, parseInt(c) + 30)).join(',')}))`
-                          }} 
-                        >
-                          {barWidth > 15 && (
-                            <span className="text-white text-xs font-semibold">{pct}%</span>
-                          )}
-                        </div>
-                      </div>
-                      {barWidth <= 15 && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 text-xs font-semibold">{pct}%</span>
-                      )}
-                    </div>
+                <div key={dept} className="flex items-center gap-3 py-2">
+                  {/* Nom du département */}
+                  <div className="w-32 sm:w-40 flex-shrink-0">
+                    <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
+                    <span className="text-xs text-slate-400">{data.count} emp.</span>
                   </div>
                   
-                  {/* Drill-down: Liste des employés du département */}
-                  {isExpanded && drillDownEmployees.length > 0 && (
-                    <div className="ml-6 mt-2 mb-1 bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-                      <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                        <span className="w-6 h-6 bg-violet-100 rounded-lg flex items-center justify-center text-xs">👥</span>
-                        Employés - {dept}
-                      </h4>
-                      <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                        {drillDownEmployees.map((emp, idx) => (
-                          <div key={emp.name} className="flex items-center justify-between py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-slate-400 w-5">{idx + 1}.</span>
-                              <span className="font-medium text-slate-700">{emp.name}</span>
-                            </div>
-                            <span className="font-bold text-slate-800">€{emp.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Barre de progression */}
+                  <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all duration-500" 
+                      style={{ 
+                        width: `${barWidth}%`,
+                        background: `rgb(${getBrandColor()})`
+                      }} 
+                    />
+                  </div>
+                  
+                  {/* Pourcentage */}
+                  <span className="w-12 text-right text-xs font-medium text-slate-500">{pct}%</span>
+                  
+                  {/* Variation */}
+                  {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 ? (
+                    <span className={`w-14 text-right text-xs font-semibold ${
+                      comparison.variationVsPrevMonth >= 0 ? 'text-red-600' : 'text-emerald-600'
+                    }`}>
+                      {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
+                    </span>
+                  ) : (
+                    <span className="w-14"></span>
                   )}
+                  
+                  {/* Montant */}
+                  <span className="w-24 text-right font-bold text-slate-800 text-sm">
+                    €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                  </span>
                 </div>
               );
             })}
           </div>
           
-          {/* Résumé des tendances - Plus visible */}
+          {/* Résumé des tendances */}
           {Object.keys(deptStatsWithComparison).length > 0 && (() => {
             const sorted = Object.entries(deptStatsWithComparison)
               .filter(([_dept, d]) => d.variationVsPrevMonth !== null && d.variationVsPrevMonth !== 0)
@@ -8538,23 +8562,19 @@ L'équipe Salarize`;
               <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
                 {highest && highest[1].variationVsPrevMonth > 0 && (
                   <div className="flex items-center gap-3 p-3 bg-red-50 rounded-xl">
-                    <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                      <span className="text-lg">📈</span>
-                    </div>
+                    <span className="text-lg">📈</span>
                     <div>
                       <p className="text-xs text-red-600 font-medium">Plus forte hausse</p>
-                      <p className="font-bold text-red-700">{highest[0]} <span className="text-sm">+{highest[1].variationVsPrevMonth.toFixed(0)}%</span></p>
+                      <p className="font-bold text-red-700 text-sm">{highest[0]} +{highest[1].variationVsPrevMonth.toFixed(0)}%</p>
                     </div>
                   </div>
                 )}
                 {lowest && lowest[1].variationVsPrevMonth < 0 && (
                   <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                      <span className="text-lg">📉</span>
-                    </div>
+                    <span className="text-lg">📉</span>
                     <div>
                       <p className="text-xs text-emerald-600 font-medium">Plus forte baisse</p>
-                      <p className="font-bold text-emerald-700">{lowest[0]} <span className="text-sm">{lowest[1].variationVsPrevMonth.toFixed(0)}%</span></p>
+                      <p className="font-bold text-emerald-700 text-sm">{lowest[0]} {lowest[1].variationVsPrevMonth.toFixed(0)}%</p>
                     </div>
                   </div>
                 )}
