@@ -13,8 +13,17 @@ const SESSION_KEY = 'salarize_browser_session';
 
 // Vérifier si c'est une nouvelle session de navigateur
 if (!sessionStorage.getItem(SESSION_KEY)) {
-  // Nouveau navigateur ouvert = supprimer l'ancienne session auth
-  localStorage.removeItem('sb-dbqlyxeorexihuitejvq-auth-token');
+  // Nouveau navigateur ouvert = supprimer TOUTES les clés auth Supabase
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(key => localStorage.removeItem(key));
+  
+  // Marquer cette session comme active
   sessionStorage.setItem(SESSION_KEY, Date.now().toString());
 }
 
@@ -360,7 +369,7 @@ const DashboardSkeleton = () => (
 const LoadingSpinner = ({ size = 'md', text = '', subtext = '', fullScreen = false, light = false }) => {
   const sizes = {
     sm: { container: 'w-10 h-10', text: 'text-sm', border: 'border-2' },
-    md: { container: 'w-16 h-16', text: 'text-xl', border: 'border-3' },
+    md: { container: 'w-16 h-16', text: 'text-xl', border: 'border-4' },
     lg: { container: 'w-20 h-20', text: 'text-2xl', border: 'border-4' }
   };
   
