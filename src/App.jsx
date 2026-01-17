@@ -2025,7 +2025,10 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
       )}
       
       <div className="flex-1 p-4 pb-20 overflow-y-auto">
-        <p className="text-slate-500 text-xs uppercase mb-2">Sociétés</p>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-1 h-4 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></div>
+          <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Mes Sociétés</p>
+        </div>
         {Object.keys(companies).length === 0 ? (
           <p className="text-slate-600 text-sm">Aucune société</p>
         ) : (
@@ -2437,7 +2440,6 @@ function AppContent() {
 
   // Load data from Supabase
   const loadFromSupabase = async (userId) => {
-    setIsLoading(true);
     setIsLoadingData(true);
     try {
       // Load companies
@@ -2499,7 +2501,6 @@ function AppContent() {
     } catch (e) {
       console.error('Error loading from Supabase:', e);
     }
-    setIsLoading(false);
     setIsLoadingData(false);
   };
 
