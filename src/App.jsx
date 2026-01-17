@@ -2821,15 +2821,15 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
   const [showDropdown, setShowDropdown] = useState(false);
   
   return (
-    <header className="fixed top-0 right-0 left-0 lg:left-64 h-16 bg-slate-900/95 backdrop-blur-lg border-b border-white/10 flex items-center justify-between px-4 lg:px-6 z-30">
-      {/* Left side - Menu button (mobile) + Logo + Nav */}
-      <div className="flex items-center gap-4">
+    <header className="fixed top-0 right-0 left-0 lg:left-64 h-14 bg-white/80 backdrop-blur-sm border-b border-slate-200/80 flex items-center justify-between px-4 lg:px-6 z-30">
+      {/* Left side - Menu button (mobile only) */}
+      <div className="flex items-center gap-3">
         {/* Menu hamburger mobile */}
         <button 
           onClick={onMenuClick}
-          className="p-2 -ml-2 lg:hidden hover:bg-white/10 rounded-lg transition-colors"
+          className="p-2 -ml-2 lg:hidden hover:bg-slate-100 rounded-lg transition-colors"
         >
-          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -2842,82 +2842,68 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
           <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">S</span>
           </div>
-          <span className="text-white font-bold text-lg">Salarize</span>
         </button>
-        
-        {/* Nav links desktop */}
-        <nav className="hidden lg:flex items-center gap-6">
-          <button 
-            onClick={() => setCurrentPage('home')}
-            className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
-          >
-            Accueil
-          </button>
-          <button 
-            onClick={() => setCurrentPage('features')}
-            className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
-          >
-            Fonctionnalités
-          </button>
-        </nav>
       </div>
       
-      {/* Right side - Profile */}
-      <div className="relative">
-        <button 
-          onClick={() => setShowDropdown(!showDropdown)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors"
-        >
-          <img src={user?.picture} alt="" className="w-8 h-8 rounded-full border-2 border-white/20" />
-          <span className="text-white text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
-          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-        {showDropdown && (
-          <>
-            <div className="fixed inset-0" onClick={() => setShowDropdown(false)} />
-            <div className="absolute right-0 top-14 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-50">
-              <button 
-                onClick={() => { setCurrentPage('home'); setShowDropdown(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                Accueil
-              </button>
-              <button 
-                onClick={() => { setCurrentPage('features'); setShowDropdown(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Fonctionnalités
-              </button>
-              <button 
-                onClick={() => { setCurrentPage('profile'); setShowDropdown(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Mon profil
-              </button>
-              <div className="border-t border-slate-100 my-1" />
-              <button 
-                onClick={() => { onLogout(); setShowDropdown(false); }}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Se déconnecter
-              </button>
-            </div>
-          </>
-        )}
+      {/* Right side - Profile only */}
+      <div className="flex items-center">
+        <div className="relative">
+          <button 
+            onClick={() => setShowDropdown(!showDropdown)}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            {user?.picture ? (
+              <img src={user.picture} alt="" className="w-8 h-8 rounded-full" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-medium text-sm">
+                {user?.name?.charAt(0) || 'U'}
+              </div>
+            )}
+            <span className="text-slate-700 text-sm font-medium hidden sm:block">{user?.name?.split(' ')[0]}</span>
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showDropdown && (
+            <>
+              <div className="fixed inset-0" onClick={() => setShowDropdown(false)} />
+              <div className="absolute right-0 top-12 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-50">
+                <div className="px-4 py-2 border-b border-slate-100">
+                  <p className="font-medium text-slate-800 text-sm">{user?.name}</p>
+                  <p className="text-slate-500 text-xs truncate">{user?.email}</p>
+                </div>
+                <button 
+                  onClick={() => { setCurrentPage('home'); setShowDropdown(false); }}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Accueil site
+                </button>
+                <button 
+                  onClick={() => { setCurrentPage('profile'); setShowDropdown(false); }}
+                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Mon profil
+                </button>
+                <div className="border-t border-slate-100 my-1" />
+                <button 
+                  onClick={() => { onLogout(); setShowDropdown(false); }}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Se déconnecter
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
@@ -6897,7 +6883,7 @@ L'équipe Salarize`;
         </div>
       )}
       
-      <main className="lg:ml-64 mt-16 flex-1 p-4 lg:p-6">
+      <main className="lg:ml-64 mt-14 flex-1 p-4 lg:p-6">
         {/* Skeleton de chargement seulement si pas de données */}
         {isLoadingData && employees.length === 0 ? (
           <DashboardSkeleton />
@@ -7451,60 +7437,6 @@ L'équipe Salarize`;
             </div>
           </div>
         )}
-
-        {/* Stats Cards - Version Améliorée */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {/* Coût Total avec comparaison */}
-          {visibleKpis.totalCost && (
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-slate-400 text-sm">Coût Total</p>
-                {comparisonData && comparisonData.variationVsPrevMonth !== null && (
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    comparisonData.variationVsPrevMonth >= 0 
-                      ? 'bg-red-50 text-red-600' 
-                      : 'bg-emerald-50 text-emerald-600'
-                  }`}>
-                    {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(1)}%
-                  </span>
-                )}
-              </div>
-              <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
-              {comparisonData && comparisonData.diffVsPrevMonth !== null && (
-                <p className={`text-xs mt-1 ${comparisonData.diffVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                  {comparisonData.diffVsPrevMonth >= 0 ? '+' : ''}€{comparisonData.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 2 })} vs mois préc.
-                </p>
-              )}
-            </div>
-          )}
-          
-          {/* Employés */}
-          {visibleKpis.employees && (
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-              <p className="text-slate-400 text-sm">Employés</p>
-              <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
-              <p className="text-xs text-slate-400 mt-1">Actifs sur la période</p>
-            </div>
-          )}
-          
-          {/* Départements */}
-          {visibleKpis.departments && (
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-              <p className="text-slate-400 text-sm">Départements</p>
-              <p className="text-2xl font-bold text-slate-800">{Object.keys(deptStats).length}</p>
-              <p className="text-xs text-slate-400 mt-1">{sortedDepts[0]?.[0] || '-'} en tête</p>
-            </div>
-          )}
-          
-          {/* Coût Moyen avec comparaison */}
-          {visibleKpis.avgCost && (
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
-              <p className="text-slate-400 text-sm">Coût Moyen / Employé</p>
-              <p className="text-2xl font-bold text-slate-800">€{(totalCost / (uniqueNames || 1)).toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-slate-400 mt-1">Par employé</p>
-            </div>
-          )}
-        </div>
 
         {/* Cartes de Comparaison Détaillées */}
         {visibleKpis.comparison && comparisonData && (
