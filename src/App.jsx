@@ -2174,6 +2174,8 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
                   <input
                     ref={avatarInputRef}
                     type="file"
+                    id="avatar-upload"
+                    name="avatar"
                     accept="image/*"
                     onChange={handleAvatarUpload}
                     className="hidden"
@@ -2266,6 +2268,9 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
                     <label className="text-sm text-slate-400 block mb-2">Nom complet</label>
                     <input
                       type="text"
+                      id="profile-name"
+                      name="fullName"
+                      autoComplete="name"
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
                       className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -2279,6 +2284,9 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
                     </label>
                     <input
                       type="email"
+                      id="profile-email"
+                      name="email"
+                      autoComplete="email"
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
                       disabled={isGoogleUser}
@@ -2351,6 +2359,9 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
                       <label className="text-sm text-slate-400 block mb-2">Nouveau mot de passe</label>
                       <input
                         type="password"
+                        id="profile-new-password"
+                        name="newPassword"
+                        autoComplete="new-password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -2361,6 +2372,9 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
                       <label className="text-sm text-slate-400 block mb-2">Confirmer le mot de passe</label>
                       <input
                         type="password"
+                        id="profile-confirm-password"
+                        name="confirmPassword"
+                        autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -2755,6 +2769,9 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
                 <label className="text-sm text-slate-400 block mb-2">Nom complet</label>
                 <input
                   type="text"
+                  id="auth-name"
+                  name="name"
+                  autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -2767,6 +2784,9 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
               <label className="text-sm text-slate-400 block mb-2">Email</label>
               <input
                 type="email"
+                id="auth-email"
+                name="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -2778,6 +2798,9 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
               <label className="text-sm text-slate-400 block mb-2">Mot de passe</label>
               <input
                 type="password"
+                id="auth-password"
+                name="password"
+                autoComplete={tab === 'signup' ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -2790,6 +2813,9 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
                 <label className="text-sm text-slate-400 block mb-2">Confirmer le mot de passe</label>
                 <input
                   type="password"
+                  id="auth-confirm-password"
+                  name="confirmPassword"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -3239,6 +3265,8 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
             <label className="block text-sm font-medium text-slate-700 mb-2">Nom de la société</label>
             <input
               type="text"
+              id="company-name"
+              name="companyName"
               value={localName}
               onChange={e => setLocalName(e.target.value)}
               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
@@ -3250,6 +3278,8 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
             <label className="block text-sm font-medium text-slate-700 mb-2">Site web</label>
             <input
               type="text"
+              id="company-website"
+              name="website"
               placeholder="www.example.com"
               value={localWebsite}
               onChange={e => setLocalWebsite(e.target.value)}
@@ -3566,30 +3596,27 @@ function AppContent() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
+      // Ignorer les events TOKEN_REFRESHED qui ne changent pas l'état
+      if (event === 'TOKEN_REFRESHED') return;
+      
       if (event === 'SIGNED_IN' && session?.user) {
         // Seulement après une nouvelle connexion, aller au dashboard
-        setUser({
-          id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
-          email: session.user.email,
-          picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
-          created_at: session.user.created_at,
-          provider: session.user.app_metadata?.provider || 'email'
+        setUser(prev => {
+          // Si l'user est déjà le même, ne pas mettre à jour
+          if (prev?.id === session.user.id) return prev;
+          return {
+            id: session.user.id,
+            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
+            email: session.user.email,
+            picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+            created_at: session.user.created_at,
+            provider: session.user.app_metadata?.provider || 'email'
+          };
         });
         setCurrentPage('dashboard');
         if (Object.keys(companies).length === 0) {
           loadFromSupabase(session.user.id);
         }
-      } else if (session?.user) {
-        // Session existante, juste mettre à jour l'user sans rediriger
-        setUser({
-          id: session.user.id,
-          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email,
-          email: session.user.email,
-          picture: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
-          created_at: session.user.created_at,
-          provider: session.user.app_metadata?.provider || 'email'
-        });
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setCompanies({});
@@ -3598,6 +3625,7 @@ function AppContent() {
         setView('upload');
         setCurrentPage('home');
       }
+      // Ne rien faire pour les autres events (évite les re-renders inutiles)
     });
 
     return () => {
@@ -5987,6 +6015,8 @@ L'équipe Salarize`;
                 </div>
                 <input 
                   type="file" 
+                  id="file-upload"
+                  name="file"
                   accept=".xlsx,.xls" 
                   onChange={handleFileChange}
                   className="hidden" 
@@ -6331,7 +6361,9 @@ L'équipe Salarize`;
                 </svg>
                 Parcourir les fichiers
                 <input 
-                  type="file" 
+                  type="file"
+                  id="import-file"
+                  name="importFile" 
                   accept=".xlsx,.xls" 
                   onChange={(e) => {
                     handleFileChange(e);
