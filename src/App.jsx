@@ -7,25 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
 
-// Storage personnalisé : localStorage pour partager entre onglets, 
-// mais on nettoie au démarrage si le navigateur a été fermé
+// Clé pour détecter si le navigateur a été fermé
 const SESSION_KEY = 'salarize_browser_session';
-
-// Vérifier si c'est une nouvelle session de navigateur
-if (!sessionStorage.getItem(SESSION_KEY)) {
-  // Nouveau navigateur ouvert = supprimer TOUTES les clés auth Supabase
-  const keysToRemove = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
-      keysToRemove.push(key);
-    }
-  }
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-  
-  // Marquer cette session comme active
-  sessionStorage.setItem(SESSION_KEY, Date.now().toString());
-}
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -3577,6 +3560,19 @@ function AppContent() {
     let mounted = true;
     
     const initAuth = async () => {
+      // Vérifier si c'est une nouvelle session de navigateur (après fermeture)
+      const isNewBrowserSession = !sessionStorage.getItem(SESSION_KEY);
+      
+      if (isNewBrowserSession) {
+        // Marquer la session comme active
+        sessionStorage.setItem(SESSION_KEY, Date.now().toString());
+        
+        // Déconnecter proprement via Supabase
+        await supabase.auth.signOut();
+        setIsLoading(false);
+        return; // Arrêter ici, l'utilisateur doit se reconnecter
+      }
+      
       // Détecter le token dans le hash (flow implicite)
       if (window.location.hash && window.location.hash.includes('access_token')) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
