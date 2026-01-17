@@ -3542,6 +3542,7 @@ function AppContent() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
+  const companiesRef = useRef({}); // Ref pour tracker companies en temps réel (pour imports multiples)
   const [showExportModal, setShowExportModal] = useState(false);
   const [comparePeriod, setComparePeriod] = useState(null);
   const [comparePeriod1, setComparePeriod1] = useState(null);
@@ -3662,6 +3663,11 @@ function AppContent() {
       return () => clearTimeout(timer);
     }
   }, [pendingPeriodSelection]);
+
+  // Synchroniser companiesRef avec companies state
+  useEffect(() => {
+    companiesRef.current = companies;
+  }, [companies]);
 
   // Check auth state on load
   useEffect(() => {
@@ -5071,7 +5077,9 @@ function AppContent() {
   const importToCompanyDirect = (companyName, data) => {
     if (!data || !companyName) return;
     
-    const existing = companies[companyName] || { employees: [], mapping: {}, periods: [] };
+    // Utiliser la ref pour avoir les données les plus récentes (important pour imports multiples)
+    const currentCompanies = companiesRef.current;
+    const existing = currentCompanies[companyName] || { employees: [], mapping: {}, periods: [] };
     const mapping = { ...existing.mapping };
     
     const existingKeys = new Set((existing.employees || []).map(e => `${e.period}-${e.name}`));
@@ -5093,7 +5101,10 @@ function AppContent() {
       mapping, 
       periods: allPeriods 
     };
-    const newCompanies = { ...companies, [companyName]: newCompany };
+    const newCompanies = { ...currentCompanies, [companyName]: newCompany };
+    
+    // Mettre à jour la ref IMMÉDIATEMENT pour les imports suivants
+    companiesRef.current = newCompanies;
     
     setCompanies(newCompanies);
     setActiveCompany(companyName);
@@ -5105,7 +5116,7 @@ function AppContent() {
     setPendingData(null);
     setShowModal(false);
     setNewCompanyName('');
-    setDebugMsg(`✓ ${newEmps.length} nouvelles entrées`);
+    setDebugMsg(`✓ ${newEmps.length} nouvelles entrées (total: ${allEmps.length})`);
 
     if (unassigned.length > 0) {
       setPendingAssignments(unassigned);
@@ -8554,7 +8565,7 @@ L'équipe Salarize`;
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    📈 Comparaison Année sur Année
+                    📈 Comparaison Annuelle
                   </button>
                 )}
                 {years.length > 1 && !showYearComparison && (
@@ -8585,7 +8596,6 @@ L'équipe Salarize`;
                       formatter={(value, name) => [value ? `€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}` : 'N/A', name]}
                       contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
                     />
-                    <Legend />
                     {years.map((year, idx) => (
                       <Line 
                         key={year}
@@ -8601,12 +8611,13 @@ L'équipe Salarize`;
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
-                <div className="flex justify-center gap-4 mt-3">
-                  {years.slice(-2).map((year, idx) => (
+                {/* Légende custom uniquement */}
+                <div className="flex justify-center gap-6 mt-3">
+                  {years.slice(-2).reverse().map((year, idx) => (
                     <div key={year} className="flex items-center gap-2">
-                      <div className={`w-4 h-1 rounded ${idx === 1 ? 'bg-violet-500' : 'bg-cyan-500'}`} 
-                           style={{ borderStyle: idx === 0 ? 'dashed' : 'solid' }} />
-                      <span className="text-sm text-slate-600">{year}</span>
+                      <div className={`w-8 h-0.5 rounded ${idx === 0 ? 'bg-violet-500' : 'bg-cyan-500'}`} 
+                           style={idx === 1 ? { backgroundImage: 'repeating-linear-gradient(90deg, #06B6D4 0, #06B6D4 4px, transparent 4px, transparent 8px)' } : {}} />
+                      <span className="text-sm font-medium text-slate-600">{year}</span>
                     </div>
                   ))}
                 </div>
@@ -8614,43 +8625,53 @@ L'équipe Salarize`;
             ) : (
               /* Graphique Standard */
               <div className="h-96">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="period" 
-                      tick={{ fontSize: 11, fill: '#64748b' }}
-                      tickLine={{ stroke: '#e2e8f0' }}
-                      tickFormatter={(value) => {
-                        const month = parseInt(value.substring(5), 10);
-                        const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-                        const year = value.substring(2, 4);
-                        return `${monthNames[month - 1]} '${year}`;
-                      }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12, fill: '#64748b' }}
-                      tickLine={{ stroke: '#e2e8f0' }}
-                      tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip 
-                      formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût total']}
-                      labelFormatter={(label) => formatPeriod(label)}
-                      contentStyle={{ 
-                        backgroundColor: '#1e293b', 
-                        border: 'none', 
-                        borderRadius: '8px',
-                        color: '#fff'
-                      }}
-                      labelStyle={{ color: '#94a3b8' }}
-                    />
-                    <Bar 
-                      dataKey="total" 
-                      fill={`rgb(${getBrandColor()})`}
-                      radius={[6, 6, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="period" 
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        tickLine={{ stroke: '#e2e8f0' }}
+                        tickFormatter={(value) => {
+                          const month = parseInt(value.substring(5), 10);
+                          const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                          const year = value.substring(2, 4);
+                          return `${monthNames[month - 1]} '${year}`;
+                        }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12, fill: '#64748b' }}
+                        tickLine={{ stroke: '#e2e8f0' }}
+                        tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip 
+                        formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût total']}
+                        labelFormatter={(label) => formatPeriod(label)}
+                        contentStyle={{ 
+                          backgroundColor: '#1e293b', 
+                          border: 'none', 
+                          borderRadius: '8px',
+                          color: '#fff'
+                        }}
+                        labelStyle={{ color: '#94a3b8' }}
+                      />
+                      <Bar 
+                        dataKey="total" 
+                        fill={`rgb(${getBrandColor()})`}
+                        radius={[6, 6, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                    <svg className="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <p className="font-medium text-slate-500">Aucune donnée disponible</p>
+                    <p className="text-sm mt-1">pour la période sélectionnée</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
