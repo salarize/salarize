@@ -3308,8 +3308,10 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
           <button
             onClick={handleSave}
             disabled={!hasChanges || saving}
-            className="flex-1 py-2.5 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            style={{ backgroundColor: hasChanges ? `rgb(${brandColor})` : undefined }}
+            className={`flex-1 py-2.5 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+              !hasChanges ? 'bg-slate-300 cursor-not-allowed' : 'hover:opacity-90'
+            }`}
+            style={hasChanges ? { backgroundColor: `rgb(${brandColor})` } : undefined}
           >
             {saving ? (
               <>
