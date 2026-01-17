@@ -3555,6 +3555,8 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile sidebar
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false); // For period multi-select
   const [showAuthModal, setShowAuthModal] = useState(false); // For auth modal
+  const [fileQueue, setFileQueue] = useState([]); // File d'attente pour import multi-fichiers
+  const [currentFileIndex, setCurrentFileIndex] = useState(0); // Index du fichier en cours
   
   // === NOUVEAUX ÉTATS PRIORITÉ HAUTE ===
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -5135,12 +5137,18 @@ function AppContent() {
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    
-    // Traiter chaque fichier séquentiellement
-    for (const file of files) {
-      await parseFile(file);
-    }
     e.target.value = '';
+    
+    if (files.length === 1) {
+      // Un seul fichier - comportement normal
+      await parseFile(files[0]);
+    } else {
+      // Plusieurs fichiers - créer une file d'attente
+      setFileQueue(files);
+      setCurrentFileIndex(0);
+      // Parser le premier fichier
+      await parseFile(files[0]);
+    }
   };
 
   const handleModalSelect = (name) => {
@@ -6990,7 +6998,11 @@ L'équipe Salarize`;
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">📅 Confirmer l'import</h2>
               <button 
-                onClick={() => setPendingPeriodSelection(null)}
+                onClick={() => {
+                  setPendingPeriodSelection(null);
+                  setFileQueue([]);
+                  setCurrentFileIndex(0);
+                }}
                 className="p-1 hover:bg-slate-100 rounded"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6998,6 +7010,22 @@ L'équipe Salarize`;
                 </svg>
               </button>
             </div>
+            
+            {/* Progress indicator for multi-file import */}
+            {fileQueue.length > 1 && (
+              <div className="mb-4 p-3 bg-slate-100 rounded-xl">
+                <div className="flex items-center justify-between text-sm text-slate-600 mb-2">
+                  <span className="font-medium">Fichier {currentFileIndex + 1} sur {fileQueue.length}</span>
+                  <span className="text-xs text-slate-400">{fileQueue[currentFileIndex]?.name}</span>
+                </div>
+                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all"
+                    style={{ width: `${((currentFileIndex + 1) / fileQueue.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
             
             <div className="mb-5 p-4 bg-violet-50 border border-violet-200 rounded-xl">
               <div className="flex gap-3">
@@ -7096,13 +7124,17 @@ L'équipe Salarize`;
             
             <div className="flex gap-3">
               <button 
-                onClick={() => setPendingPeriodSelection(null)}
+                onClick={() => {
+                  setPendingPeriodSelection(null);
+                  setFileQueue([]);
+                  setCurrentFileIndex(0);
+                }}
                 className="flex-1 py-2.5 border border-slate-200 rounded-lg hover:bg-slate-50"
               >
                 Annuler
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   const year = document.getElementById('period-year').value;
                   const month = document.getElementById('period-month').value;
                   const period = `${year}-${month}`;
@@ -7118,9 +7150,6 @@ L'équipe Salarize`;
                     periods: [period]
                   };
                   
-                  setDebugMsg(`${result.employees.length} entrées`);
-                  setPendingPeriodSelection(null);
-                  
                   // Import direct si on est sur une société
                   if (activeCompany && view === 'dashboard') {
                     importToCompanyDirect(activeCompany, result);
@@ -7128,12 +7157,59 @@ L'équipe Salarize`;
                     setPendingData(result);
                     setShowModal(true);
                   }
+                  
+                  // Passer au fichier suivant s'il y en a
+                  if (fileQueue.length > 0 && currentFileIndex < fileQueue.length - 1) {
+                    const nextIndex = currentFileIndex + 1;
+                    setCurrentFileIndex(nextIndex);
+                    setPendingPeriodSelection(null);
+                    // Parser le fichier suivant après un court délai
+                    setTimeout(async () => {
+                      await parseFile(fileQueue[nextIndex]);
+                    }, 300);
+                  } else {
+                    // Fin de la file d'attente
+                    setPendingPeriodSelection(null);
+                    setFileQueue([]);
+                    setCurrentFileIndex(0);
+                    if (fileQueue.length > 1) {
+                      setDebugMsg(`✓ ${fileQueue.length} fichiers importés`);
+                    }
+                  }
                 }}
                 className="flex-1 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg font-medium hover:opacity-90"
               >
-                Importer
+                {fileQueue.length > 1 && currentFileIndex < fileQueue.length - 1 
+                  ? `Importer et suivant (${fileQueue.length - currentFileIndex - 1} restants)`
+                  : 'Importer'
+                }
               </button>
             </div>
+            
+            {/* Skip button for multi-file */}
+            {fileQueue.length > 1 && (
+              <button
+                onClick={async () => {
+                  // Passer au fichier suivant sans importer celui-ci
+                  if (currentFileIndex < fileQueue.length - 1) {
+                    const nextIndex = currentFileIndex + 1;
+                    setCurrentFileIndex(nextIndex);
+                    setPendingPeriodSelection(null);
+                    setTimeout(async () => {
+                      await parseFile(fileQueue[nextIndex]);
+                    }, 300);
+                  } else {
+                    // Fin de la file
+                    setPendingPeriodSelection(null);
+                    setFileQueue([]);
+                    setCurrentFileIndex(0);
+                  }
+                }}
+                className="w-full mt-2 py-2 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                Ignorer ce fichier
+              </button>
+            )}
           </div>
         </div>
       )}
