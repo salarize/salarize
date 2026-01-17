@@ -7,47 +7,50 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
 
-// Storage qui utilise sessionStorage pour la session (déconnexion à la fermeture)
-// mais synchronise entre les onglets via localStorage events
-const sessionSyncStorage = {
+// Storage qui utilise UNIQUEMENT sessionStorage (déconnexion à la fermeture du navigateur)
+// avec sync entre onglets via localStorage events temporaires
+const sessionOnlyStorage = {
   getItem: (key) => {
-    try {
-      return sessionStorage.getItem(key);
-    } catch (e) {
-      console.warn('sessionStorage not available:', e);
-      return null;
-    }
+    return sessionStorage.getItem(key);
   },
   
   setItem: (key, value) => {
-    try {
-      sessionStorage.setItem(key, value);
-      // Broadcaster aux autres onglets via localStorage
-      const broadcastKey = `__salarize_sync_${Date.now()}`;
-      localStorage.setItem(broadcastKey, JSON.stringify({ key, value }));
-      localStorage.removeItem(broadcastKey);
-    } catch (e) {
-      console.warn('sessionStorage not available:', e);
+    sessionStorage.setItem(key, value);
+    // Supprimer de localStorage si présent (nettoyage)
+    if (localStorage.getItem(key)) {
+      localStorage.removeItem(key);
     }
+    // Broadcaster aux autres onglets via localStorage (temporaire)
+    const broadcastKey = `__salarize_broadcast_${Date.now()}`;
+    localStorage.setItem(broadcastKey, JSON.stringify({ key, value }));
+    setTimeout(() => localStorage.removeItem(broadcastKey), 100);
   },
   
   removeItem: (key) => {
-    try {
-      sessionStorage.removeItem(key);
-      // Broadcaster la suppression aux autres onglets
-      const broadcastKey = `__salarize_sync_${Date.now()}`;
-      localStorage.setItem(broadcastKey, JSON.stringify({ key, value: null }));
-      localStorage.removeItem(broadcastKey);
-    } catch (e) {
-      console.warn('sessionStorage not available:', e);
+    sessionStorage.removeItem(key);
+    // Aussi supprimer de localStorage si présent
+    if (localStorage.getItem(key)) {
+      localStorage.removeItem(key);
     }
+    // Broadcaster la suppression
+    const broadcastKey = `__salarize_broadcast_${Date.now()}`;
+    localStorage.setItem(broadcastKey, JSON.stringify({ key, value: null }));
+    setTimeout(() => localStorage.removeItem(broadcastKey), 100);
   }
 };
 
-// Écouter les changements pour synchroniser entre onglets
+// Nettoyer les anciennes clés Supabase de localStorage au démarrage
 if (typeof window !== 'undefined') {
+  // Supprimer toutes les clés Supabase de localStorage
+  Object.keys(localStorage).forEach(key => {
+    if (key.includes('supabase') || key.includes('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Écouter les broadcasts pour sync entre onglets
   window.addEventListener('storage', (e) => {
-    if (e.key?.startsWith('__salarize_sync_') && e.newValue) {
+    if (e.key?.startsWith('__salarize_broadcast_') && e.newValue) {
       try {
         const { key, value } = JSON.parse(e.newValue);
         if (value === null) {
@@ -63,9 +66,10 @@ if (typeof window !== 'undefined') {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: sessionSyncStorage,
+    storage: sessionOnlyStorage,
     autoRefreshToken: true,
     persistSession: true,
+    storageKey: 'salarize-auth', // Clé custom pour éviter conflits
   }
 });
 
