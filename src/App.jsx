@@ -7140,7 +7140,7 @@ L'équipe Salarize`;
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-medium">Employés</p>
-                  <p className="text-lg font-bold text-slate-800">{employeeCount}</p>
+                  <p className="text-lg font-bold text-slate-800">{uniqueNames}</p>
                 </div>
               </div>
               
@@ -7152,7 +7152,7 @@ L'équipe Salarize`;
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-medium">Départements</p>
-                  <p className="text-lg font-bold text-slate-800">{departmentCount}</p>
+                  <p className="text-lg font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
                 </div>
               </div>
               
@@ -7164,7 +7164,7 @@ L'équipe Salarize`;
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-medium">Coût Moyen</p>
-                  <p className="text-lg font-bold text-slate-800">€{avgCost.toLocaleString('fr-BE', {minimumFractionDigits: 2})}</p>
+                  <p className="text-lg font-bold text-slate-800">€{uniqueNames > 0 ? (totalCost / uniqueNames).toLocaleString('fr-BE', {minimumFractionDigits: 2}) : '0,00'}</p>
                 </div>
               </div>
             </div>
