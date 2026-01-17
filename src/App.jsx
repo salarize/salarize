@@ -7,28 +7,50 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
 
-// Clé pour détecter la session navigateur
-const SESSION_KEY = 'salarize_active';
+// Storage personnalisé qui broadcast entre onglets via localStorage events
+const broadcastStorage = {
+  _broadcast: (key, value) => {
+    // Utiliser localStorage temporairement pour broadcaster aux autres onglets
+    const broadcastKey = `__salarize_broadcast_${Date.now()}`;
+    localStorage.setItem(broadcastKey, JSON.stringify({ key, value }));
+    localStorage.removeItem(broadcastKey);
+  },
+  
+  getItem: (key) => sessionStorage.getItem(key),
+  
+  setItem: (key, value) => {
+    sessionStorage.setItem(key, value);
+    // Broadcaster aux autres onglets
+    broadcastStorage._broadcast(key, value);
+  },
+  
+  removeItem: (key) => {
+    sessionStorage.removeItem(key);
+    broadcastStorage._broadcast(key, null);
+  }
+};
 
-// Détecter si le navigateur a été fermé (sessionStorage vide = nouvelle session)
-const browserWasClosed = !sessionStorage.getItem(SESSION_KEY);
-
-// Marquer immédiatement cette session comme active
-sessionStorage.setItem(SESSION_KEY, '1');
-
-// Si le navigateur a été fermé, on nettoie la session Supabase
-if (browserWasClosed) {
-  // Supprimer tous les tokens Supabase du localStorage
-  Object.keys(localStorage).forEach(key => {
-    if (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth-token')) {
-      localStorage.removeItem(key);
+// Écouter les broadcasts des autres onglets
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key?.startsWith('__salarize_broadcast_') && e.newValue) {
+      try {
+        const { key, value } = JSON.parse(e.newValue);
+        if (value === null) {
+          sessionStorage.removeItem(key);
+        } else {
+          sessionStorage.setItem(key, value);
+        }
+        // Forcer un refresh de l'auth state
+        window.dispatchEvent(new Event('salarize-auth-sync'));
+      } catch (err) {}
     }
   });
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: localStorage, // localStorage pour partager entre onglets
+    storage: broadcastStorage,
     autoRefreshToken: true,
     persistSession: true,
   }
