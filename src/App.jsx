@@ -3557,6 +3557,7 @@ function AppContent() {
   const [showAuthModal, setShowAuthModal] = useState(false); // For auth modal
   const [fileQueue, setFileQueue] = useState([]); // File d'attente pour import multi-fichiers
   const [currentFileIndex, setCurrentFileIndex] = useState(0); // Index du fichier en cours
+  const [importReady, setImportReady] = useState(false); // Délai avant de pouvoir importer
   
   // === NOUVEAUX ÉTATS PRIORITÉ HAUTE ===
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -3652,6 +3653,15 @@ function AppContent() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, activeCompany, employees.length]);
+
+  // Délai avant de pouvoir importer (évite les clics trop rapides)
+  useEffect(() => {
+    if (pendingPeriodSelection) {
+      setImportReady(false);
+      const timer = setTimeout(() => setImportReady(true), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingPeriodSelection]);
 
   // Check auth state on load
   useEffect(() => {
@@ -6992,19 +7002,63 @@ L'équipe Salarize`;
         </div>
       )}
       
-      {/* Period Selection Modal */}
+      {/* Period Selection Modal - Redesigned */}
       {pendingPeriodSelection && (
-        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">📅 Confirmer l'import</h2>
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden">
+            {/* Header avec gradient */}
+            <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-6 text-white relative overflow-hidden">
+              {/* Background pattern */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full translate-y-1/2 -translate-x-1/2" />
+              </div>
+              
+              <div className="relative">
+                {/* Progress pour multi-fichiers */}
+                {fileQueue.length > 1 && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="font-medium">Import en cours</span>
+                      <span className="text-white/80">{currentFileIndex + 1} / {fileQueue.length}</span>
+                    </div>
+                    <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-white transition-all duration-300"
+                        style={{ width: `${((currentFileIndex + 1) / fileQueue.length) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Nom du fichier */}
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
+                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-lg truncate">
+                      {pendingPeriodSelection.fileName || 'Fichier importé'}
+                    </p>
+                    <p className="text-white/70 text-sm">
+                      {pendingPeriodSelection.employees.length} employés • {pendingPeriodSelection.detectedProvider === 'acerta' ? 'Acerta FR' : 
+                       pendingPeriodSelection.detectedProvider === 'acerta-nl' ? 'Acerta NL' :
+                       pendingPeriodSelection.detectedProvider === 'securex' ? 'Securex' : 'Format générique'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Bouton fermer */}
               <button 
                 onClick={() => {
                   setPendingPeriodSelection(null);
                   setFileQueue([]);
                   setCurrentFileIndex(0);
                 }}
-                className="p-1 hover:bg-slate-100 rounded"
+                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-xl transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -7012,204 +7066,122 @@ L'équipe Salarize`;
               </button>
             </div>
             
-            {/* Progress indicator for multi-file import */}
-            {fileQueue.length > 1 && (
-              <div className="mb-4 p-3 bg-slate-100 rounded-xl">
-                <div className="flex items-center justify-between text-sm text-slate-600 mb-2">
-                  <span className="font-medium">Fichier {currentFileIndex + 1} sur {fileQueue.length}</span>
-                </div>
-                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all"
-                    style={{ width: `${((currentFileIndex + 1) / fileQueue.length) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Nom du fichier bien visible */}
-            <div className="mb-4 p-3 bg-slate-800 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-medium truncate">
-                    {pendingPeriodSelection.fileName || (fileQueue.length > 0 ? fileQueue[currentFileIndex]?.name : 'Fichier importé')}
-                  </p>
-                  <p className="text-slate-400 text-xs">Fichier Excel</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mb-5 p-4 bg-violet-50 border border-violet-200 rounded-xl">
-              <div className="flex gap-3">
-                <div className="text-violet-500 mt-0.5">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="text-sm">
-                  <p className="font-semibold text-violet-800 mb-1">Fichier analysé avec succès</p>
-                  <p className="text-violet-700">
-                    <strong>{pendingPeriodSelection.employees.length} employés</strong> détectés
-                    {pendingPeriodSelection.detectedProvider && (
-                      <span className="ml-2 px-2 py-0.5 bg-violet-200 text-violet-800 rounded-full text-xs font-medium">
-                        {pendingPeriodSelection.detectedProvider === 'acerta' ? 'Acerta FR' : 
-                         pendingPeriodSelection.detectedProvider === 'acerta-nl' ? 'Acerta NL' :
-                         pendingPeriodSelection.detectedProvider === 'securex' ? 'Securex' : 'Générique'}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Période suggérée */}
-            {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' && (
-              <div className={`mb-4 p-3 border rounded-xl ${
-                pendingPeriodSelection.periodConfidence >= 0.8 
-                  ? 'bg-emerald-50 border-emerald-200' 
-                  : pendingPeriodSelection.periodConfidence >= 0.5
-                    ? 'bg-amber-50 border-amber-200'
-                    : 'bg-slate-50 border-slate-200'
-              }`}>
-                <div className={`flex items-center gap-2 text-sm ${
+            {/* Contenu */}
+            <div className="p-6">
+              {/* Période suggérée */}
+              {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' && (
+                <div className={`mb-6 p-4 rounded-2xl flex items-center gap-4 ${
                   pendingPeriodSelection.periodConfidence >= 0.8 
-                    ? 'text-emerald-700' 
-                    : pendingPeriodSelection.periodConfidence >= 0.5
-                      ? 'text-amber-700'
-                      : 'text-slate-600'
+                    ? 'bg-emerald-50 border-2 border-emerald-200' 
+                    : 'bg-amber-50 border-2 border-amber-200'
                 }`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    pendingPeriodSelection.periodConfidence >= 0.8 ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
                   <div className="flex-1">
-                    <span>Période suggérée : <strong>{formatPeriod(pendingPeriodSelection.suggestedPeriod)}</strong></span>
-                    <span className="ml-2 text-xs opacity-75">
-                      ({pendingPeriodSelection.periodSource === 'data' ? 'détectée dans le fichier' : 
-                        pendingPeriodSelection.periodSource === 'filename' ? 'depuis le nom du fichier' : 
-                        'suggestion par défaut'})
-                    </span>
+                    <p className={`font-bold text-lg ${
+                      pendingPeriodSelection.periodConfidence >= 0.8 ? 'text-emerald-800' : 'text-amber-800'
+                    }`}>
+                      {formatPeriod(pendingPeriodSelection.suggestedPeriod)}
+                    </p>
+                    <p className={`text-sm ${
+                      pendingPeriodSelection.periodConfidence >= 0.8 ? 'text-emerald-600' : 'text-amber-600'
+                    }`}>
+                      {pendingPeriodSelection.periodSource === 'data' ? 'Détectée dans les données' : 
+                       pendingPeriodSelection.periodSource === 'filename' ? 'Détectée dans le nom du fichier' : 
+                       'Suggestion automatique'}
+                    </p>
                   </div>
                   {pendingPeriodSelection.periodConfidence >= 0.8 && (
-                    <span className="text-xs px-2 py-0.5 bg-emerald-200 text-emerald-800 rounded-full">Haute confiance</span>
+                    <div className="px-3 py-1 bg-emerald-500 text-white text-xs font-bold rounded-full">
+                      ✓ Sûr
+                    </div>
                   )}
                 </div>
+              )}
+              
+              {/* Sélecteur de période */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-700 mb-3">
+                  {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' 
+                    ? 'Modifier si nécessaire' 
+                    : 'Sélectionnez la période'}
+                </label>
+                <div className="flex gap-3">
+                  <select 
+                    id="period-year"
+                    className="flex-1 px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-violet-500 focus:bg-white outline-none text-lg font-medium transition-colors"
+                    defaultValue={
+                      pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown'
+                        ? pendingPeriodSelection.suggestedPeriod.split('-')[0]
+                        : new Date().getFullYear()
+                    }
+                  >
+                    {[2022, 2023, 2024, 2025, 2026, 2027].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <select 
+                    id="period-month"
+                    className="flex-1 px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-violet-500 focus:bg-white outline-none font-medium transition-colors"
+                    defaultValue={
+                      pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown'
+                        ? pendingPeriodSelection.suggestedPeriod.split('-')[1]
+                        : String(new Date().getMonth() + 1).padStart(2, '0')
+                    }
+                  >
+                    {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
+                      <option key={m} value={m}>
+                        {['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][parseInt(m) - 1]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            )}
-            
-            <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' 
-                  ? 'Confirmez ou modifiez la période' 
-                  : 'Sélectionnez la période de ce fichier'}
-              </label>
-              <div className="flex gap-2">
-                <select 
-                  id="period-year"
-                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none text-lg"
-                  defaultValue={
-                    pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown'
-                      ? pendingPeriodSelection.suggestedPeriod.split('-')[0]
-                      : new Date().getFullYear()
-                  }
-                >
-                  {[2022, 2023, 2024, 2025, 2026, 2027].map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-                <select 
-                  id="period-month"
-                  className="flex-1 px-3 py-2.5 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
-                  defaultValue={
-                    pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown'
-                      ? pendingPeriodSelection.suggestedPeriod.split('-')[1]
-                      : String(new Date().getMonth() + 1).padStart(2, '0')
-                  }
-                >
-                  {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map(m => (
-                    <option key={m} value={m}>
-                      {['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][parseInt(m) - 1]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <button 
-                onClick={() => {
-                  setPendingPeriodSelection(null);
-                  setFileQueue([]);
-                  setCurrentFileIndex(0);
-                }}
-                className="flex-1 py-2.5 border border-slate-200 rounded-lg hover:bg-slate-50"
-              >
-                Annuler tout
-              </button>
-              <button
-                onClick={async () => {
-                  const year = document.getElementById('period-year').value;
-                  const month = document.getElementById('period-month').value;
-                  const period = `${year}-${month}`;
-                  
-                  // Mettre à jour tous les employés avec cette période
-                  const updatedEmployees = pendingPeriodSelection.employees.map(e => ({
-                    ...e,
-                    period
-                  }));
-                  
-                  const result = {
-                    employees: updatedEmployees,
-                    periods: [period]
-                  };
-                  
-                  // Import direct si on est sur une société
-                  if (activeCompany && view === 'dashboard') {
-                    importToCompanyDirect(activeCompany, result);
-                  } else {
-                    setPendingData(result);
-                    setShowModal(true);
-                  }
-                  
-                  // Passer au fichier suivant s'il y en a
-                  if (fileQueue.length > 0 && currentFileIndex < fileQueue.length - 1) {
-                    const nextIndex = currentFileIndex + 1;
-                    setCurrentFileIndex(nextIndex);
-                    setPendingPeriodSelection(null);
-                    // Parser le fichier suivant après un court délai
-                    setTimeout(async () => {
-                      await parseFile(fileQueue[nextIndex]);
-                    }, 300);
-                  } else {
-                    // Fin de la file d'attente
+              
+              {/* Boutons d'action */}
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => {
                     setPendingPeriodSelection(null);
                     setFileQueue([]);
                     setCurrentFileIndex(0);
-                    if (fileQueue.length > 1) {
-                      setDebugMsg(`✓ ${fileQueue.length} fichiers importés`);
-                    }
-                  }
-                }}
-                className="flex-1 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg font-medium hover:opacity-90"
-              >
-                {fileQueue.length > 1 && currentFileIndex < fileQueue.length - 1 
-                  ? `Importer et suivant`
-                  : 'Importer'
-                }
-              </button>
-            </div>
-            
-            {/* Skip button for multi-file - séparé et discret */}
-            {fileQueue.length > 1 && (
-              <div className="mt-6 pt-4 border-t border-slate-100">
+                  }}
+                  className="flex-1 py-3 border-2 border-slate-200 rounded-xl font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Annuler
+                </button>
                 <button
+                  disabled={!importReady}
                   onClick={async () => {
-                    // Passer au fichier suivant sans importer celui-ci
-                    if (currentFileIndex < fileQueue.length - 1) {
+                    if (!importReady) return;
+                    
+                    const year = document.getElementById('period-year').value;
+                    const month = document.getElementById('period-month').value;
+                    const period = `${year}-${month}`;
+                    
+                    const updatedEmployees = pendingPeriodSelection.employees.map(e => ({
+                      ...e,
+                      period
+                    }));
+                    
+                    const result = {
+                      employees: updatedEmployees,
+                      periods: [period]
+                    };
+                    
+                    if (activeCompany && view === 'dashboard') {
+                      importToCompanyDirect(activeCompany, result);
+                    } else {
+                      setPendingData(result);
+                      setShowModal(true);
+                    }
+                    
+                    if (fileQueue.length > 0 && currentFileIndex < fileQueue.length - 1) {
                       const nextIndex = currentFileIndex + 1;
                       setCurrentFileIndex(nextIndex);
                       setPendingPeriodSelection(null);
@@ -7217,18 +7189,75 @@ L'équipe Salarize`;
                         await parseFile(fileQueue[nextIndex]);
                       }, 300);
                     } else {
-                      // Fin de la file
                       setPendingPeriodSelection(null);
                       setFileQueue([]);
                       setCurrentFileIndex(0);
+                      if (fileQueue.length > 1) {
+                        toast.success(`${fileQueue.length} fichiers importés avec succès`);
+                      }
                     }
                   }}
-                  className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                  className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                    importReady 
+                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white hover:shadow-lg hover:shadow-violet-500/25' 
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
-                  Ignorer ce fichier et passer au suivant →
+                  {!importReady ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Vérification...
+                    </>
+                  ) : (
+                    <>
+                      {fileQueue.length > 1 && currentFileIndex < fileQueue.length - 1 ? (
+                        <>
+                          Confirmer
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Importer
+                        </>
+                      )}
+                    </>
+                  )}
                 </button>
               </div>
-            )}
+              
+              {/* Ignorer - très discret, séparé */}
+              {fileQueue.length > 1 && (
+                <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+                  <button
+                    onClick={async () => {
+                      if (currentFileIndex < fileQueue.length - 1) {
+                        const nextIndex = currentFileIndex + 1;
+                        setCurrentFileIndex(nextIndex);
+                        setPendingPeriodSelection(null);
+                        setTimeout(async () => {
+                          await parseFile(fileQueue[nextIndex]);
+                        }, 300);
+                      } else {
+                        setPendingPeriodSelection(null);
+                        setFileQueue([]);
+                        setCurrentFileIndex(0);
+                      }
+                    }}
+                    className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    Ignorer ce fichier →
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
