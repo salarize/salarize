@@ -9087,99 +9087,99 @@ L'équipe Salarize`;
         )}
         </>
         )}
-        
-        {/* Bouton Actions Sticky - Visible sur mobile et desktop */}
-        <div className="fixed bottom-6 left-6 lg:left-72 z-40">
-          <div className="relative">
-            {showActionsFloat && (
-              <>
-                <div 
-                  className="fixed inset-0 z-10" 
-                  onClick={() => setShowActionsFloat(false)}
-                />
-                <div className="absolute bottom-full left-0 mb-3 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden z-20 w-64 animate-fadeIn">
-                  <div className="p-2">
-                    <button
-                      onClick={() => { handleAddCompany(); setShowActionsFloat(false); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
-                    >
-                      <div className="w-9 h-9 bg-violet-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-white text-sm">Nouvelle société</p>
-                        <p className="text-slate-400 text-xs">Créer une société vide</p>
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => { fileInputRef.current?.click(); setShowActionsFloat(false); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
-                    >
-                      <div className="w-9 h-9 bg-fuchsia-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-white text-sm">Importer des données</p>
-                        <p className="text-slate-400 text-xs">Fichier Excel (.xlsx)</p>
-                      </div>
-                    </button>
-                    
-                    {activeCompany && (
-                      <>
-                        <div className="border-t border-slate-700 my-1"></div>
-                        <button
-                          onClick={() => { setShowCompanySettings(true); setShowActionsFloat(false); }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
-                        >
-                          <div className="w-9 h-9 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="font-medium text-white text-sm">Gérer les données</p>
-                            <p className="text-slate-400 text-xs">Périodes, supprimer</p>
-                          </div>
-                        </button>
-                        
-                        <button
-                          onClick={() => { setShowDeptManager(true); setShowActionsFloat(false); }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
-                        >
-                          <div className="w-9 h-9 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="font-medium text-white text-sm">Départements</p>
-                            <p className="text-slate-400 text-xs">Réassigner, fusionner</p>
-                          </div>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-            
-            <button
-              onClick={() => setShowActionsFloat(!showActionsFloat)}
-              className="w-14 h-14 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all hover:scale-105 flex items-center justify-center"
-            >
-              <svg className={`w-6 h-6 text-white transition-transform duration-200 ${showActionsFloat ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-            </button>
-          </div>
-        </div>
       </main>
+      
+      {/* Bouton Actions Sticky - Toujours visible */}
+      <div className="fixed bottom-6 left-6 lg:left-72 z-50">
+        <div className="relative">
+          {showActionsFloat && (
+            <>
+              <div 
+                className="fixed inset-0 z-10" 
+                onClick={() => setShowActionsFloat(false)}
+              />
+              <div className="absolute bottom-full left-0 mb-3 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden z-20 w-64">
+                <div className="p-2">
+                  <button
+                    onClick={() => { handleAddCompany(); setShowActionsFloat(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 bg-violet-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-white text-sm">Nouvelle société</p>
+                      <p className="text-slate-400 text-xs">Créer une société vide</p>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => { fileInputRef.current?.click(); setShowActionsFloat(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 bg-fuchsia-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-white text-sm">Importer des données</p>
+                      <p className="text-slate-400 text-xs">Fichier Excel (.xlsx)</p>
+                    </div>
+                  </button>
+                  
+                  {activeCompany && (
+                    <>
+                      <div className="border-t border-slate-700 my-1"></div>
+                      <button
+                        onClick={() => { setShowCompanySettings(true); setShowActionsFloat(false); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
+                      >
+                        <div className="w-9 h-9 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="font-medium text-white text-sm">Gérer les données</p>
+                          <p className="text-slate-400 text-xs">Périodes, supprimer</p>
+                        </div>
+                      </button>
+                      
+                      <button
+                        onClick={() => { setShowDeptManager(true); setShowActionsFloat(false); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-700 rounded-lg transition-colors text-left"
+                      >
+                        <div className="w-9 h-9 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="font-medium text-white text-sm">Départements</p>
+                          <p className="text-slate-400 text-xs">Réassigner, fusionner</p>
+                        </div>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+          
+          <button
+            onClick={() => setShowActionsFloat(!showActionsFloat)}
+            className="w-14 h-14 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full shadow-lg shadow-violet-500/30 hover:shadow-xl hover:shadow-violet-500/40 transition-all hover:scale-105 flex items-center justify-center"
+          >
+            <svg className={`w-6 h-6 text-white transition-transform duration-200 ${showActionsFloat ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
     </PageTransition>
   );
