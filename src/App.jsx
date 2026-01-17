@@ -356,6 +356,44 @@ const DashboardSkeleton = () => (
   </div>
 );
 
+// Spinner avec logo S - réutilisable
+const LoadingSpinner = ({ size = 'md', text = '', subtext = '', fullScreen = false, light = false }) => {
+  const sizes = {
+    sm: { container: 'w-10 h-10', text: 'text-sm', border: 'border-2' },
+    md: { container: 'w-16 h-16', text: 'text-xl', border: 'border-3' },
+    lg: { container: 'w-20 h-20', text: 'text-2xl', border: 'border-4' }
+  };
+  
+  const s = sizes[size];
+  const bgColor = light ? 'bg-white' : 'bg-slate-950';
+  const textColor = light ? 'text-slate-800' : 'text-white';
+  const subtextColor = light ? 'text-slate-500' : 'text-slate-400';
+  
+  const spinner = (
+    <div className="text-center">
+      <div className={`${s.container} relative mx-auto ${text || subtext ? 'mb-4' : ''}`}>
+        <div className={`${s.container} ${s.border} border-violet-500/30 rounded-full`}></div>
+        <div className={`${s.container} ${s.border} border-violet-500 border-t-transparent rounded-full animate-spin absolute inset-0`}></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`${s.text} font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent`}>S</span>
+        </div>
+      </div>
+      {text && <p className={`${textColor} text-base font-medium mb-1`}>{text}</p>}
+      {subtext && <p className={`${subtextColor} text-sm`}>{subtext}</p>}
+    </div>
+  );
+  
+  if (fullScreen) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center ${bgColor}`}>
+        {spinner}
+      </div>
+    );
+  }
+  
+  return spinner;
+};
+
 // Optimized Button Component
 const Button = React.memo(({ 
   children, 
@@ -5783,21 +5821,7 @@ L'équipe Salarize`;
 
   // Loading screen
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="text-center">
-          <div className="w-20 h-20 relative mx-auto mb-6">
-            <div className="w-20 h-20 border-4 border-violet-500/30 rounded-full"></div>
-            <div className="w-20 h-20 border-4 border-violet-500 border-t-transparent rounded-full animate-spin absolute inset-0"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl font-black bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">S</span>
-            </div>
-          </div>
-          <p className="text-white text-lg font-medium mb-1">Salarize</p>
-          <p className="text-slate-400 text-sm">Chargement de votre espace...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner size="lg" text="Salarize" subtext="Chargement de votre espace..." fullScreen />;
   }
 
   // Landing page (home)
@@ -6992,9 +7016,20 @@ L'équipe Salarize`;
       )}
       
       <main className="lg:ml-64 pt-4 lg:pt-6 flex-1 p-4 lg:p-6">
+        {/* Loading overlay quand on recharge les données */}
+        {isLoadingData && employees.length > 0 && (
+          <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-40 flex items-center justify-center">
+            <div className="bg-slate-900/90 rounded-2xl p-8 shadow-2xl border border-slate-800">
+              <LoadingSpinner size="md" text="Synchronisation..." />
+            </div>
+          </div>
+        )}
+        
         {/* Skeleton de chargement seulement si pas de données */}
         {isLoadingData && employees.length === 0 ? (
-          <DashboardSkeleton />
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <LoadingSpinner size="lg" text="Chargement des données" subtext="Veuillez patienter..." />
+          </div>
         ) : (
         <>
         {/* Company Header Card */}
@@ -7096,6 +7131,18 @@ L'équipe Salarize`;
                   </svg>
                   {periods.length} période{periods.length > 1 ? 's' : ''}
                 </span>
+                {isSyncing && (
+                  <>
+                    <span className="text-white/30">•</span>
+                    <span className="flex items-center gap-1.5 text-violet-400">
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Sync...
+                    </span>
+                  </>
+                )}
               </div>
             </div>
             
