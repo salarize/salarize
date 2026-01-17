@@ -7,12 +7,28 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
 
-// Clé pour détecter si le navigateur a été fermé
-const SESSION_KEY = 'salarize_browser_session';
+// Clé pour détecter la session navigateur
+const SESSION_KEY = 'salarize_active';
+
+// Détecter si le navigateur a été fermé (sessionStorage vide = nouvelle session)
+const browserWasClosed = !sessionStorage.getItem(SESSION_KEY);
+
+// Marquer immédiatement cette session comme active
+sessionStorage.setItem(SESSION_KEY, '1');
+
+// Si le navigateur a été fermé, on nettoie la session Supabase
+if (browserWasClosed) {
+  // Supprimer tous les tokens Supabase du localStorage
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith('sb-') || key.includes('supabase') || key.includes('auth-token')) {
+      localStorage.removeItem(key);
+    }
+  });
+}
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: localStorage,
+    storage: localStorage, // localStorage pour partager entre onglets
     autoRefreshToken: true,
     persistSession: true,
   }
@@ -177,11 +193,14 @@ const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OP
 // Couleurs pour les graphiques
 const CHART_COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#7C3AED', '#6D28D9', '#5B21B6', '#4C1D95', '#DDD6FE', '#EDE9FE', '#F5F3FF'];
 
-// Page transition wrapper
-function PageTransition({ children, className = '' }) {
+// Page transition wrapper - évite le flash blanc
+function PageTransition({ children, className = '', dark = false }) {
+  const bgColor = dark ? 'bg-slate-950' : 'bg-slate-50';
   return (
-    <div className={`animate-fadeIn ${className}`}>
-      {children}
+    <div className={`min-h-screen ${bgColor}`}>
+      <div className={`page-transition ${className}`}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -191,6 +210,26 @@ if (typeof document !== 'undefined' && !document.getElementById('salarize-animat
   const style = document.createElement('style');
   style.id = 'salarize-animations';
   style.textContent = `
+    /* Transition de page fluide - commence visible puis s'anime */
+    .page-transition {
+      animation: pageEnter 0.25s ease-out;
+    }
+    @keyframes pageEnter {
+      from { 
+        opacity: 0.6; 
+        transform: translateY(4px);
+      }
+      to { 
+        opacity: 1; 
+        transform: translateY(0);
+      }
+    }
+    
+    /* Fond persistant pour éviter le flash */
+    html, body, #root {
+      background-color: #020617; /* slate-950 */
+    }
+    
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -3560,20 +3599,7 @@ function AppContent() {
     let mounted = true;
     
     const initAuth = async () => {
-      // Vérifier si c'est une nouvelle session de navigateur (après fermeture)
-      const isNewBrowserSession = !sessionStorage.getItem(SESSION_KEY);
-      
-      if (isNewBrowserSession) {
-        // Marquer la session comme active
-        sessionStorage.setItem(SESSION_KEY, Date.now().toString());
-        
-        // Déconnecter proprement via Supabase
-        await supabase.auth.signOut();
-        setIsLoading(false);
-        return; // Arrêter ici, l'utilisateur doit se reconnecter
-      }
-      
-      // Détecter le token dans le hash (flow implicite)
+      // Détecter le token dans le hash (flow OAuth)
       if (window.location.hash && window.location.hash.includes('access_token')) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
@@ -5832,7 +5858,7 @@ L'équipe Salarize`;
   // Landing page (home)
   if (currentPage === 'home') {
     return (
-      <PageTransition key="home">
+      <PageTransition key="home" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -5859,7 +5885,7 @@ L'équipe Salarize`;
   // Features page
   if (currentPage === 'features') {
     return (
-      <PageTransition key="features">
+      <PageTransition key="features" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -5885,7 +5911,7 @@ L'équipe Salarize`;
   // Pricing page (accessible à tous)
   if (currentPage === 'pricing') {
     return (
-      <PageTransition key="pricing">
+      <PageTransition key="pricing" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -5911,7 +5937,7 @@ L'équipe Salarize`;
   // Demo page (accessible à tous)
   if (currentPage === 'demo') {
     return (
-      <PageTransition key="demo">
+      <PageTransition key="demo" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -5937,7 +5963,7 @@ L'équipe Salarize`;
   // Legal pages (accessibles à tous)
   if (currentPage === 'legal') {
     return (
-      <PageTransition key="legal">
+      <PageTransition key="legal" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -5952,7 +5978,7 @@ L'équipe Salarize`;
 
   if (currentPage === 'privacy') {
     return (
-      <PageTransition key="privacy">
+      <PageTransition key="privacy" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -5967,7 +5993,7 @@ L'équipe Salarize`;
 
   if (currentPage === 'terms') {
     return (
-      <PageTransition key="terms">
+      <PageTransition key="terms" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -5982,7 +6008,7 @@ L'équipe Salarize`;
 
   if (currentPage === 'cookies') {
     return (
-      <PageTransition key="cookies">
+      <PageTransition key="cookies" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6004,7 +6030,7 @@ L'équipe Salarize`;
   // Profile page (connecté uniquement)
   if (currentPage === 'profile') {
     return (
-      <PageTransition key="profile">
+      <PageTransition key="profile" dark>
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
