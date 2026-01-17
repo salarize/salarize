@@ -7042,17 +7042,8 @@ L'équipe Salarize`;
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                   </svg>
                 </button>
-                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60] w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                   <div className="p-1.5">
-                    <button
-                      onClick={() => setShowKpiSettings(true)}
-                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                    >
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                      </svg>
-                      <span className="text-sm text-slate-700">Personnaliser</span>
-                    </button>
                     <button
                       onClick={() => setShowActivityLog(true)}
                       className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
@@ -7070,7 +7061,7 @@ L'équipe Salarize`;
                         <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span className="text-sm text-slate-700">Périodes</span>
+                        <span className="text-sm text-slate-700">Sélection périodes</span>
                       </button>
                     )}
                     <div className="border-t border-slate-100 my-1"></div>
@@ -7081,7 +7072,7 @@ L'équipe Salarize`;
                       <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span className="text-sm text-slate-700">Aide</span>
+                      <span className="text-sm text-slate-700">Aide / Tutorial</span>
                     </button>
                   </div>
                 </div>
@@ -7101,7 +7092,7 @@ L'équipe Salarize`;
               </div>
               <span className="text-sm font-medium text-slate-500">Coût Total</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 2})}</p>
+            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
           </div>
           
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
@@ -7139,7 +7130,7 @@ L'équipe Salarize`;
               </div>
               <span className="text-sm font-medium text-slate-500">Coût Moyen</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">€{uniqueNames > 0 ? (totalCost / uniqueNames).toLocaleString('fr-BE', {minimumFractionDigits: 2}) : '0,00'}</p>
+            <p className="text-2xl font-bold text-slate-800">€{uniqueNames > 0 ? (totalCost / uniqueNames).toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0,00'}</p>
             <p className="text-xs text-slate-400 mt-1">Par employé</p>
           </div>
         </div>
