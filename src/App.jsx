@@ -783,7 +783,15 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
                 onClick={() => setShowDropdown(!showDropdown)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
-                <img src={user.picture} alt="" className="w-7 h-7 rounded-full" />
+                {user.picture ? (
+                  <img src={user.picture} alt="" className="w-7 h-7 rounded-full" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                )}
                 <span className="text-white text-sm font-medium hidden sm:block">{user.name?.split(' ')[0]}</span>
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -2256,11 +2264,19 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
             <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
               <div className="bg-gradient-to-br from-violet-600/30 to-fuchsia-600/30 p-6 text-center">
                 <div className="relative inline-block group">
-                  <img 
-                    src={user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=8B5CF6&color=fff`} 
-                    alt="" 
-                    className="w-24 h-24 rounded-2xl mx-auto border-4 border-white/20 object-cover"
-                  />
+                  {user?.picture ? (
+                    <img 
+                      src={user.picture} 
+                      alt="" 
+                      className="w-24 h-24 rounded-2xl mx-auto border-4 border-white/20 object-cover"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl mx-auto border-4 border-white/20 bg-violet-500 flex items-center justify-center">
+                      <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
                   {/* Overlay pour changer la photo */}
                   <button
                     onClick={() => avatarInputRef.current?.click()}
@@ -2990,8 +3006,10 @@ function DashboardHeader({ user, onLogout, setCurrentPage, onMenuClick }) {
             {user?.picture ? (
               <img src={user.picture} alt="" className="w-8 h-8 rounded-lg" />
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white font-medium text-sm">
-                {user?.name?.charAt(0) || 'U'}
+              <div className="w-8 h-8 rounded-lg bg-violet-500 flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
               </div>
             )}
           </button>
