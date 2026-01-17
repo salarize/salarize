@@ -3159,27 +3159,46 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
 // Modal des paramètres de société avec état local
 function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiveCompany, getBrandColor, handleBrandColorChange, onClose, saveAll }) {
   const [localWebsite, setLocalWebsite] = useState(companies[activeCompany]?.website || '');
+  const [localName, setLocalName] = useState(activeCompany);
   const [saving, setSaving] = useState(false);
   
   // Détecter si quelque chose a changé
   const originalWebsite = companies[activeCompany]?.website || '';
-  const hasChanges = localWebsite !== originalWebsite;
+  const hasWebsiteChanged = localWebsite !== originalWebsite;
+  const hasNameChanged = localName.trim() !== '' && localName.trim() !== activeCompany;
+  const hasChanges = hasWebsiteChanged || hasNameChanged;
   
   const handleSave = async () => {
     if (!hasChanges) return;
     
+    const newName = localName.trim();
+    
+    // Vérifier si le nouveau nom existe déjà
+    if (hasNameChanged && companies[newName]) {
+      alert('Une société avec ce nom existe déjà');
+      return;
+    }
+    
     setSaving(true);
     
-    const newCompanies = {
-      ...companies,
-      [activeCompany]: { 
-        ...companies[activeCompany], 
-        website: localWebsite 
-      }
+    let newCompanies = { ...companies };
+    
+    // Mettre à jour le website
+    newCompanies[activeCompany] = {
+      ...newCompanies[activeCompany],
+      website: localWebsite
     };
     
+    // Si le nom a changé, renommer la société
+    if (hasNameChanged) {
+      newCompanies[newName] = newCompanies[activeCompany];
+      delete newCompanies[activeCompany];
+      setActiveCompany(newName);
+      localStorage.setItem('salarize_active', newName);
+    }
+    
     setCompanies(newCompanies);
-    await saveAll(newCompanies, activeCompany);
+    await saveAll(newCompanies, hasNameChanged ? newName : activeCompany);
     
     setSaving(false);
     onClose();
@@ -3203,6 +3222,17 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
         </div>
         
         <div className="space-y-4">
+          {/* Company Name */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Nom de la société</label>
+            <input
+              type="text"
+              value={localName}
+              onChange={e => setLocalName(e.target.value)}
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:border-violet-500 outline-none"
+            />
+          </div>
+          
           {/* Website */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Site web</label>
