@@ -2112,7 +2112,7 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
         if (onUpdateUser) {
           onUpdateUser(updatedUser);
         }
-        localStorage.setItem('salarize_user', JSON.stringify(updatedUser));
+        sessionStorage.setItem('salarize_user', JSON.stringify(updatedUser));
         
         setMessage({ type: 'success', text: 'Photo de profil mise à jour' });
         setUploadingAvatar(false);
@@ -2158,7 +2158,7 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
       
       // Mettre à jour le localStorage aussi
       const updatedUser = { ...user, name: editName, email: editEmail };
-      localStorage.setItem('salarize_user', JSON.stringify(updatedUser));
+      sessionStorage.setItem('salarize_user', JSON.stringify(updatedUser));
       
       setMessage({ type: 'success', text: editEmail !== user?.email 
         ? 'Profil mis à jour. Un email de confirmation a été envoyé.' 
@@ -4245,7 +4245,7 @@ function AppContent() {
   
   const handleAuthSuccess = (userData) => {
     setUser(userData);
-    localStorage.setItem('salarize_user', JSON.stringify(userData));
+    sessionStorage.setItem('salarize_user', JSON.stringify(userData));
     setShowAuthModal(false);
   };
 
@@ -5892,7 +5892,7 @@ L'équipe Salarize`;
   // Load user from localStorage
   useEffect(() => {
     try {
-      const savedUser = localStorage.getItem('salarize_user');
+      const savedUser = sessionStorage.getItem('salarize_user');
       if (savedUser) setUser(JSON.parse(savedUser));
     } catch (e) {}
   }, []);
