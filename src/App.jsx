@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
@@ -25,6 +25,148 @@ const getValidSession = async () => {
   }
   return session;
 };
+
+// ============================================
+// DONNÉES DE DÉMONSTRATION
+// ============================================
+const DEMO_COMPANY = {
+  name: 'TechStart SPRL',
+  logo: null,
+  brandColor: '139, 92, 246',
+  website: 'techstart.be'
+};
+
+const DEMO_EMPLOYEES = [
+  // 2024-01
+  { name: 'Marie Dubois', department: 'Direction', function: 'CEO', totalCost: 8500, period: '2024-01' },
+  { name: 'Pierre Martin', department: 'IT', function: 'Lead Developer', totalCost: 5200, period: '2024-01' },
+  { name: 'Sophie Laurent', department: 'IT', function: 'Frontend Dev', totalCost: 4100, period: '2024-01' },
+  { name: 'Lucas Bernard', department: 'IT', function: 'Backend Dev', totalCost: 4300, period: '2024-01' },
+  { name: 'Emma Petit', department: 'Marketing', function: 'Marketing Manager', totalCost: 4800, period: '2024-01' },
+  { name: 'Thomas Roux', department: 'Marketing', function: 'Content Creator', totalCost: 3200, period: '2024-01' },
+  { name: 'Léa Moreau', department: 'Sales', function: 'Sales Lead', totalCost: 4500, period: '2024-01' },
+  { name: 'Hugo Lefebvre', department: 'Sales', function: 'Account Manager', totalCost: 3800, period: '2024-01' },
+  { name: 'Chloé Simon', department: 'Admin', function: 'Office Manager', totalCost: 3400, period: '2024-01' },
+  { name: 'Nathan Michel', department: 'Admin', function: 'Comptable', totalCost: 3900, period: '2024-01' },
+  // 2024-02
+  { name: 'Marie Dubois', department: 'Direction', function: 'CEO', totalCost: 8500, period: '2024-02' },
+  { name: 'Pierre Martin', department: 'IT', function: 'Lead Developer', totalCost: 5200, period: '2024-02' },
+  { name: 'Sophie Laurent', department: 'IT', function: 'Frontend Dev', totalCost: 4100, period: '2024-02' },
+  { name: 'Lucas Bernard', department: 'IT', function: 'Backend Dev', totalCost: 4300, period: '2024-02' },
+  { name: 'Emma Petit', department: 'Marketing', function: 'Marketing Manager', totalCost: 4800, period: '2024-02' },
+  { name: 'Thomas Roux', department: 'Marketing', function: 'Content Creator', totalCost: 3200, period: '2024-02' },
+  { name: 'Léa Moreau', department: 'Sales', function: 'Sales Lead', totalCost: 4500, period: '2024-02' },
+  { name: 'Hugo Lefebvre', department: 'Sales', function: 'Account Manager', totalCost: 3800, period: '2024-02' },
+  { name: 'Chloé Simon', department: 'Admin', function: 'Office Manager', totalCost: 3400, period: '2024-02' },
+  { name: 'Nathan Michel', department: 'Admin', function: 'Comptable', totalCost: 3900, period: '2024-02' },
+  // 2024-03 (augmentation)
+  { name: 'Marie Dubois', department: 'Direction', function: 'CEO', totalCost: 8700, period: '2024-03' },
+  { name: 'Pierre Martin', department: 'IT', function: 'Lead Developer', totalCost: 5400, period: '2024-03' },
+  { name: 'Sophie Laurent', department: 'IT', function: 'Frontend Dev', totalCost: 4200, period: '2024-03' },
+  { name: 'Lucas Bernard', department: 'IT', function: 'Backend Dev', totalCost: 4400, period: '2024-03' },
+  { name: 'Emma Petit', department: 'Marketing', function: 'Marketing Manager', totalCost: 4900, period: '2024-03' },
+  { name: 'Thomas Roux', department: 'Marketing', function: 'Content Creator', totalCost: 3300, period: '2024-03' },
+  { name: 'Léa Moreau', department: 'Sales', function: 'Sales Lead', totalCost: 4600, period: '2024-03' },
+  { name: 'Hugo Lefebvre', department: 'Sales', function: 'Account Manager', totalCost: 3900, period: '2024-03' },
+  { name: 'Chloé Simon', department: 'Admin', function: 'Office Manager', totalCost: 3500, period: '2024-03' },
+  { name: 'Nathan Michel', department: 'Admin', function: 'Comptable', totalCost: 4000, period: '2024-03' },
+  { name: 'Julie Dupont', department: 'IT', function: 'UX Designer', totalCost: 4000, period: '2024-03' },
+  // 2024-04
+  { name: 'Marie Dubois', department: 'Direction', function: 'CEO', totalCost: 8700, period: '2024-04' },
+  { name: 'Pierre Martin', department: 'IT', function: 'Lead Developer', totalCost: 5400, period: '2024-04' },
+  { name: 'Sophie Laurent', department: 'IT', function: 'Frontend Dev', totalCost: 4200, period: '2024-04' },
+  { name: 'Lucas Bernard', department: 'IT', function: 'Backend Dev', totalCost: 4400, period: '2024-04' },
+  { name: 'Emma Petit', department: 'Marketing', function: 'Marketing Manager', totalCost: 5100, period: '2024-04' },
+  { name: 'Thomas Roux', department: 'Marketing', function: 'Content Creator', totalCost: 3400, period: '2024-04' },
+  { name: 'Léa Moreau', department: 'Sales', function: 'Sales Lead', totalCost: 4700, period: '2024-04' },
+  { name: 'Hugo Lefebvre', department: 'Sales', function: 'Account Manager', totalCost: 4000, period: '2024-04' },
+  { name: 'Chloé Simon', department: 'Admin', function: 'Office Manager', totalCost: 3500, period: '2024-04' },
+  { name: 'Nathan Michel', department: 'Admin', function: 'Comptable', totalCost: 4000, period: '2024-04' },
+  { name: 'Julie Dupont', department: 'IT', function: 'UX Designer', totalCost: 4100, period: '2024-04' },
+];
+
+const DEMO_MAPPING = {
+  'Marie Dubois': 'Direction',
+  'Pierre Martin': 'IT',
+  'Sophie Laurent': 'IT',
+  'Lucas Bernard': 'IT',
+  'Julie Dupont': 'IT',
+  'Emma Petit': 'Marketing',
+  'Thomas Roux': 'Marketing',
+  'Léa Moreau': 'Sales',
+  'Hugo Lefebvre': 'Sales',
+  'Chloé Simon': 'Admin',
+  'Nathan Michel': 'Admin'
+};
+
+// ============================================
+// PLANS TARIFAIRES
+// ============================================
+const PRICING_PLANS = [
+  {
+    name: 'Starter',
+    price: 0,
+    period: 'Gratuit',
+    description: 'Pour découvrir Salarize',
+    features: [
+      '1 société',
+      '10 employés max',
+      '3 mois d\'historique',
+      'Export PDF basique',
+      'Support email'
+    ],
+    notIncluded: [
+      'Export Excel',
+      'Multi-sociétés',
+      'Personnalisation',
+      'Support prioritaire'
+    ],
+    cta: 'Commencer gratuitement',
+    popular: false
+  },
+  {
+    name: 'Pro',
+    price: 29,
+    period: '/mois',
+    description: 'Pour les PME en croissance',
+    features: [
+      '5 sociétés',
+      'Employés illimités',
+      'Historique illimité',
+      'Export PDF & Excel',
+      'Logo personnalisé',
+      'Comparaisons avancées',
+      'Support prioritaire'
+    ],
+    notIncluded: [
+      'API Access',
+      'SSO'
+    ],
+    cta: 'Essai gratuit 14 jours',
+    popular: true
+  },
+  {
+    name: 'Business',
+    price: 79,
+    period: '/mois',
+    description: 'Pour les grandes entreprises',
+    features: [
+      'Sociétés illimitées',
+      'Employés illimités',
+      'Historique illimité',
+      'Export PDF & Excel',
+      'Logo personnalisé',
+      'Comparaisons avancées',
+      'API Access',
+      'SSO / SAML',
+      'Account Manager dédié',
+      'Formation incluse'
+    ],
+    notIncluded: [],
+    cta: 'Contacter les ventes',
+    popular: false
+  }
+];
 
 const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
 
@@ -478,7 +620,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
         </button>
         
         {/* Nav */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-6">
           <button 
             onClick={() => setCurrentPage('home')}
             className={`text-sm font-medium transition-colors ${currentPage === 'home' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
@@ -490,6 +632,18 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
             className={`text-sm font-medium transition-colors ${currentPage === 'features' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
           >
             Fonctionnalités
+          </button>
+          <button 
+            onClick={() => setCurrentPage('pricing')}
+            className={`text-sm font-medium transition-colors ${currentPage === 'pricing' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            Tarifs
+          </button>
+          <button 
+            onClick={() => setCurrentPage('demo')}
+            className={`text-sm font-medium transition-colors ${currentPage === 'demo' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
+          >
+            Démo
           </button>
           {user && (
             <button 
@@ -574,7 +728,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
 }
 
 // Landing Page Component
-function LandingPage({ onLogin, user, onGoToDashboard }) {
+function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo }) {
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Hero Section */}
@@ -618,27 +772,96 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
                 </svg>
               </button>
               {!user && (
-                <button className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/10 transition-all">
+                <button 
+                  onClick={onViewDemo}
+                  className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-xl border border-white/10 transition-all flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
                   Voir la démo
                 </button>
               )}
             </div>
           </div>
           
-          {/* Preview Image Placeholder */}
-          <div className="mt-20 relative">
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent z-10" />
-            <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 p-4 shadow-2xl">
-              <div className="bg-slate-900 rounded-xl p-8 min-h-[300px] flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-violet-500/20">
-                    <svg className="w-8 h-8 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
+          {/* Dashboard Preview */}
+          <div className="mt-16 relative">
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent z-10 pointer-events-none" />
+            <div className="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 p-3 md:p-4 shadow-2xl">
+              <div className="bg-slate-100 rounded-xl overflow-hidden">
+                {/* Mini Dashboard Header */}
+                <div className="bg-white p-3 md:p-4 border-b border-slate-200 flex items-center gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-xs md:text-sm">T</span>
                   </div>
-                  <p className="text-slate-500 text-sm">Aperçu du dashboard</p>
+                  <div>
+                    <p className="font-semibold text-slate-800 text-sm md:text-base">TechStart SPRL</p>
+                    <p className="text-slate-400 text-xs">techstart.be</p>
+                  </div>
+                  <div className="ml-auto">
+                    <span className="px-2 py-1 bg-violet-100 text-violet-600 rounded text-xs font-medium">Avril 2024</span>
+                  </div>
+                </div>
+                
+                {/* Mini KPI Cards */}
+                <div className="p-3 md:p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-3 md:mb-4">
+                    <div className="bg-white rounded-lg p-2 md:p-3 shadow-sm">
+                      <p className="text-slate-400 text-[10px] md:text-xs">Coût Total</p>
+                      <p className="font-bold text-slate-800 text-sm md:text-lg">€51.500</p>
+                      <p className="text-emerald-500 text-[10px]">↓ -2.3%</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-2 md:p-3 shadow-sm">
+                      <p className="text-slate-400 text-[10px] md:text-xs">Employés</p>
+                      <p className="font-bold text-slate-800 text-sm md:text-lg">11</p>
+                      <p className="text-slate-400 text-[10px]">Actifs</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-2 md:p-3 shadow-sm">
+                      <p className="text-slate-400 text-[10px] md:text-xs">Départements</p>
+                      <p className="font-bold text-slate-800 text-sm md:text-lg">5</p>
+                      <p className="text-slate-400 text-[10px]">IT en tête</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-2 md:p-3 shadow-sm">
+                      <p className="text-slate-400 text-[10px] md:text-xs">Coût Moyen</p>
+                      <p className="font-bold text-slate-800 text-sm md:text-lg">€4.682</p>
+                      <p className="text-slate-400 text-[10px]">Par emp.</p>
+                    </div>
+                  </div>
+                  
+                  {/* Mini Chart Preview */}
+                  <div className="bg-white rounded-lg p-3 md:p-4 shadow-sm">
+                    <div className="flex items-end justify-between h-24 md:h-32 gap-2 md:gap-3">
+                      {[45, 45, 47, 51].map((h, i) => (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <div 
+                            className="w-full bg-violet-500 rounded-t"
+                            style={{ height: `${h * 2}px` }}
+                          />
+                          <span className="text-[8px] md:text-[10px] text-slate-400">
+                            {['Jan', 'Fév', 'Mar', 'Avr'][i]}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+            
+            {/* Floating badge */}
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-20">
+              <button 
+                onClick={onViewDemo}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-full border border-slate-600 shadow-lg flex items-center gap-2 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Explorer la démo interactive →
+              </button>
             </div>
           </div>
         </div>
@@ -716,21 +939,7 @@ function LandingPage({ onLogin, user, onGoToDashboard }) {
       </div>
       
       {/* Footer */}
-      <footer className="border-t border-slate-800 py-12">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
-              </div>
-              <span className="text-white font-bold">Salarize</span>
-            </div>
-            <p className="text-slate-500 text-sm">
-              © 2025 Salarize. Tous droits réservés.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer setCurrentPage={() => {}} />
     </div>
   );
 }
@@ -866,21 +1075,650 @@ function FeaturesPage({ onLogin, user, onGoToDashboard }) {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800 py-12">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
+      <Footer setCurrentPage={() => {}} />
+    </div>
+  );
+}
+
+// ============================================
+// FOOTER COMPONENT
+// ============================================
+function Footer({ setCurrentPage }) {
+  return (
+    <footer className="bg-slate-900 border-t border-slate-800">
+      <div className="max-w-6xl mx-auto px-6 py-16">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+          {/* Brand */}
+          <div className="col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">S</span>
               </div>
-              <span className="text-white font-bold">Salarize</span>
+              <span className="text-white font-bold text-xl">Salarize</span>
             </div>
-            <p className="text-slate-500 text-sm">
-              © 2025 Salarize. Tous droits réservés.
+            <p className="text-slate-400 text-sm mb-4">
+              La solution belge pour analyser et optimiser vos coûts salariaux.
+            </p>
+            <div className="flex gap-3">
+              <a href="#" className="w-9 h-9 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
+              </a>
+              <a href="#" className="w-9 h-9 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+              </a>
+            </div>
+          </div>
+          
+          {/* Product */}
+          <div>
+            <h4 className="text-white font-semibold mb-4">Produit</h4>
+            <ul className="space-y-3">
+              <li><button onClick={() => setCurrentPage('features')} className="text-slate-400 hover:text-white text-sm transition-colors">Fonctionnalités</button></li>
+              <li><button onClick={() => setCurrentPage('pricing')} className="text-slate-400 hover:text-white text-sm transition-colors">Tarifs</button></li>
+              <li><button onClick={() => setCurrentPage('demo')} className="text-slate-400 hover:text-white text-sm transition-colors">Démo</button></li>
+            </ul>
+          </div>
+          
+          {/* Company */}
+          <div>
+            <h4 className="text-white font-semibold mb-4">Entreprise</h4>
+            <ul className="space-y-3">
+              <li><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">À propos</a></li>
+              <li><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">Contact</a></li>
+              <li><a href="#" className="text-slate-400 hover:text-white text-sm transition-colors">Blog</a></li>
+            </ul>
+          </div>
+          
+          {/* Legal */}
+          <div>
+            <h4 className="text-white font-semibold mb-4">Légal</h4>
+            <ul className="space-y-3">
+              <li><button onClick={() => setCurrentPage('privacy')} className="text-slate-400 hover:text-white text-sm transition-colors">Politique de confidentialité</button></li>
+              <li><button onClick={() => setCurrentPage('terms')} className="text-slate-400 hover:text-white text-sm transition-colors">Conditions générales</button></li>
+              <li><button onClick={() => setCurrentPage('legal')} className="text-slate-400 hover:text-white text-sm transition-colors">Mentions légales</button></li>
+            </ul>
+          </div>
+        </div>
+        
+        {/* Bottom */}
+        <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-slate-500 text-sm">
+            © {new Date().getFullYear()} Salarize. Tous droits réservés. Made with ❤️ in Belgium 🇧🇪
+          </p>
+          <div className="flex items-center gap-4">
+            <span className="text-slate-500 text-xs">TVA: BE0xxx.xxx.xxx</span>
+            <span className="text-slate-500 text-xs">•</span>
+            <span className="text-slate-500 text-xs">Bruxelles, Belgique</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ============================================
+// PRICING PAGE
+// ============================================
+function PricingPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
+  const [annual, setAnnual] = useState(true);
+  
+  return (
+    <div className="min-h-screen bg-slate-950">
+      {/* Hero */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-fuchsia-600/20" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-violet-500/20 to-transparent rounded-full blur-3xl" />
+        
+        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-6">
+              <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-emerald-400 text-sm font-medium">14 jours d'essai gratuit sur tous les plans</span>
+            </div>
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+              Des tarifs <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">simples et transparents</span>
+            </h1>
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-8">
+              Choisissez le plan qui correspond à vos besoins. Évoluez quand vous voulez.
+            </p>
+            
+            {/* Toggle */}
+            <div className="inline-flex items-center gap-3 bg-slate-800/50 p-1.5 rounded-xl">
+              <button 
+                onClick={() => setAnnual(false)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${!annual ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
+              >
+                Mensuel
+              </button>
+              <button 
+                onClick={() => setAnnual(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${annual ? 'bg-white text-slate-900' : 'text-slate-400 hover:text-white'}`}
+              >
+                Annuel
+                <span className="px-2 py-0.5 bg-emerald-500 text-white text-xs rounded-full">-20%</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing Cards */}
+      <div className="max-w-6xl mx-auto px-6 py-16">
+        <div className="grid md:grid-cols-3 gap-8">
+          {PRICING_PLANS.map((plan, index) => (
+            <div 
+              key={plan.name}
+              className={`relative bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border transition-all hover:-translate-y-1 ${
+                plan.popular 
+                  ? 'border-violet-500 shadow-lg shadow-violet-500/20' 
+                  : 'border-slate-700/50 hover:border-slate-600'
+              }`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <span className="px-4 py-1.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-medium rounded-full">
+                    Plus populaire
+                  </span>
+                </div>
+              )}
+              
+              <div className="text-center mb-8">
+                <h3 className="text-xl font-bold text-white mb-2">{plan.name}</h3>
+                <p className="text-slate-400 text-sm mb-4">{plan.description}</p>
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-4xl font-bold text-white">
+                    €{annual && plan.price > 0 ? Math.round(plan.price * 0.8) : plan.price}
+                  </span>
+                  <span className="text-slate-400">{plan.period}</span>
+                </div>
+                {annual && plan.price > 0 && (
+                  <p className="text-emerald-400 text-sm mt-1">
+                    Économisez €{Math.round(plan.price * 12 * 0.2)}/an
+                  </p>
+                )}
+              </div>
+              
+              <ul className="space-y-3 mb-8">
+                {plan.features.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-slate-300 text-sm">{feature}</span>
+                  </li>
+                ))}
+                {plan.notIncluded.map((feature, i) => (
+                  <li key={i} className="flex items-start gap-3 opacity-50">
+                    <svg className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span className="text-slate-500 text-sm">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              
+              <button 
+                onClick={user ? onGoToDashboard : onLogin}
+                className={`w-full py-3 rounded-xl font-medium transition-all ${
+                  plan.popular 
+                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white shadow-lg shadow-violet-500/25' 
+                    : 'bg-slate-700 hover:bg-slate-600 text-white'
+                }`}
+              >
+                {plan.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+        
+        {/* FAQ teaser */}
+        <div className="mt-20 text-center">
+          <p className="text-slate-400 mb-4">Des questions sur nos tarifs ?</p>
+          <a href="mailto:contact@salarize.be" className="text-violet-400 hover:text-violet-300 font-medium">
+            Contactez-nous →
+          </a>
+        </div>
+      </div>
+      
+      <Footer setCurrentPage={setCurrentPage} />
+    </div>
+  );
+}
+
+// ============================================
+// LEGAL PAGES
+// ============================================
+function LegalPage({ setCurrentPage }) {
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <div className="max-w-4xl mx-auto px-6 pt-32 pb-20">
+        <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Retour
+        </button>
+        
+        <h1 className="text-4xl font-bold text-white mb-8">Mentions Légales</h1>
+        
+        <div className="prose prose-invert prose-slate max-w-none">
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700 mb-8">
+            <h2 className="text-xl font-bold text-white mb-4">Éditeur du site</h2>
+            <p className="text-slate-300 mb-2"><strong>Salarize</strong></p>
+            <p className="text-slate-400 text-sm">
+              Société à responsabilité limitée (SPRL/BV)<br />
+              Siège social : Rue de la Loi 1, 1000 Bruxelles, Belgique<br />
+              Numéro d'entreprise : BE0xxx.xxx.xxx<br />
+              TVA : BE0xxx.xxx.xxx<br />
+              Email : contact@salarize.be<br />
+              Téléphone : +32 2 xxx xx xx
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700 mb-8">
+            <h2 className="text-xl font-bold text-white mb-4">Hébergement</h2>
+            <p className="text-slate-400 text-sm">
+              Ce site est hébergé par :<br />
+              <strong className="text-slate-300">Vercel Inc.</strong><br />
+              440 N Barranca Ave #4133, Covina, CA 91723, USA<br />
+              <br />
+              Base de données hébergée par :<br />
+              <strong className="text-slate-300">Supabase Inc.</strong><br />
+              970 Toa Payoh North #07-04, Singapore 318992
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700 mb-8">
+            <h2 className="text-xl font-bold text-white mb-4">Propriété intellectuelle</h2>
+            <p className="text-slate-400 text-sm">
+              L'ensemble du contenu de ce site (textes, images, logos, graphismes, icônes, logiciels) est la propriété exclusive de Salarize ou de ses partenaires et est protégé par les lois belges et internationales relatives à la propriété intellectuelle.
+            </p>
+            <p className="text-slate-400 text-sm mt-4">
+              Toute reproduction, représentation, modification, publication, transmission ou dénaturation, totale ou partielle, du site ou de son contenu, par quelque procédé que ce soit, sans l'autorisation préalable écrite de Salarize, est interdite.
+            </p>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Droit applicable</h2>
+            <p className="text-slate-400 text-sm">
+              Les présentes mentions légales sont soumises au droit belge. En cas de litige, les tribunaux de Bruxelles seront seuls compétents.
             </p>
           </div>
         </div>
-      </footer>
+      </div>
+      <Footer setCurrentPage={setCurrentPage} />
+    </div>
+  );
+}
+
+function PrivacyPage({ setCurrentPage }) {
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <div className="max-w-4xl mx-auto px-6 pt-32 pb-20">
+        <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Retour
+        </button>
+        
+        <h1 className="text-4xl font-bold text-white mb-4">Politique de Confidentialité</h1>
+        <p className="text-slate-400 mb-8">Dernière mise à jour : {new Date().toLocaleDateString('fr-BE')}</p>
+        
+        <div className="space-y-8">
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">1. Responsable du traitement</h2>
+            <p className="text-slate-400 text-sm">
+              Salarize, dont le siège social est situé Rue de la Loi 1, 1000 Bruxelles, Belgique, est responsable du traitement de vos données personnelles conformément au Règlement Général sur la Protection des Données (RGPD) et à la loi belge du 30 juillet 2018.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">2. Données collectées</h2>
+            <p className="text-slate-400 text-sm mb-4">Nous collectons les données suivantes :</p>
+            <ul className="text-slate-400 text-sm space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span><strong className="text-slate-300">Données d'identification :</strong> nom, prénom, adresse email</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span><strong className="text-slate-300">Données professionnelles :</strong> nom de société, données salariales importées</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span><strong className="text-slate-300">Données techniques :</strong> adresse IP, type de navigateur, données de connexion</span>
+              </li>
+            </ul>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">3. Finalités du traitement</h2>
+            <p className="text-slate-400 text-sm mb-4">Vos données sont traitées pour :</p>
+            <ul className="text-slate-400 text-sm space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>La fourniture et la gestion de nos services</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>La création et la gestion de votre compte utilisateur</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>L'amélioration de nos services et de l'expérience utilisateur</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-violet-400">•</span>
+                <span>Le respect de nos obligations légales</span>
+              </li>
+            </ul>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">4. Base légale</h2>
+            <p className="text-slate-400 text-sm">
+              Le traitement de vos données repose sur : l'exécution du contrat (fourniture du service), votre consentement (newsletter, cookies), notre intérêt légitime (amélioration des services), et le respect de nos obligations légales.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">5. Durée de conservation</h2>
+            <p className="text-slate-400 text-sm">
+              Vos données sont conservées pendant la durée de votre utilisation du service, puis pendant une durée de 3 ans après la clôture de votre compte, sauf obligation légale de conservation plus longue.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">6. Vos droits</h2>
+            <p className="text-slate-400 text-sm mb-4">Conformément au RGPD, vous disposez des droits suivants :</p>
+            <ul className="text-slate-400 text-sm space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-400">✓</span>
+                <span>Droit d'accès à vos données personnelles</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-400">✓</span>
+                <span>Droit de rectification des données inexactes</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-400">✓</span>
+                <span>Droit à l'effacement ("droit à l'oubli")</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-400">✓</span>
+                <span>Droit à la portabilité de vos données</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-emerald-400">✓</span>
+                <span>Droit d'opposition et de limitation du traitement</span>
+              </li>
+            </ul>
+            <p className="text-slate-400 text-sm mt-4">
+              Pour exercer vos droits : <a href="mailto:privacy@salarize.be" className="text-violet-400 hover:text-violet-300">privacy@salarize.be</a>
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">7. Autorité de contrôle</h2>
+            <p className="text-slate-400 text-sm">
+              Vous pouvez introduire une réclamation auprès de l'Autorité de Protection des Données (APD) :<br /><br />
+              <strong className="text-slate-300">Autorité de protection des données</strong><br />
+              Rue de la Presse 35, 1000 Bruxelles<br />
+              <a href="https://www.autoriteprotectiondonnees.be" className="text-violet-400 hover:text-violet-300">www.autoriteprotectiondonnees.be</a>
+            </p>
+          </section>
+        </div>
+      </div>
+      <Footer setCurrentPage={setCurrentPage} />
+    </div>
+  );
+}
+
+function TermsPage({ setCurrentPage }) {
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <div className="max-w-4xl mx-auto px-6 pt-32 pb-20">
+        <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Retour
+        </button>
+        
+        <h1 className="text-4xl font-bold text-white mb-4">Conditions Générales d'Utilisation</h1>
+        <p className="text-slate-400 mb-8">Dernière mise à jour : {new Date().toLocaleDateString('fr-BE')}</p>
+        
+        <div className="space-y-8">
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 1 - Objet</h2>
+            <p className="text-slate-400 text-sm">
+              Les présentes conditions générales d'utilisation (CGU) ont pour objet de définir les modalités d'accès et d'utilisation de la plateforme Salarize, accessible à l'adresse salarize.be, éditée par Salarize SPRL.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 2 - Accès au service</h2>
+            <p className="text-slate-400 text-sm">
+              L'accès au service nécessite la création d'un compte utilisateur. L'utilisateur s'engage à fournir des informations exactes et à les maintenir à jour. Le service est accessible 24h/24, 7j/7, sauf en cas de force majeure ou de maintenance.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 3 - Description du service</h2>
+            <p className="text-slate-400 text-sm">
+              Salarize est une plateforme d'analyse des coûts salariaux permettant aux entreprises d'importer leurs données de paie, de les visualiser sous forme de tableaux de bord et de générer des rapports. Le service est fourni "tel quel" sans garantie d'adéquation à un usage particulier.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 4 - Tarification</h2>
+            <p className="text-slate-400 text-sm">
+              Les tarifs en vigueur sont disponibles sur la page Tarifs du site. Les prix sont indiqués en euros, hors TVA. La TVA belge (21%) sera appliquée. Les tarifs peuvent être modifiés à tout moment, les utilisateurs en seront informés avec un préavis de 30 jours.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 5 - Propriété des données</h2>
+            <p className="text-slate-400 text-sm">
+              L'utilisateur reste propriétaire des données qu'il importe sur la plateforme. Salarize s'engage à ne pas utiliser ces données à d'autres fins que la fourniture du service. En cas de résiliation, l'utilisateur peut exporter ses données pendant une période de 30 jours.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 6 - Responsabilités</h2>
+            <p className="text-slate-400 text-sm">
+              L'utilisateur est responsable de l'utilisation qu'il fait du service et des données qu'il y importe. Salarize ne saurait être tenu responsable des dommages indirects résultant de l'utilisation du service. La responsabilité de Salarize est limitée au montant des sommes versées par l'utilisateur au cours des 12 derniers mois.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 7 - Résiliation</h2>
+            <p className="text-slate-400 text-sm">
+              L'utilisateur peut résilier son compte à tout moment depuis les paramètres de son compte. En cas de manquement aux présentes CGU, Salarize se réserve le droit de suspendre ou résilier le compte de l'utilisateur sans préavis.
+            </p>
+          </section>
+          
+          <section className="bg-slate-800/50 rounded-2xl p-8 border border-slate-700">
+            <h2 className="text-xl font-bold text-white mb-4">Article 8 - Droit applicable</h2>
+            <p className="text-slate-400 text-sm">
+              Les présentes CGU sont soumises au droit belge. Tout litige relatif à l'interprétation ou à l'exécution des présentes sera soumis aux tribunaux de Bruxelles.
+            </p>
+          </section>
+        </div>
+      </div>
+      <Footer setCurrentPage={setCurrentPage} />
+    </div>
+  );
+}
+
+// ============================================
+// DEMO PAGE (Dashboard Preview)
+// ============================================
+function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
+  const demoTotalCost = DEMO_EMPLOYEES.filter(e => e.period === '2024-04').reduce((sum, e) => sum + e.totalCost, 0);
+  const demoEmployeeCount = new Set(DEMO_EMPLOYEES.filter(e => e.period === '2024-04').map(e => e.name)).size;
+  const demoDepts = [...new Set(DEMO_EMPLOYEES.map(e => e.department))];
+  
+  const demoChartData = ['2024-01', '2024-02', '2024-03', '2024-04'].map(period => {
+    const periodEmps = DEMO_EMPLOYEES.filter(e => e.period === period);
+    return {
+      period,
+      total: periodEmps.reduce((sum, e) => sum + e.totalCost, 0)
+    };
+  });
+  
+  const demoDeptData = demoDepts.map(dept => ({
+    name: dept,
+    total: DEMO_EMPLOYEES.filter(e => e.period === '2024-04' && e.department === dept).reduce((sum, e) => sum + e.totalCost, 0),
+    count: new Set(DEMO_EMPLOYEES.filter(e => e.period === '2024-04' && e.department === dept).map(e => e.name)).size
+  })).sort((a, b) => b.total - a.total);
+  
+  return (
+    <div className="min-h-screen bg-slate-950">
+      {/* Hero */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-fuchsia-600/20" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-violet-500/20 to-transparent rounded-full blur-3xl" />
+        
+        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-8">
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full mb-6">
+              <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span className="text-amber-400 text-sm font-medium">Mode démonstration - Données fictives</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              Découvrez Salarize <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">en action</span>
+            </h1>
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-6">
+              Explorez notre dashboard avec des données de démonstration
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Demo Dashboard */}
+      <div className="max-w-6xl mx-auto px-6 pb-16">
+        <div className="bg-slate-100 rounded-2xl p-4 md:p-6 shadow-2xl border border-slate-200">
+          {/* Demo Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">T</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">{DEMO_COMPANY.name}</h2>
+                <p className="text-slate-500 text-sm">{DEMO_COMPANY.website}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <span className="px-3 py-1.5 bg-violet-100 text-violet-600 rounded-lg text-sm font-medium">Avril 2024</span>
+            </div>
+          </div>
+          
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+              <p className="text-slate-500 text-sm">Coût Total</p>
+              <p className="text-2xl font-bold text-slate-800">€{demoTotalCost.toLocaleString('fr-BE')}</p>
+              <p className="text-emerald-500 text-xs mt-1">↓ -2.3% vs mois préc.</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+              <p className="text-slate-500 text-sm">Employés</p>
+              <p className="text-2xl font-bold text-slate-800">{demoEmployeeCount}</p>
+              <p className="text-slate-400 text-xs mt-1">Actifs ce mois</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+              <p className="text-slate-500 text-sm">Départements</p>
+              <p className="text-2xl font-bold text-slate-800">{demoDepts.length}</p>
+              <p className="text-slate-400 text-xs mt-1">IT en tête</p>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+              <p className="text-slate-500 text-sm">Coût Moyen</p>
+              <p className="text-2xl font-bold text-slate-800">€{Math.round(demoTotalCost / demoEmployeeCount).toLocaleString('fr-BE')}</p>
+              <p className="text-slate-400 text-xs mt-1">Par employé</p>
+            </div>
+          </div>
+          
+          {/* Chart */}
+          <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-200 mb-6">
+            <h3 className="font-bold text-slate-800 mb-4">📈 Évolution des Coûts</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={demoChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis 
+                    dataKey="period" 
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    tickFormatter={(value) => {
+                      const months = ['Jan', 'Fév', 'Mar', 'Avr'];
+                      return months[parseInt(value.split('-')[1]) - 1] + " '24";
+                    }}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    formatter={(value) => [`€${value.toLocaleString('fr-BE')}`, 'Coût total']}
+                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                  />
+                  <Bar dataKey="total" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {/* Departments */}
+          <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-200">
+            <h3 className="font-bold text-slate-800 mb-4">📊 Répartition par Département</h3>
+            <div className="space-y-3">
+              {demoDeptData.map((dept, idx) => (
+                <div key={dept.name} className="flex items-center gap-3">
+                  <span className="text-slate-700 font-medium text-sm w-24 truncate">{dept.name}</span>
+                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full bg-violet-500" 
+                      style={{ width: `${(dept.total / demoDeptData[0].total) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-slate-500 text-xs w-12">{dept.count} emp.</span>
+                  <span className="text-slate-800 font-semibold text-sm w-20 text-right">€{dept.total.toLocaleString('fr-BE')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* CTA */}
+        <div className="text-center mt-12">
+          <p className="text-slate-400 mb-6">Prêt à analyser vos propres données ?</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button 
+              onClick={user ? onGoToDashboard : onLogin}
+              className="px-8 py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/25 flex items-center gap-2"
+            >
+              {user ? 'Aller au dashboard' : 'Créer un compte gratuit'}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+            <button 
+              onClick={() => setCurrentPage('pricing')}
+              className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl border border-slate-700 transition-all"
+            >
+              Voir les tarifs
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <Footer setCurrentPage={setCurrentPage} />
     </div>
   );
 }
@@ -4582,7 +5420,8 @@ L'équipe Salarize`;
         <LandingPage 
           onLogin={handleLogin} 
           user={user} 
-          onGoToDashboard={() => setCurrentPage('dashboard')} 
+          onGoToDashboard={() => setCurrentPage('dashboard')}
+          onViewDemo={() => setCurrentPage('demo')}
         />
         <AuthModal 
           isOpen={showAuthModal}
@@ -4614,6 +5453,104 @@ L'équipe Salarize`;
           onClose={() => setShowAuthModal(false)}
           onSuccess={handleAuthSuccess}
         />
+      </PageTransition>
+    );
+  }
+
+  // Pricing page (accessible à tous)
+  if (currentPage === 'pricing') {
+    return (
+      <PageTransition key="pricing">
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <PricingPage 
+          onLogin={handleLogin} 
+          user={user} 
+          onGoToDashboard={() => setCurrentPage('dashboard')}
+          setCurrentPage={setCurrentPage}
+        />
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
+      </PageTransition>
+    );
+  }
+
+  // Demo page (accessible à tous)
+  if (currentPage === 'demo') {
+    return (
+      <PageTransition key="demo">
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <DemoPage 
+          onLogin={handleLogin} 
+          user={user} 
+          onGoToDashboard={() => setCurrentPage('dashboard')}
+          setCurrentPage={setCurrentPage}
+        />
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
+      </PageTransition>
+    );
+  }
+
+  // Legal pages (accessibles à tous)
+  if (currentPage === 'legal') {
+    return (
+      <PageTransition key="legal">
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <LegalPage setCurrentPage={setCurrentPage} />
+      </PageTransition>
+    );
+  }
+
+  if (currentPage === 'privacy') {
+    return (
+      <PageTransition key="privacy">
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <PrivacyPage setCurrentPage={setCurrentPage} />
+      </PageTransition>
+    );
+  }
+
+  if (currentPage === 'terms') {
+    return (
+      <PageTransition key="terms">
+        <LandingHeader 
+          user={user} 
+          onLogin={handleLogin} 
+          onLogout={handleLogout}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+        />
+        <TermsPage setCurrentPage={setCurrentPage} />
       </PageTransition>
     );
   }
