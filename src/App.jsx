@@ -7,50 +7,49 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://dbqlyxeorexihuitejvq.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRicWx5eGVvcmV4aWh1aXRlanZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MzU3OTEsImV4cCI6MjA4NDAxMTc5MX0.QZKAv2vs5K_xwExc4P5GYtRaIr5DOIqIP_fh-BYR9Jo';
 
-// Storage personnalisé qui broadcast entre onglets via localStorage events
-const broadcastStorage = {
-  _broadcast: (key, value) => {
-    // Utiliser localStorage temporairement pour broadcaster aux autres onglets
-    const broadcastKey = `__salarize_broadcast_${Date.now()}`;
-    localStorage.setItem(broadcastKey, JSON.stringify({ key, value }));
-    localStorage.removeItem(broadcastKey);
+// Storage persistant qui utilise localStorage pour conserver la session entre les visites
+// et synchronise automatiquement entre les onglets via l'event natif 'storage'
+const persistentStorage = {
+  getItem: (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.warn('localStorage not available:', e);
+      return null;
+    }
   },
   
-  getItem: (key) => sessionStorage.getItem(key),
-  
   setItem: (key, value) => {
-    sessionStorage.setItem(key, value);
-    // Broadcaster aux autres onglets
-    broadcastStorage._broadcast(key, value);
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.warn('localStorage not available:', e);
+    }
   },
   
   removeItem: (key) => {
-    sessionStorage.removeItem(key);
-    broadcastStorage._broadcast(key, null);
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.warn('localStorage not available:', e);
+    }
   }
 };
 
-// Écouter les broadcasts des autres onglets
+// Écouter les changements de storage pour synchroniser l'auth entre onglets
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
-    if (e.key?.startsWith('__salarize_broadcast_') && e.newValue) {
-      try {
-        const { key, value } = JSON.parse(e.newValue);
-        if (value === null) {
-          sessionStorage.removeItem(key);
-        } else {
-          sessionStorage.setItem(key, value);
-        }
-        // Forcer un refresh de l'auth state
-        window.dispatchEvent(new Event('salarize-auth-sync'));
-      } catch (err) {}
+    // Détecter les changements de session Supabase
+    if (e.key?.includes('supabase') && e.key?.includes('auth')) {
+      // Forcer un refresh de l'auth state dans cet onglet
+      window.dispatchEvent(new Event('salarize-auth-sync'));
     }
   });
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: broadcastStorage,
+    storage: persistentStorage,
     autoRefreshToken: true,
     persistSession: true,
   }
