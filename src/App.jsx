@@ -3415,6 +3415,7 @@ function AppContent() {
   const [isLoadingData, setIsLoadingData] = useState(false); // Chargement des données Supabase
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
   const [showExportModal, setShowExportModal] = useState(false);
   const [comparePeriod, setComparePeriod] = useState(null);
   const [comparePeriod1, setComparePeriod1] = useState(null);
@@ -3583,9 +3584,16 @@ function AppContent() {
           created_at: session.user.created_at,
           provider: session.user.app_metadata?.provider || 'email'
         });
-        loadFromSupabase(session.user.id);
+        // Ne charger que si pas déjà chargé
+        if (!dataLoadedRef.current) {
+          dataLoadedRef.current = true;
+          loadFromSupabase(session.user.id);
+        }
       } else {
-        loadFromLocalStorage();
+        if (!dataLoadedRef.current) {
+          dataLoadedRef.current = true;
+          loadFromLocalStorage();
+        }
       }
       setIsLoading(false);
     };
@@ -3596,8 +3604,8 @@ function AppContent() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       
-      // Ignorer les events TOKEN_REFRESHED qui ne changent pas l'état
-      if (event === 'TOKEN_REFRESHED') return;
+      // Ignorer les events qui ne changent pas l'état
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
       
       if (event === 'SIGNED_IN' && session?.user) {
         // Seulement après une nouvelle connexion, aller au dashboard
@@ -3614,10 +3622,12 @@ function AppContent() {
           };
         });
         setCurrentPage('dashboard');
-        if (Object.keys(companies).length === 0) {
+        if (!dataLoadedRef.current) {
+          dataLoadedRef.current = true;
           loadFromSupabase(session.user.id);
         }
       } else if (event === 'SIGNED_OUT') {
+        dataLoadedRef.current = false; // Reset pour permettre le rechargement après reconnexion
         setUser(null);
         setCompanies({});
         setActiveCompany(null);
