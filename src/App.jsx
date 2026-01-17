@@ -3707,10 +3707,11 @@ function AppContent() {
           companyId = newCompany.id;
           newCompanies[companyName].id = companyId;
         } else {
-          // Existing company - update
+          // Existing company - update (including name for renaming)
           await supabase
             .from('companies')
             .update({
+              name: companyName,
               logo: companyData.logo || null,
               brand_color: companyData.brandColor || null,
               website: companyData.website || null
@@ -5349,11 +5350,30 @@ L'équipe Salarize`;
     saveAll(newCompanies, activeCompany);
   };
 
-  const deleteCompany = () => {
+  const deleteCompany = async () => {
     if (!activeCompany) return;
+    
+    // Récupérer l'ID de la société à supprimer avant de la retirer
+    const companyToDelete = companies[activeCompany];
+    const companyId = companyToDelete?.id;
+    
     const newCompanies = { ...companies };
     delete newCompanies[activeCompany];
     setCompanies(newCompanies);
+    
+    // Supprimer de Supabase si connecté et si la société a un ID
+    if (user?.id && companyId) {
+      try {
+        // Supprimer les employés
+        await supabase.from('employees').delete().eq('company_id', companyId);
+        // Supprimer les mappings
+        await supabase.from('department_mappings').delete().eq('company_id', companyId);
+        // Supprimer la société
+        await supabase.from('companies').delete().eq('id', companyId);
+      } catch (e) {
+        console.error('Error deleting company from Supabase:', e);
+      }
+    }
     
     const remainingCompanies = Object.keys(newCompanies);
     if (remainingCompanies.length > 0) {
