@@ -4465,14 +4465,26 @@ function AppContent() {
     return dominantColor;
   };
 
+  // Debounce pour la sauvegarde du website
+  const websiteTimeoutRef = useRef(null);
+  
   const handleWebsiteChange = (website) => {
     if (!activeCompany) return;
+    
+    // Mise à jour immédiate de l'état local (sans sauvegarde)
     const newCompanies = {
       ...companies,
       [activeCompany]: { ...companies[activeCompany], website }
     };
     setCompanies(newCompanies);
-    saveAll(newCompanies, activeCompany);
+    
+    // Debounce la sauvegarde (500ms après la dernière frappe)
+    if (websiteTimeoutRef.current) {
+      clearTimeout(websiteTimeoutRef.current);
+    }
+    websiteTimeoutRef.current = setTimeout(() => {
+      saveAll(newCompanies, activeCompany);
+    }, 500);
   };
 
   // Export period data to Excel
