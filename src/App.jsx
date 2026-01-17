@@ -728,7 +728,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
 }
 
 // Landing Page Component
-function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo }) {
+function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPage }) {
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Hero Section */}
@@ -939,13 +939,13 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo }) {
       </div>
       
       {/* Footer */}
-      <Footer setCurrentPage={() => {}} />
+      <Footer setCurrentPage={setCurrentPage} />
     </div>
   );
 }
 
 // Features Page
-function FeaturesPage({ onLogin, user, onGoToDashboard }) {
+function FeaturesPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
   const features = [
     {
       icon: (
@@ -1075,7 +1075,7 @@ function FeaturesPage({ onLogin, user, onGoToDashboard }) {
       </div>
 
       {/* Footer */}
-      <Footer setCurrentPage={() => {}} />
+      <Footer setCurrentPage={setCurrentPage} />
     </div>
   );
 }
@@ -5618,6 +5618,7 @@ L'équipe Salarize`;
           user={user} 
           onGoToDashboard={() => setCurrentPage('dashboard')}
           onViewDemo={() => setCurrentPage('demo')}
+          setCurrentPage={setCurrentPage}
         />
         <AuthModal 
           isOpen={showAuthModal}
@@ -5642,7 +5643,8 @@ L'équipe Salarize`;
         <FeaturesPage 
           onLogin={handleLogin} 
           user={user} 
-          onGoToDashboard={() => setCurrentPage('dashboard')} 
+          onGoToDashboard={() => setCurrentPage('dashboard')}
+          setCurrentPage={setCurrentPage}
         />
         <AuthModal 
           isOpen={showAuthModal}
