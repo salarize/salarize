@@ -7550,15 +7550,15 @@ L'équipe Salarize`;
                     onClick={() => setDrillDownDept(isExpanded ? null : dept)}
                   >
                     {/* Ligne principale */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3">
                       <svg className={`w-3 h-3 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                       
-                      <span className="font-medium text-slate-700 text-sm w-28 truncate">{dept}</span>
+                      <span className="font-medium text-slate-700 text-sm w-24 sm:w-32 truncate">{dept}</span>
                       
-                      {/* Barre de progression - largeur fixe */}
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden w-32 sm:w-48 flex-shrink-0">
+                      {/* Barre de progression - plus large */}
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex-1 min-w-[80px] max-w-[300px]">
                         <div 
                           className="h-full rounded-full" 
                           style={{ 
@@ -7569,7 +7569,7 @@ L'équipe Salarize`;
                       </div>
                       
                       {/* Comparaisons inline */}
-                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 ml-auto">
+                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                         {comparison.variationVsPrevMonth !== null && (
                           <span className={`text-xs font-medium ${comparison.variationVsPrevMonth >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                             {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
