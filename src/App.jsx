@@ -756,7 +756,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
             
             {/* Subtitle */}
             <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-              Importez vos fichiers Acerta, visualisez vos données par département, 
+              Importez vos fichiers de secrétariat social, visualisez vos données par département, 
               et exportez des rapports professionnels en quelques clics.
             </p>
             
@@ -888,7 +888,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
             </div>
             <h3 className="text-xl font-bold text-white mb-3">Import intelligent</h3>
             <p className="text-slate-400">
-              Importez vos fichiers Acerta et Excel. Détection automatique des colonnes et des périodes.
+              Importez vos fichiers de secrétariat social et Excel. Détection automatique des colonnes et des périodes.
             </p>
           </div>
           
@@ -954,8 +954,8 @@ function FeaturesPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
         </svg>
       ),
       title: "Import multi-formats",
-      description: "Importez vos fichiers Acerta, Excel (.xlsx, .xls) et CSV. Détection automatique des colonnes et mapping intelligent des données.",
-      details: ["Export Acerta", "Fichiers Excel", "Détection automatique", "Mapping intelligent"]
+      description: "Importez vos fichiers de secrétariat social, Excel (.xlsx, .xls) et CSV. Détection automatique des colonnes et mapping intelligent des données.",
+      details: ["Acerta, SD Worx, Securex...", "Fichiers Excel", "Détection automatique", "Mapping intelligent"]
     },
     {
       icon: (
@@ -5839,7 +5839,7 @@ L'équipe Salarize`;
             </div>
             
             <p className="text-center text-slate-600 text-sm mt-6">
-              Compatible : Export Acerta, fichiers d'analyse internes
+              Compatible : Export secrétariat social (Acerta, SD Worx, Securex...), fichiers d'analyse internes
             </p>
           </div>
         </div>
@@ -6289,7 +6289,7 @@ L'équipe Salarize`;
             </div>
             
             <p className="text-xs text-slate-400 mt-4 text-center">
-              Formats supportés : .xlsx, .xls (Acerta, format interne)
+              Formats supportés : .xlsx, .xls (Acerta, SD Worx, Securex, format interne)
             </p>
             
             {/* Périodes existantes */}
@@ -8961,7 +8961,7 @@ L'équipe Salarize`;
                     <h2 className="text-2xl font-bold text-slate-800 mb-3">1. Importez vos données</h2>
                     <p className="text-slate-500 mb-6">
                       Cliquez sur <strong>+ Actions</strong> en bas à gauche puis <strong>Importer des données</strong>. 
-                      Salarize accepte les fichiers Excel (.xlsx) exportés d'Acerta ou d'autres systèmes de paie.
+                      Salarize accepte les fichiers Excel (.xlsx) exportés de votre secrétariat social (Acerta, SD Worx, Securex...) ou d'autres systèmes de paie.
                     </p>
                     <div className="bg-slate-50 rounded-xl p-4 text-left">
                       <p className="text-sm text-slate-600">
