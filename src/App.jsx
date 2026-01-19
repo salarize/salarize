@@ -2679,6 +2679,13 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   
   const handleGoogleLogin = async () => {
     try {
+      // Sauvegarder le token d'invitation s'il existe dans l'URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const inviteToken = urlParams.get('invite');
+      if (inviteToken) {
+        sessionStorage.setItem('pending_invite_token', inviteToken);
+      }
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -3505,6 +3512,15 @@ function AppContent() {
   // Toast notifications
   const toast = useToast();
   
+  // Sauvegarder le token d'invitation dès le chargement (avant toute redirection OAuth)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+    if (inviteToken) {
+      sessionStorage.setItem('pending_invite_token', inviteToken);
+    }
+  }, []);
+  
   // Helper pour formater les périodes (2024-03 → Mars 2024)
   const formatPeriod = (period) => {
     if (!period || period === 'Unknown') return period;
@@ -3744,7 +3760,15 @@ function AppContent() {
   // Vérifier s'il y a un token d'invitation dans l'URL
   const checkInviteToken = async (userEmail) => {
     const urlParams = new URLSearchParams(window.location.search);
-    const inviteToken = urlParams.get('invite');
+    let inviteToken = urlParams.get('invite');
+    
+    // Si pas dans l'URL, vérifier sessionStorage (sauvegardé avant OAuth)
+    if (!inviteToken) {
+      inviteToken = sessionStorage.getItem('pending_invite_token');
+      if (inviteToken) {
+        sessionStorage.removeItem('pending_invite_token');
+      }
+    }
     
     if (inviteToken) {
       // Chercher l'invitation correspondante
