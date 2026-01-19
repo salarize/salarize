@@ -3321,7 +3321,12 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                   {name.charAt(0)}
                 </div>
               )}
-              <span className="truncate">{name}</span>
+              <span className="truncate flex-1">{name}</span>
+              {companies[name]?.isShared && (
+                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">
+                  {companies[name].memberRole === 'viewer' ? '👁' : '✏️'}
+                </span>
+              )}
             </button>
           ))
         )}
@@ -3599,6 +3604,7 @@ function AppContent() {
   const [inviteRole, setInviteRole] = useState('viewer'); // Rôle de l'invité
   const [pendingInvites, setPendingInvites] = useState([]); // Invitations en attente
   const [sendingInvite, setSendingInvite] = useState(false); // État d'envoi de l'invitation
+  const [pendingInvitation, setPendingInvitation] = useState(null); // Invitation reçue à accepter
 
   // Fonction pour envoyer une invitation par email
   const sendInvitation = async () => {
@@ -3610,10 +3616,51 @@ function AppContent() {
     setSendingInvite(true);
     
     try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        toast.error('Vous devez être connecté');
+        setSendingInvite(false);
+        return;
+      }
+
+      // Récupérer l'ID de la société
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('name', activeCompany)
+        .single();
+
+      if (!companyData) {
+        toast.error('Société introuvable');
+        setSendingInvite(false);
+        return;
+      }
+
       // Générer un token unique pour l'invitation
       const inviteToken = crypto.randomUUID();
       const inviteLink = `${window.location.origin}?invite=${inviteToken}`;
       
+      // Sauvegarder l'invitation dans Supabase
+      const { error: insertError } = await supabase
+        .from('invitations')
+        .insert({
+          company_id: companyData.id,
+          company_name: activeCompany,
+          invited_by: currentUser.id,
+          invited_email: inviteEmail.toLowerCase(),
+          role: inviteRole,
+          token: inviteToken,
+          status: 'pending'
+        });
+
+      if (insertError) {
+        console.error('Erreur insertion invitation:', insertError);
+        toast.error('Erreur lors de la création de l\'invitation');
+        setSendingInvite(false);
+        return;
+      }
+
       // Envoyer l'email via EmailJS
       await emailjs.send(
         EMAILJS_SERVICE_ID,
@@ -3644,6 +3691,78 @@ function AppContent() {
       toast.error('Erreur lors de l\'envoi de l\'invitation. Veuillez réessayer.');
     } finally {
       setSendingInvite(false);
+    }
+  };
+
+  // Fonction pour accepter une invitation
+  const acceptInvitation = async () => {
+    if (!pendingInvitation) return;
+    
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        toast.error('Vous devez être connecté pour accepter l\'invitation');
+        return;
+      }
+
+      // Ajouter l'utilisateur comme membre de la société
+      const { error: memberError } = await supabase
+        .from('company_members')
+        .insert({
+          company_id: pendingInvitation.company_id,
+          user_id: currentUser.id,
+          role: pendingInvitation.role
+        });
+
+      if (memberError && !memberError.message?.includes('duplicate')) {
+        console.error('Erreur ajout membre:', memberError);
+        toast.error('Erreur lors de l\'acceptation');
+        return;
+      }
+
+      // Mettre à jour le statut de l'invitation
+      await supabase
+        .from('invitations')
+        .update({ 
+          status: 'accepted',
+          accepted_at: new Date().toISOString()
+        })
+        .eq('token', pendingInvitation.token);
+
+      toast.success(`Vous avez maintenant accès à ${pendingInvitation.company_name}`);
+      setPendingInvitation(null);
+      
+      // Recharger la page pour voir la société partagée
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Erreur acceptation:', error);
+      toast.error('Erreur lors de l\'acceptation de l\'invitation');
+    }
+  };
+
+  // Vérifier s'il y a un token d'invitation dans l'URL
+  const checkInviteToken = async (userEmail) => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+    
+    if (inviteToken) {
+      // Chercher l'invitation correspondante
+      const { data: invitation, error } = await supabase
+        .from('invitations')
+        .select('*')
+        .eq('token', inviteToken)
+        .eq('status', 'pending')
+        .single();
+
+      if (invitation && !error) {
+        setPendingInvitation(invitation);
+      } else {
+        toast.error('Invitation invalide ou expirée');
+      }
+      
+      // Nettoyer l'URL
+      window.history.replaceState(null, '', window.location.pathname);
     }
   };
   
@@ -3769,6 +3888,7 @@ function AppContent() {
             });
             setCurrentPage('dashboard');
             loadFromSupabase(user.id);
+            checkInviteToken(user.email);
             setIsLoading(false);
             return;
           }
@@ -3797,6 +3917,7 @@ function AppContent() {
         if (!dataLoadedRef.current) {
           dataLoadedRef.current = true;
           loadFromSupabase(session.user.id);
+          checkInviteToken(session.user.email);
         }
       } else {
         if (!dataLoadedRef.current) {
@@ -3874,7 +3995,7 @@ function AppContent() {
     console.log('[Salarize] Loading data from Supabase for user:', userId);
     setIsLoadingData(true);
     try {
-      // Load companies
+      // Load user's own companies
       const { data: companiesData, error: companiesError } = await supabase
         .from('companies')
         .select('*')
@@ -3885,12 +4006,36 @@ function AppContent() {
         throw companiesError;
       }
 
-      console.log('[Salarize] Loaded companies:', companiesData?.length || 0);
+      // Load shared companies (via company_members)
+      const { data: membershipData } = await supabase
+        .from('company_members')
+        .select('company_id, role')
+        .eq('user_id', userId);
+
+      let sharedCompaniesData = [];
+      if (membershipData && membershipData.length > 0) {
+        const sharedCompanyIds = membershipData.map(m => m.company_id);
+        const { data: sharedData } = await supabase
+          .from('companies')
+          .select('*')
+          .in('id', sharedCompanyIds);
+        
+        if (sharedData) {
+          sharedCompaniesData = sharedData.map(c => ({
+            ...c,
+            isShared: true,
+            memberRole: membershipData.find(m => m.company_id === c.id)?.role || 'viewer'
+          }));
+        }
+      }
+
+      const allCompanies = [...(companiesData || []), ...sharedCompaniesData];
+      console.log('[Salarize] Loaded companies:', allCompanies.length, '(own:', companiesData?.length || 0, ', shared:', sharedCompaniesData.length, ')');
 
       const loadedCompanies = {};
       
-      for (const company of companiesData || []) {
-        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
+      for (const company of allCompanies) {
+        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})${company.isShared ? ' [SHARED]' : ''}`);
         
         // Load employees for this company (limite augmentée à 10000)
         const { data: employeesData, error: empError } = await supabase
@@ -3938,7 +4083,9 @@ function AppContent() {
           periods,
           logo: company.logo,
           brandColor: company.brand_color,
-          website: company.website
+          website: company.website,
+          isShared: company.isShared || false,
+          memberRole: company.memberRole || null
         };
       }
 
@@ -9774,6 +9921,70 @@ L'équipe Salarize`;
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Modal Acceptation Invitation */}
+        {pendingInvitation && (
+          <div 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          >
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white text-center">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold">Invitation reçue !</h2>
+              </div>
+              
+              <div className="p-6">
+                <p className="text-slate-600 text-center mb-6">
+                  Vous avez été invité à consulter les données salariales de 
+                  <strong className="text-slate-800"> {pendingInvitation.company_name}</strong>
+                </p>
+                
+                <div className="bg-slate-50 rounded-xl p-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                      <svg className={`w-5 h-5 ${pendingInvitation.role === 'viewer' ? 'text-emerald-600' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {pendingInvitation.role === 'viewer' ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        )}
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-800">
+                        {pendingInvitation.role === 'viewer' ? 'Accès Lecteur' : 'Accès Éditeur'}
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {pendingInvitation.role === 'viewer' 
+                          ? 'Consultation des données uniquement' 
+                          : 'Consultation et modification des données'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPendingInvitation(null)}
+                    className="flex-1 py-3 border border-slate-200 rounded-xl font-medium hover:bg-slate-100 transition-colors"
+                  >
+                    Refuser
+                  </button>
+                  <button
+                    onClick={acceptInvitation}
+                    className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-colors"
+                  >
+                    Accepter
+                  </button>
+                </div>
               </div>
             </div>
           </div>
