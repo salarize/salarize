@@ -3418,11 +3418,8 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
 }
 
 // Sidebar component OUTSIDE of App
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, companyRoles }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose }) {
   const [showActions, setShowActions] = useState(false);
-  
-  // Vérifier si l'utilisateur peut modifier la company active
-  const canEdit = !activeCompany || companyRoles?.[activeCompany] === 'owner' || companyRoles?.[activeCompany] === 'editor';
   
   // Calculer employés non assignés
   const unassignedCount = activeCompany && companies[activeCompany] 
@@ -3490,11 +3487,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-20">
                   {/* 1. Importer des données - Action principale */}
                   <button
-                    onClick={() => { if (canEdit) { onImportClick(); setShowActions(false); } }}
-                    disabled={!canEdit}
-                    className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
-                      canEdit ? 'hover:bg-slate-700' : 'opacity-50 cursor-not-allowed'
-                    }`}
+                    onClick={() => { onImportClick(); setShowActions(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
                   >
                     <div className="w-8 h-8 bg-fuchsia-500/20 rounded-lg flex items-center justify-center">
                       <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3503,7 +3497,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                     </div>
                     <div>
                       <p className="font-medium text-white text-sm">Importer des données</p>
-                      <p className="text-slate-400 text-xs">{canEdit ? 'Fichier Excel (.xlsx)' : 'Mode lecture seule'}</p>
+                      <p className="text-slate-400 text-xs">Fichier Excel (.xlsx)</p>
                     </div>
                   </button>
                   
@@ -3520,7 +3514,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                       </div>
                       <div>
                         <p className="font-medium text-white text-sm">Départements</p>
-                        <p className="text-slate-400 text-xs">{canEdit ? 'Réassigner, renommer, fusionner' : 'Consultation uniquement'}</p>
+                        <p className="text-slate-400 text-xs">Réassigner, renommer, fusionner</p>
                       </div>
                     </button>
                   )}
@@ -3541,8 +3535,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                     </div>
                   </button>
                   
-                  {/* 4. Séparateur + Gérer société - Si société active et pas en mode viewer */}
-                  {activeCompany && canEdit && (
+                  {/* 4. Séparateur + Gérer société - Si société active */}
+                  {activeCompany && (
                     <button
                       onClick={() => { onManageData(); setShowActions(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left border-t border-slate-700"
@@ -3565,8 +3559,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
           </div>
         </div>
       
-      {/* Alerte employés non assignés - seulement si peut éditer */}
-      {unassignedCount > 0 && canEdit && (
+      {/* Alerte employés non assignés */}
+      {unassignedCount > 0 && (
         <button
           onClick={onManageDepts}
           className="mx-4 mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 hover:bg-amber-500/20 transition-colors"
@@ -3591,37 +3585,24 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         {Object.keys(companies).length === 0 ? (
           <p className="text-slate-600 text-sm">Aucune société</p>
         ) : (
-          Object.keys(companies).map(name => {
-            const role = companyRoles?.[name];
-            const isShared = role === 'viewer' || role === 'editor';
-            return (
-              <button
-                key={name}
-                onClick={() => onSelectCompany(name)}
-                className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                  activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
-                }`}
-              >
-                {companies[name]?.logo ? (
-                  <img src={companies[name].logo} alt="" className="w-6 h-6 rounded object-cover" />
-                ) : (
-                  <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
-                    {name.charAt(0)}
-                  </div>
-                )}
-                <span className="truncate flex-1">{name}</span>
-                {isShared && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                    role === 'viewer' 
-                      ? 'bg-amber-500/20 text-amber-400' 
-                      : 'bg-emerald-500/20 text-emerald-400'
-                  }`}>
-                    {role === 'viewer' ? 'Lecteur' : 'Éditeur'}
-                  </span>
-                )}
-              </button>
-            );
-          })
+          Object.keys(companies).map(name => (
+            <button
+              key={name}
+              onClick={() => onSelectCompany(name)}
+              className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
+              }`}
+            >
+              {companies[name]?.logo ? (
+                <img src={companies[name].logo} alt="" className="w-6 h-6 rounded object-cover" />
+              ) : (
+                <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
+                  {name.charAt(0)}
+                </div>
+              )}
+              <span className="truncate">{name}</span>
+            </button>
+          ))
         )}
       </div>
     </div>
@@ -3906,10 +3887,6 @@ function AppContent() {
   const [pendingInvites, setPendingInvites] = useState([]); // Invitations en attente
   const [sendingInvite, setSendingInvite] = useState(false); // État d'envoi de l'invitation
   
-  // === SYSTÈME DE PARTAGE MULTI-USERS ===
-  const [companyRoles, setCompanyRoles] = useState({}); // { companyName: 'owner' | 'viewer' | 'editor' }
-  const [pendingInvitations, setPendingInvitations] = useState([]); // Invitations reçues en attente
-  
   // Détecter si on arrive d'un lien de reset password IMMÉDIATEMENT
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(() => {
     if (typeof window !== 'undefined' && window.location.hash) {
@@ -3966,83 +3943,27 @@ function AppContent() {
       return;
     }
 
-    if (!activeCompany || !companies[activeCompany]?.id) {
-      toast.error('Aucune entreprise sélectionnée');
-      return;
-    }
-
     setSendingInvite(true);
     
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
-        toast.error('Vous devez être connecté');
-        setSendingInvite(false);
-        return;
-      }
-
-      const companyId = companies[activeCompany].id;
-      
-      // Vérifier si une invitation existe déjà
-      const { data: existingShare } = await supabase
-        .from('company_shares')
-        .select('id, status')
-        .eq('company_id', companyId)
-        .eq('shared_with_email', inviteEmail.toLowerCase())
-        .single();
-
-      if (existingShare) {
-        if (existingShare.status === 'accepted') {
-          toast.error('Cet utilisateur a déjà accès à cette entreprise');
-        } else {
-          toast.error('Une invitation est déjà en attente pour cet email');
-        }
-        setSendingInvite(false);
-        return;
-      }
-
       // Générer un token unique pour l'invitation
       const inviteToken = crypto.randomUUID();
       const inviteLink = `${window.location.origin}?invite=${inviteToken}`;
       
-      // Sauvegarder dans company_shares
-      const { error: shareError } = await supabase
-        .from('company_shares')
-        .insert({
-          company_id: companyId,
-          owner_id: currentUser.id,
-          shared_with_email: inviteEmail.toLowerCase(),
-          role: inviteRole,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        });
-
-      if (shareError) {
-        console.error('Erreur sauvegarde invitation:', shareError);
-        toast.error('Erreur lors de la sauvegarde de l\'invitation');
-        setSendingInvite(false);
-        return;
-      }
-      
       // Envoyer l'email via EmailJS
-      try {
-        await emailjs.send(
-          EMAILJS_SERVICE_ID,
-          EMAILJS_TEMPLATE_ID,
-          {
-            to_email: inviteEmail,
-            from_name: user?.name || user?.email || 'Un utilisateur',
-            company_name: activeCompany,
-            role: inviteRole === 'viewer' ? 'Lecteur (consultation uniquement)' : 'Éditeur (consultation et modification)',
-            invite_link: inviteLink,
-          }
-        );
-      } catch (emailErr) {
-        console.warn('Email non envoyé mais invitation sauvegardée:', emailErr);
-        // L'invitation est quand même sauvegardée, on continue
-      }
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        {
+          to_email: inviteEmail,
+          from_name: user?.name || user?.email || 'Un utilisateur',
+          company_name: activeCompany,
+          role: inviteRole === 'viewer' ? 'Lecteur (consultation uniquement)' : 'Éditeur (consultation et modification)',
+          invite_link: inviteLink,
+        }
+      );
 
-      // Ajouter à la liste des invitations en attente (UI)
+      // Ajouter à la liste des invitations en attente
       setPendingInvites([...pendingInvites, { 
         email: inviteEmail, 
         role: inviteRole, 
@@ -4075,18 +3996,6 @@ function AppContent() {
   // Debounced search terms for performance
   const debouncedEmpSearch = useDebounce(empSearchTerm, 300);
   const debouncedDeptSearch = useDebounce(deptSearchTerm, 300);
-
-  // Calculer si l'utilisateur peut modifier la company active
-  const isViewer = useMemo(() => {
-    if (!activeCompany || !companyRoles[activeCompany]) return false;
-    return companyRoles[activeCompany] === 'viewer';
-  }, [activeCompany, companyRoles]);
-
-  const canEdit = useMemo(() => {
-    if (!activeCompany) return true;
-    const role = companyRoles[activeCompany];
-    return !role || role === 'owner' || role === 'editor';
-  }, [activeCompany, companyRoles]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -4329,11 +4238,7 @@ function AppContent() {
     console.log('[Salarize] Loading data from Supabase for user:', userId);
     setIsLoadingData(true);
     try {
-      // Get user email for shared companies lookup
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const userEmail = currentUser?.email?.toLowerCase();
-
-      // Load owned companies
+      // Load companies
       const { data: companiesData, error: companiesError } = await supabase
         .from('companies')
         .select('*')
@@ -4344,91 +4249,12 @@ function AppContent() {
         throw companiesError;
       }
 
-      console.log('[Salarize] Loaded owned companies:', companiesData?.length || 0);
-
-      // Load shared companies (accepted invitations)
-      let sharedCompaniesData = [];
-      const roles = {}; // Track roles for each company
-      
-      if (userEmail) {
-        // First, auto-accept any pending invitations for this user
-        const { data: pendingShares } = await supabase
-          .from('company_shares')
-          .select('id, company_id, role')
-          .eq('shared_with_email', userEmail)
-          .eq('status', 'pending');
-
-        if (pendingShares && pendingShares.length > 0) {
-          console.log('[Salarize] Auto-accepting', pendingShares.length, 'pending invitations');
-          
-          // Update all pending invitations to accepted
-          const { error: updateError } = await supabase
-            .from('company_shares')
-            .update({ 
-              status: 'accepted', 
-              shared_with_id: userId,
-              accepted_at: new Date().toISOString()
-            })
-            .eq('shared_with_email', userEmail)
-            .eq('status', 'pending');
-
-          if (updateError) {
-            console.error('[Salarize] Error accepting invitations:', updateError);
-          }
-        }
-
-        // Now load all accepted shares for this user
-        const { data: acceptedShares, error: sharesError } = await supabase
-          .from('company_shares')
-          .select('company_id, role')
-          .or(`shared_with_email.eq.${userEmail},shared_with_id.eq.${userId}`)
-          .eq('status', 'accepted');
-
-        if (sharesError) {
-          console.error('[Salarize] Error loading shares:', sharesError);
-        } else if (acceptedShares && acceptedShares.length > 0) {
-          console.log('[Salarize] Found', acceptedShares.length, 'shared companies');
-          
-          // Get company IDs from shares
-          const sharedCompanyIds = acceptedShares.map(s => s.company_id);
-          
-          // Store roles by company_id first, we'll convert to company names later
-          const rolesByCompanyId = {};
-          acceptedShares.forEach(s => {
-            rolesByCompanyId[s.company_id] = s.role;
-          });
-          
-          // Load the shared companies
-          const { data: sharedData, error: sharedError } = await supabase
-            .from('companies')
-            .select('*')
-            .in('id', sharedCompanyIds);
-
-          if (sharedError) {
-            console.error('[Salarize] Error loading shared companies:', sharedError);
-          } else {
-            sharedCompaniesData = sharedData || [];
-            // Map roles to company names
-            sharedCompaniesData.forEach(c => {
-              roles[c.name] = rolesByCompanyId[c.id] || 'viewer';
-            });
-          }
-        }
-      }
-
-      // Mark owned companies
-      (companiesData || []).forEach(c => {
-        roles[c.name] = 'owner';
-      });
-
-      // Combine owned and shared companies
-      const allCompanies = [...(companiesData || []), ...sharedCompaniesData];
-      console.log('[Salarize] Total companies to load:', allCompanies.length);
+      console.log('[Salarize] Loaded companies:', companiesData?.length || 0);
 
       const loadedCompanies = {};
       
-      for (const company of allCompanies) {
-        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id}) - Role: ${roles[company.name]}`);
+      for (const company of companiesData || []) {
+        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
         
         // Load ALL employees for this company with pagination
         let allEmployeesData = [];
@@ -4503,31 +4329,6 @@ function AppContent() {
 
       setCompanies(loadedCompanies);
       companiesRef.current = loadedCompanies; // Synchroniser la ref
-      setCompanyRoles(roles); // Sauvegarder les rôles
-      
-      // Load pending invites sent by this user
-      const { data: sentInvites } = await supabase
-        .from('company_shares')
-        .select('shared_with_email, role, status, created_at, company_id')
-        .eq('owner_id', userId)
-        .eq('status', 'pending');
-      
-      if (sentInvites && sentInvites.length > 0) {
-        const invitesWithCompanyNames = sentInvites.map(invite => {
-          // Find company name by ID
-          const companyName = Object.keys(loadedCompanies).find(
-            name => loadedCompanies[name].id === invite.company_id
-          );
-          return {
-            email: invite.shared_with_email,
-            role: invite.role,
-            company: companyName || 'Unknown',
-            createdAt: invite.created_at
-          };
-        });
-        setPendingInvites(invitesWithCompanyNames);
-        console.log('[Salarize] Loaded pending invites:', invitesWithCompanyNames.length);
-      }
       
       // Load first company if exists
       const companyNames = Object.keys(loadedCompanies);
@@ -4733,7 +4534,7 @@ function AppContent() {
               .delete()
               .eq('company_id', companyId);
             
-            // Insert new mappings with upsert to avoid duplicates
+            // Insert new mappings
             const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
               company_id: companyId,
               employee_name: empName,
@@ -4742,7 +4543,7 @@ function AppContent() {
 
             const { error: mapError } = await supabase
               .from('department_mappings')
-              .upsert(mappingsToInsert, { onConflict: 'company_id,employee_name' });
+              .insert(mappingsToInsert);
 
             if (mapError) {
               console.error('[Salarize] Error inserting mappings:', mapError);
@@ -5853,7 +5654,7 @@ function AppContent() {
     setNewCompanyName('');
     setDebugMsg(`✓ ${newEmps.length} nouvelles entrées (total: ${allEmps.length})`);
 
-    // Toujours aller au dashboard après import (pas de flow d'assignation automatique)
+    // Toujours aller au dashboard (pas de flow d'assignation automatique)
     setView('dashboard');
     
     return newCompanies; // Retourner pour pouvoir sauvegarder à la fin
@@ -7689,15 +7490,8 @@ L'équipe Salarize`;
     );
   }
 
-  // Assignment screen - redirect viewers to dashboard
+  // Assignment screen
   if (view === 'assign' && currentAssignment) {
-    // Redirect viewers to dashboard
-    if (isViewer) {
-      setView('dashboard');
-      setPendingAssignments([]);
-      setCurrentAssignment(null);
-      return null;
-    }
     return (
       <PageTransition key="assign">
         <div className="min-h-screen flex">
@@ -7713,7 +7507,6 @@ L'équipe Salarize`;
             setCurrentPage={setCurrentPage}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
-            companyRoles={companyRoles}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -7816,7 +7609,6 @@ L'équipe Salarize`;
           setCurrentPage={setCurrentPage}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          companyRoles={companyRoles}
         />
         <DashboardHeader 
           user={user} 
@@ -8029,7 +7821,7 @@ L'équipe Salarize`;
                 <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
               </div>
               
-              {/* Bouton fermer - positionné en haut à droite du header */}
+              {/* Bouton fermer - positionné en haut à droite */}
               <button 
                 onClick={() => {
                   setPendingPeriodSelection(null);
@@ -8194,11 +7986,11 @@ L'équipe Salarize`;
                     const isMultiFileImport = fileQueue.length > 1;
                     
                     if (activeCompany && view === 'dashboard') {
-                      // skipSave=true pour TOUS les fichiers en multi-import, on sauvegarde une seule fois à la fin
-                      const skipSave = isMultiFileImport;
+                      // skipSave=true si on est en multi-fichier ET pas le dernier
+                      const skipSave = isMultiFileImport && !isLastFile;
                       importToCompanyDirect(activeCompany, result, skipSave);
                       
-                      // Si c'est le dernier fichier d'un batch, sauvegarder explicitement UNE SEULE FOIS
+                      // Si c'est le dernier fichier d'un batch, sauvegarder explicitement
                       if (isMultiFileImport && isLastFile) {
                         console.log('[Salarize] Last file of batch - saving all data now');
                         saveAll(companiesRef.current, activeCompany);
@@ -8236,7 +8028,7 @@ L'équipe Salarize`;
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
-                      <span className="hidden sm:inline">Vérification...</span>
+                      Vérification...
                     </>
                   ) : (
                     <>
@@ -8260,9 +8052,9 @@ L'équipe Salarize`;
                 </button>
               </div>
               
-              {/* Ignorer - uniquement pour multi-fichiers */}
+              {/* Ignorer - très discret, séparé */}
               {fileQueue.length > 1 && (
-                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-100 text-center">
+                <div className="mt-4 pt-4 border-t border-slate-100 text-center">
                   <button
                     onClick={async () => {
                       if (currentFileIndex < fileQueue.length - 1) {
@@ -8484,20 +8276,6 @@ L'équipe Salarize`;
                 )}
                 
                 {!showRenameDept && !showMergeDept && !showCreateDept && (
-                  <>
-                  {/* Message pour les viewers */}
-                  {isViewer && (
-                    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                      <p className="text-sm text-amber-700 flex items-center gap-2">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        Mode lecture seule - Vous ne pouvez pas modifier les départements
-                      </p>
-                    </div>
-                  )}
-                  {canEdit && (
                   <div className="flex gap-2 mb-3">
                     <button
                       onClick={() => setShowCreateDept(true)}
@@ -8520,8 +8298,6 @@ L'équipe Salarize`;
                       🔀 Fusionner
                     </button>
                   </div>
-                  )}
-                  </>
                 )}
                 
                 {/* Create department UI */}
@@ -8569,8 +8345,8 @@ L'équipe Salarize`;
                   </div>
                 )}
                 
-                {/* Bulk assign bar - Only for editors */}
-                {selectedEmployees.size > 0 && canEdit && (
+                {/* Bulk assign bar */}
+                {selectedEmployees.size > 0 && (
                   <div className="mb-3 p-3 bg-violet-50 border border-violet-200 rounded-xl flex items-center gap-3">
                     <div className="flex-1">
                       <span className="text-sm font-medium text-violet-700">
@@ -8679,9 +8455,8 @@ L'équipe Salarize`;
                   </div>
                 ) : (
                   <>
-                    {/* Select all header - Only show checkbox if can edit */}
+                    {/* Select all header */}
                     <div className="flex items-center gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 sticky top-0">
-                      {canEdit && (
                       <input
                         type="checkbox"
                         id="select-all-employees"
@@ -8706,11 +8481,10 @@ L'équipe Salarize`;
                         }}
                         className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                       />
-                      )}
                       <span className="text-sm text-slate-500 flex-1">
-                        {canEdit && selectedEmployees.size > 0 
+                        {selectedEmployees.size > 0 
                           ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}` 
-                          : canEdit ? `Tout sélectionner (${allFilteredEmployeesForDept.length})` : `${allFilteredEmployeesForDept.length} employé${allFilteredEmployeesForDept.length > 1 ? 's' : ''}`}
+                          : `Tout sélectionner (${allFilteredEmployeesForDept.length})`}
                       </span>
                       <span className="text-xs text-slate-400">
                         {deptPage * DEPT_PAGE_SIZE + 1}-{Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length)} sur {allFilteredEmployeesForDept.length}
@@ -8723,8 +8497,7 @@ L'équipe Salarize`;
                         className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}
                         style={{ contain: 'layout style paint' }}
                       >
-                        {/* Checkbox - Only for editors */}
-                        {canEdit && (
+                        {/* Checkbox */}
                         <input
                           type="checkbox"
                           id={`emp-checkbox-${emp.name.replace(/\s+/g, '-')}`}
@@ -8741,7 +8514,6 @@ L'équipe Salarize`;
                           }}
                           className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                         />
-                        )}
                         
                         {/* Avatar */}
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
@@ -8758,9 +8530,7 @@ L'équipe Salarize`;
                         
                         <select
                           value={emp.currentDept || ''}
-                          disabled={!canEdit}
                           onChange={e => {
-                            if (!canEdit) return;
                             const newDept = e.target.value || null;
                             
                             const newMapping = { ...departmentMapping };
@@ -8785,9 +8555,7 @@ L'équipe Salarize`;
                             companiesRef.current = newCompanies; // Update ref immediately
                             debouncedSaveAll(newCompanies, activeCompany);
                           }}
-                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all ${
-                            !canEdit ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
-                          } ${
+                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
                             emp.currentDept 
                               ? 'border-slate-200 bg-white hover:border-slate-300' 
                               : 'border-amber-300 bg-amber-50 text-amber-700'
@@ -8864,86 +8632,73 @@ L'équipe Salarize`;
           </div>
         ) : (
         <>
-        {/* Company Header Card - Mobile optimized */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl sm:rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 relative overflow-hidden">
-          {/* Background decoration - hidden on mobile for performance */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl pointer-events-none hidden sm:block"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl pointer-events-none hidden sm:block"></div>
+        {/* Company Header Card */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 mb-6 relative">
+          {/* Background decoration */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
           
-          <div className="relative flex flex-col gap-4">
-            {/* Top row: Logo + Info + Actions */}
-            <div className="flex items-start sm:items-center gap-3 sm:gap-4">
-              {/* Company Logo */}
-              <div className="relative group flex-shrink-0">
-                {companies[activeCompany]?.logo ? (
-                  <img src={companies[activeCompany].logo} alt="" className="w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-xl sm:rounded-2xl object-cover ring-2 sm:ring-4 ring-white/10" />
-                ) : (
-                  <div 
-                    className="w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-xl sm:rounded-2xl flex items-center justify-center text-white text-xl sm:text-2xl lg:text-3xl font-bold ring-2 sm:ring-4 ring-white/10"
-                    style={{ background: `linear-gradient(135deg, rgb(${getBrandColor()}), rgb(${getBrandColor().split(',').map((c, i) => Math.max(0, parseInt(c) - 40)).join(',')}))` }}
-                  >
-                    {activeCompany?.charAt(0)?.toUpperCase()}
-                  </div>
-                )}
-                <button
-                  onClick={() => setShowLogoMenu(!showLogoMenu)}
-                  className="absolute inset-0 bg-black/60 rounded-xl sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
+            {/* Company Logo */}
+            <div className="relative group flex-shrink-0">
+              {companies[activeCompany]?.logo ? (
+                <img src={companies[activeCompany].logo} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-4 ring-white/10" />
+              ) : (
+                <div 
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white text-2xl sm:text-3xl font-bold ring-4 ring-white/10"
+                  style={{ background: `linear-gradient(135deg, rgb(${getBrandColor()}), rgb(${getBrandColor().split(',').map((c, i) => Math.max(0, parseInt(c) - 40)).join(',')}))` }}
                 >
-                  <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-                
-                {showLogoMenu && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowLogoMenu(false)} />
-                    <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-20">
-                      <label className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
-                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  {activeCompany?.charAt(0)?.toUpperCase()}
+                </div>
+              )}
+              <button
+                onClick={() => setShowLogoMenu(!showLogoMenu)}
+                className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+              >
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+              
+              {showLogoMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowLogoMenu(false)} />
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg py-2 w-48 z-20">
+                    <label className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {companies[activeCompany]?.logo ? 'Modifier le logo' : 'Ajouter un logo'}
+                      <input 
+                        type="file"
+                        id="company-logo-upload"
+                        name="companyLogo"
+                        accept="image/*" 
+                        onChange={(e) => { handleLogoChange(e); setShowLogoMenu(false); }}
+                        className="hidden" 
+                      />
+                    </label>
+                    {companies[activeCompany]?.logo && (
+                      <button
+                        onClick={() => { handleLogoDelete(); setShowLogoMenu(false); }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
-                        {companies[activeCompany]?.logo ? 'Modifier le logo' : 'Ajouter un logo'}
-                        <input 
-                          type="file"
-                          id="company-logo-upload"
-                          name="companyLogo"
-                          accept="image/*" 
-                          onChange={(e) => { handleLogoChange(e); setShowLogoMenu(false); }}
-                          className="hidden" 
-                        />
-                      </label>
-                      {companies[activeCompany]?.logo && (
-                        <button
-                          onClick={() => { handleLogoDelete(); setShowLogoMenu(false); }}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Supprimer le logo
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+                        Supprimer le logo
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
             
             {/* Company Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5 sm:mb-1 flex-wrap">
-                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white truncate max-w-[200px] sm:max-w-none">{activeCompany}</h1>
-                {/* Badge rôle si partagé */}
-                {companyRoles[activeCompany] && companyRoles[activeCompany] !== 'owner' && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    companyRoles[activeCompany] === 'viewer'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                  }`}>
-                    {companyRoles[activeCompany] === 'viewer' ? '👁 Lecteur' : '✏️ Éditeur'}
-                  </span>
-                )}
-                {canEdit && (
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{activeCompany}</h1>
                 <button
                   onClick={() => setShowCompanySettings(true)}
                   className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
@@ -8954,47 +8709,51 @@ L'équipe Salarize`;
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </button>
-                )}
               </div>
-              <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-white/60 flex-wrap">
+              <div className="flex items-center gap-3 text-sm text-white/60">
                 {companies[activeCompany]?.website && (
-                  <a 
-                    href={companies[activeCompany].website.startsWith('http') ? companies[activeCompany].website : `https://${companies[activeCompany].website}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-white transition-colors flex items-center gap-1 hidden sm:flex"
-                  >
-                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                    <span className="truncate max-w-[100px] sm:max-w-[150px]">{companies[activeCompany].website.replace(/^https?:\/\//, '')}</span>
-                  </a>
+                  <>
+                    <a 
+                      href={companies[activeCompany].website.startsWith('http') ? companies[activeCompany].website : `https://${companies[activeCompany].website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-white transition-colors flex items-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                      <span className="truncate max-w-[150px]">{companies[activeCompany].website.replace(/^https?:\/\//, '')}</span>
+                    </a>
+                    <span className="text-white/30">•</span>
+                  </>
                 )}
                 <span className="flex items-center gap-1">
-                  <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   {periods.length} période{periods.length > 1 ? 's' : ''}
                 </span>
                 {isSyncing && (
-                  <span className="flex items-center gap-1 text-violet-400">
-                    <svg className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span className="hidden sm:inline">Sync...</span>
-                  </span>
+                  <>
+                    <span className="text-white/30">•</span>
+                    <span className="flex items-center gap-1.5 text-violet-400">
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Sync...
+                    </span>
+                  </>
                 )}
               </div>
             </div>
-            </div>
             
-            {/* Action Buttons - Mobile: bottom row, Desktop: inline */}
-            <div className="flex items-center gap-2 justify-end sm:justify-start">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               {/* Export Dropdown */}
               <div className="relative group">
-                <button className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-lg sm:rounded-xl transition-colors text-xs sm:text-sm font-medium text-white border border-white/10">
-                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-sm font-medium text-white border border-white/10">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   <span className="hidden sm:inline">Exporter</span>
@@ -9036,35 +8795,33 @@ L'équipe Salarize`;
               {/* Share Button */}
               <button
                 onClick={() => setShowShareModal(true)}
-                className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-lg sm:rounded-xl transition-all text-xs sm:text-sm font-medium text-white border border-white/20"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-all text-sm font-medium text-white border border-white/20"
               >
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
                 <span className="hidden sm:inline">Partager</span>
               </button>
               
-              {/* Invite CEO Button - Only for owners */}
-              {(!companyRoles[activeCompany] || companyRoles[activeCompany] === 'owner') && (
+              {/* Invite CEO Button */}
               <button
                 onClick={() => setShowInviteModal(true)}
-                className="flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-lg sm:rounded-xl transition-all text-xs sm:text-sm font-medium text-white shadow-lg shadow-violet-500/25"
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
               >
-                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
                 <span className="hidden sm:inline">Inviter</span>
               </button>
-              )}
               
               {/* Settings Menu */}
               <div className="relative group">
-                <button className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-white/10 hover:bg-white/20 backdrop-blur rounded-lg sm:rounded-xl transition-colors text-white border border-white/10">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button className="flex items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-white border border-white/10">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                   </svg>
                 </button>
-                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60] w-48 sm:w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60] w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                   <div className="p-1.5">
                     {periods.length > 1 && (
                       <button
@@ -9094,268 +8851,59 @@ L'équipe Salarize`;
           </div>
         </div>
         
-        {/* KPI Cards - Mobile optimized */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
-          <div className="bg-white rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-11 lg:h-11 rounded-lg sm:rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <span className="text-[10px] sm:text-xs lg:text-sm font-medium text-slate-500">Coût Total</span>
+              <span className="text-sm font-medium text-slate-500">Coût Total</span>
             </div>
-            <p className="text-base sm:text-lg lg:text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
+            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
           </div>
           
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <span className="text-xs sm:text-sm font-medium text-slate-500">Employés</span>
+              <span className="text-sm font-medium text-slate-500">Employés</span>
             </div>
-            <p className="text-lg sm:text-2xl font-bold text-slate-800">{uniqueNames}</p>
-            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1">Actifs sur la période</p>
+            <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
+            <p className="text-xs text-slate-400 mt-1">Actifs sur la période</p>
           </div>
           
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
-              <span className="text-xs sm:text-sm font-medium text-slate-500">Départements</span>
+              <span className="text-sm font-medium text-slate-500">Départements</span>
             </div>
-            <p className="text-lg sm:text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
-            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 truncate">{[...new Set(filtered.map(e => e.department).filter(Boolean))][0] || 'Aucun'}</p>
+            <p className="text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
+            <p className="text-xs text-slate-400 mt-1">{[...new Set(filtered.map(e => e.department).filter(Boolean))][0] || 'Aucun'} en tête</p>
           </div>
           
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
               </div>
-              <span className="text-xs sm:text-sm font-medium text-slate-500">Coût Moyen</span>
+              <span className="text-sm font-medium text-slate-500">Coût Moyen</span>
             </div>
-            <p className="text-lg sm:text-2xl font-bold text-slate-800">€{avgMonthlyCostPerEmployee.toLocaleString('fr-BE', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
-            <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1">Par employé/mois</p>
+            <p className="text-2xl font-bold text-slate-800">€{avgMonthlyCostPerEmployee.toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+            <p className="text-xs text-slate-400 mt-1">Mensuel par employé</p>
           </div>
         </div>
-        
-        {/* Period Filter Bar - Mobile optimized */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-6 bg-white rounded-xl p-2 border border-slate-200 shadow-sm overflow-x-auto">
-          {/* Quick filters */}
-          <div className="flex items-center gap-1 pr-2 sm:pr-3 border-r border-slate-200 flex-shrink-0">
-            <button
-              onClick={() => { setSelectedPeriods([]); setPeriodFilter('all'); }}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
-                selectedPeriods.length === 0 && periodFilter === 'all'
-                  ? 'bg-violet-100 text-violet-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              Tout
-            </button>
-            <button
-              onClick={() => { setPeriodFilter('3m'); setSelectedPeriods([]); }}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
-                periodFilter === '3m' && selectedPeriods.length === 0
-                  ? 'bg-violet-100 text-violet-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              3m
-            </button>
-            <button
-              onClick={() => { setPeriodFilter('6m'); setSelectedPeriods([]); }}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
-                periodFilter === '6m' && selectedPeriods.length === 0
-                  ? 'bg-violet-100 text-violet-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              6m
-            </button>
-            <button
-              onClick={() => { setPeriodFilter('12m'); setSelectedPeriods([]); }}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap hidden sm:block ${
-                periodFilter === '12m' && selectedPeriods.length === 0
-                  ? 'bg-violet-100 text-violet-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              12m
-            </button>
-            <button
-              onClick={() => { setPeriodFilter('ytd'); setSelectedPeriods([]); }}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap hidden sm:block ${
-                periodFilter === 'ytd' && selectedPeriods.length === 0
-                  ? 'bg-violet-100 text-violet-700'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {new Date().getFullYear()}
-            </button>
-          </div>
-          
-          {/* Custom period selector */}
-          {periods.length > 1 && (
-            <div className="relative">
-              <button
-                onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                  selectedPeriods.length > 0
-                    ? 'bg-violet-500 text-white'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                {selectedPeriods.length > 0 ? (
-                  <span>{selectedPeriods.length} période{selectedPeriods.length > 1 ? 's' : ''}</span>
-                ) : (
-                  <span>Personnalisé</span>
-                )}
-                <svg className={`w-3 h-3 transition-transform ${showPeriodDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-            </div>
-          )}
-          
-          {/* Selected periods pills */}
-          {selectedPeriods.length > 0 && selectedPeriods.length <= 4 && (
-            <div className="flex items-center gap-1 pl-2 border-l border-slate-200">
-              {selectedPeriods.sort().map(p => (
-                <span
-                  key={p}
-                  className="inline-flex items-center gap-1 px-2 py-1 bg-violet-50 text-violet-700 rounded-md text-xs font-medium"
-                >
-                  {formatPeriod(p)}
-                  <button
-                    onClick={() => setSelectedPeriods(selectedPeriods.filter(sp => sp !== p))}
-                    className="hover:text-violet-900"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </span>
-              ))}
-              <button
-                onClick={() => setSelectedPeriods([])}
-                className="text-xs text-slate-400 hover:text-slate-600 ml-1"
-              >
-                Effacer
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Period Multi-Select Dropdown */}
-        {showPeriodDropdown && periods.length > 1 && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowPeriodDropdown(false)} />
-            <div className="fixed right-6 top-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 w-72 max-h-96 overflow-hidden">
-              <div className="p-3 border-b border-slate-100 bg-slate-50 sticky top-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-slate-700">Sélectionner des périodes</span>
-                  <button
-                    onClick={() => setShowPeriodDropdown(false)}
-                    className="p-1 hover:bg-slate-200 rounded"
-                  >
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  onClick={() => setSelectedPeriods([])}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm mt-2 transition-colors ${
-                    selectedPeriods.length === 0 ? 'bg-violet-100 text-violet-700 font-medium' : 'hover:bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  ✓ Toutes les périodes
-                </button>
-              </div>
-              
-              <div className="overflow-y-auto max-h-64 p-2">
-              {(() => {
-                const grouped = periods.reduce((acc, p) => {
-                  const year = p.substring(0, 4);
-                  if (!acc[year]) acc[year] = [];
-                  acc[year].push(p);
-                  return acc;
-                }, {});
-                
-                return Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0])).map(([year, yearPeriods]) => (
-                  <div key={year} className="mb-2">
-                    <div className="flex items-center justify-between px-2 py-1 bg-slate-50 rounded-lg mb-1">
-                      <span className="text-xs font-bold text-slate-500">{year}</span>
-                      <button
-                        onClick={() => {
-                          const allYearSelected = yearPeriods.every(p => selectedPeriods.includes(p));
-                          if (allYearSelected) {
-                            setSelectedPeriods(selectedPeriods.filter(p => !yearPeriods.includes(p)));
-                          } else {
-                            setSelectedPeriods([...new Set([...selectedPeriods, ...yearPeriods])]);
-                          }
-                        }}
-                        className="text-xs text-violet-600 hover:text-violet-700 font-medium"
-                      >
-                        {yearPeriods.every(p => selectedPeriods.includes(p)) ? 'Désélectionner' : 'Tout sélectionner'}
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1">
-                    {yearPeriods.sort().reverse().map(p => {
-                      const isSelected = selectedPeriods.includes(p);
-                      const monthName = formatPeriod(p).split(' ')[0].substring(0, 3);
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedPeriods(selectedPeriods.filter(sp => sp !== p));
-                            } else {
-                              setSelectedPeriods([...selectedPeriods, p]);
-                            }
-                          }}
-                          className={`px-2 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            isSelected
-                              ? 'bg-violet-500 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          {monthName}
-                        </button>
-                      );
-                    })}
-                    </div>
-                  </div>
-                ));
-              })()}
-              </div>
-              
-              {selectedPeriods.length > 0 && (
-                <div className="p-3 border-t border-slate-100 bg-slate-50">
-                  <button
-                    onClick={() => setShowPeriodDropdown(false)}
-                    className="w-full py-2 bg-violet-500 text-white rounded-lg text-sm font-medium hover:bg-violet-600 transition-colors"
-                  >
-                    Appliquer ({selectedPeriods.length} période{selectedPeriods.length > 1 ? 's' : ''})
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
 
         {/* Data Manager Modal */}
         {showDataManager && (
@@ -9571,224 +9119,163 @@ L'équipe Salarize`;
           </div>
         )}
 
-        {/* Cartes de Comparaison Détaillées - Mobile optimized */}
+        {/* Cartes de Comparaison Détaillées */}
         {visibleKpis.comparison && comparisonData && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             {/* Comparaison vs Mois Précédent */}
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 sm:p-6 text-white">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-6 text-white">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm sm:text-base">vs Mois Précédent</h3>
-                  <p className="text-slate-400 text-[10px] sm:text-xs">{comparisonData.prevMonth ? formatPeriod(comparisonData.prevMonth.period) : 'N/A'}</p>
+                  <h3 className="font-semibold">vs Mois Précédent</h3>
+                  <p className="text-slate-400 text-xs">{comparisonData.prevMonth ? formatPeriod(comparisonData.prevMonth.period) : 'N/A'}</p>
                 </div>
               </div>
               
               {comparisonData.prevMonth ? (
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-between items-center text-sm sm:text-base">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
                     <span className="text-slate-300">Mois actuel</span>
-                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 0 }) || '0'}</span>
+                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm sm:text-base">
+                  <div className="flex justify-between items-center">
                     <span className="text-slate-300">Mois précédent</span>
-                    <span className="font-bold">€{comparisonData.prevMonth?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 0 }) || '0'}</span>
+                    <span className="font-bold">€{comparisonData.prevMonth?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
-                  <div className="border-t border-slate-700 pt-2 sm:pt-3">
+                  <div className="border-t border-slate-700 pt-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-300 text-sm">Différence</span>
-                      <span className={`font-bold text-base sm:text-lg ${(comparisonData.diffVsPrevMonth || 0) >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {(comparisonData.diffVsPrevMonth || 0) >= 0 ? '+' : ''}€{(comparisonData.diffVsPrevMonth || 0).toLocaleString('fr-BE', { minimumFractionDigits: 0 })}
+                      <span className="text-slate-300">Différence</span>
+                      <span className={`font-bold text-lg ${(comparisonData.diffVsPrevMonth || 0) >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {(comparisonData.diffVsPrevMonth || 0) >= 0 ? '+' : ''}€{(comparisonData.diffVsPrevMonth || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     {comparisonData.variationVsPrevMonth !== null && (
                       <div className="flex justify-between items-center mt-1">
-                        <span className="text-slate-400 text-xs sm:text-sm">Variation</span>
-                        <span className={`font-semibold text-sm sm:text-base ${comparisonData.variationVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                          {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(1)}%
+                        <span className="text-slate-400 text-sm">Variation</span>
+                        <span className={`font-semibold ${comparisonData.variationVsPrevMonth >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {comparisonData.variationVsPrevMonth >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsPrevMonth).toFixed(2)}%
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-slate-400 text-xs sm:text-sm">Pas de données du mois précédent</p>
+                <p className="text-slate-400 text-sm">Pas de données du mois précédent</p>
               )}
             </div>
 
             {/* Comparaison vs Même Mois Année Précédente */}
-            <div className="bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl p-4 sm:p-6 text-white">
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl p-6 text-white">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-sm sm:text-base">vs Année Précédente</h3>
-                  <p className="text-violet-200 text-[10px] sm:text-xs">{comparisonData.sameMonthLastYear ? formatPeriod(comparisonData.sameMonthLastYear.period) : 'N/A'}</p>
+                  <h3 className="font-semibold">vs Année Précédente</h3>
+                  <p className="text-violet-200 text-xs">{comparisonData.sameMonthLastYear ? formatPeriod(comparisonData.sameMonthLastYear.period) : 'N/A'}</p>
                 </div>
               </div>
               
               {comparisonData.sameMonthLastYear ? (
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-between items-center text-sm sm:text-base">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
                     <span className="text-violet-200">Cette année</span>
-                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 0 }) || '0'}</span>
+                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm sm:text-base">
+                  <div className="flex justify-between items-center">
                     <span className="text-violet-200">Année précédente</span>
-                    <span className="font-bold">€{comparisonData.sameMonthLastYear?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 0 }) || '0'}</span>
+                    <span className="font-bold">€{comparisonData.sameMonthLastYear?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
-                  <div className="border-t border-violet-500/50 pt-2 sm:pt-3">
+                  <div className="border-t border-violet-500/50 pt-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-violet-200 text-sm">Différence</span>
-                      <span className={`font-bold text-base sm:text-lg ${(comparisonData.diffVsLastYear || 0) >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
-                        {(comparisonData.diffVsLastYear || 0) >= 0 ? '+' : ''}€{(comparisonData.diffVsLastYear || 0).toLocaleString('fr-BE', { minimumFractionDigits: 0 })}
+                      <span className="text-violet-200">Différence</span>
+                      <span className={`font-bold text-lg ${(comparisonData.diffVsLastYear || 0) >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                        {(comparisonData.diffVsLastYear || 0) >= 0 ? '+' : ''}€{(comparisonData.diffVsLastYear || 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     {comparisonData.variationVsLastYear !== null && (
                       <div className="flex justify-between items-center mt-1">
-                        <span className="text-violet-300 text-xs sm:text-sm">Variation</span>
-                        <span className={`font-semibold text-sm sm:text-base ${comparisonData.variationVsLastYear >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
-                          {comparisonData.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsLastYear).toFixed(1)}%
+                        <span className="text-violet-300 text-sm">Variation annuelle</span>
+                        <span className={`font-semibold ${comparisonData.variationVsLastYear >= 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                          {comparisonData.variationVsLastYear >= 0 ? '↑' : '↓'} {Math.abs(comparisonData.variationVsLastYear).toFixed(2)}%
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-violet-200 text-xs sm:text-sm">Pas de données de l'année précédente</p>
+                <p className="text-violet-200 text-sm">Pas de données de l'année précédente pour ce mois</p>
               )}
             </div>
           </div>
         )}
 
-        {/* Evolution Chart - Mobile optimized */}
+        {/* Evolution Chart */}
         {chartData.length >= 1 && (
-          <div className="bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border border-slate-100 mb-4 sm:mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-4">
-              <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Évolution des coûts</h2>
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {/* Toggle comparaison année */}
-                {years.length > 1 && (
-                  <button
-                    onClick={() => setShowYearComparison(!showYearComparison)}
-                    className={`px-2 sm:px-3 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-colors ${
-                      showYearComparison 
-                        ? 'bg-violet-100 text-violet-700 border border-violet-200' 
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    <span className="hidden sm:inline">📈 Comparaison Annuelle</span>
-                    <span className="sm:hidden">📈 Comparer</span>
-                  </button>
-                )}
-                {years.length > 1 && !showYearComparison && (
-                  <select
-                    value={selectedYear}
-                    onChange={e => setSelectedYear(e.target.value)}
-                    className="px-2 py-1 border border-slate-200 rounded-lg bg-white text-[10px] sm:text-xs"
-                  >
-                    <option value="all">Tout</option>
-                    {years.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                )}
-              </div>
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-slate-800">📊 Évolution des coûts salariaux</h2>
+              {years.length > 1 && (
+                <select
+                  value={selectedYear}
+                  onChange={e => setSelectedYear(e.target.value)}
+                  className="px-3 py-1 border border-slate-200 rounded-lg bg-white text-sm"
+                >
+                  <option value="all">Toutes les années</option>
+                  {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              )}
             </div>
             
-            {/* Graphique Comparatif Année sur Année */}
-            {showYearComparison && years.length > 1 ? (
-              <div className="h-48 sm:h-64 lg:h-80">
+            {/* Graphique Standard */}
+            <div className="h-96">
+              {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={yearComparisonData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} />
+                    <XAxis 
+                      dataKey="period" 
+                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      tickLine={{ stroke: '#e2e8f0' }}
+                      tickFormatter={(value) => {
+                        const month = parseInt(value.substring(5), 10);
+                        const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                        const year = value.substring(2, 4);
+                        return `${monthNames[month - 1]} '${year}`;
+                      }}
+                    />
                     <YAxis 
-                      tick={{ fontSize: 10, fill: '#64748b' }}
-                      tickFormatter={(value) => value ? `€${(value / 1000).toFixed(0)}k` : ''}
-                      width={45}
-                    />
-                    <Tooltip 
-                      formatter={(value, name) => [value ? `€${value.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : 'N/A', name]}
-                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                    />
-                    {years.map((year, idx) => (
-                      <Line 
-                        key={year}
-                        type="monotone"
-                        dataKey={year}
-                        name={year}
-                        stroke={idx === years.length - 1 ? '#8B5CF6' : idx === years.length - 2 ? '#06B6D4' : '#94A3B8'}
-                        strokeWidth={idx === years.length - 1 ? 2 : 1.5}
-                        dot={{ r: idx === years.length - 1 ? 3 : 2 }}
-                        strokeDasharray={idx < years.length - 1 ? '5 5' : '0'}
-                        connectNulls
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-                {/* Légende custom */}
-                <div className="flex justify-center gap-4 sm:gap-6 mt-2 sm:mt-3">
-                  {years.slice(-2).reverse().map((year, idx) => (
-                    <div key={year} className="flex items-center gap-1.5 sm:gap-2">
-                      <div className={`w-5 sm:w-8 h-0.5 rounded ${idx === 0 ? 'bg-violet-500' : 'bg-cyan-500'}`} 
-                           style={idx === 1 ? { backgroundImage: 'repeating-linear-gradient(90deg, #06B6D4 0, #06B6D4 4px, transparent 4px, transparent 8px)' } : {}} />
-                      <span className="text-xs sm:text-sm font-medium text-slate-600">{year}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* Graphique Standard - Mobile optimized */
-              <div className="h-56 sm:h-72 lg:h-96">
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 5, left: 0, bottom: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis 
-                        dataKey="period" 
-                        tick={{ fontSize: 9, fill: '#64748b' }}
-                        tickLine={{ stroke: '#e2e8f0' }}
-                        interval="preserveStartEnd"
-                        tickFormatter={(value) => {
-                          const month = parseInt(value.substring(5), 10);
-                          const monthNames = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-                          return monthNames[month - 1];
-                        }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 10, fill: '#64748b' }}
+                      tick={{ fontSize: 12, fill: '#64748b' }}
                         tickLine={{ stroke: '#e2e8f0' }}
                         tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
-                        width={45}
                       />
                       <Tooltip 
-                        formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}`, 'Coût']}
+                        formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût total']}
                         labelFormatter={(label) => formatPeriod(label)}
                         contentStyle={{ 
                           backgroundColor: '#1e293b', 
                           border: 'none', 
                           borderRadius: '8px',
-                          color: '#fff',
-                          fontSize: '12px'
+                          color: '#fff'
                         }}
                         labelStyle={{ color: '#94a3b8' }}
                       />
                       <Bar 
                         dataKey="total" 
                         fill={`rgb(${getBrandColor()})`}
-                        radius={[4, 4, 0, 0]}
+                        radius={[6, 6, 0, 0]}
                       />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                    <svg className="w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                     <p className="font-medium text-slate-500">Aucune donnée disponible</p>
@@ -9796,20 +9283,32 @@ L'équipe Salarize`;
                   </div>
                 )}
               </div>
-            )}
           </div>
         )}
 
-        {/* Departments - Mobile optimized */}
+        {/* Departments - Version Simple sans scroll */}
         {visibleKpis.deptBreakdown && (
-        <div className="bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border border-slate-100 mb-4 sm:mb-6">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
-            <span className="text-[10px] sm:text-xs text-slate-400">{sortedDepts.length} dép.</span>
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Filtre de période */}
+              {periods.length > 1 && (
+                <select
+                  value={selectedYear}
+                  onChange={e => setSelectedYear(e.target.value)}
+                  className="px-2 sm:px-3 py-1 border border-slate-200 rounded-lg bg-white text-xs sm:text-sm"
+                >
+                  <option value="all">Toutes</option>
+                  {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              )}
+              <span className="text-xs text-slate-400">{sortedDepts.length} dép.</span>
+            </div>
           </div>
           
-          {/* Header de colonnes - masqué sur mobile */}
-          <div className="hidden lg:flex items-center gap-3 py-2 mb-2 border-b border-slate-100 text-xs font-medium text-slate-400">
+          {/* Header de colonnes */}
+          <div className="hidden sm:flex items-center gap-3 py-2 mb-2 border-b border-slate-100 text-xs font-medium text-slate-400">
             <div className="w-32 sm:w-40 flex-shrink-0">Département</div>
             <div className="flex-1">Répartition</div>
             <div className="w-12 text-right">%</div>
@@ -9817,66 +9316,47 @@ L'équipe Salarize`;
             <div className="w-24 text-right">Montant</div>
           </div>
           
-          <div className="space-y-1.5 sm:space-y-2">
+          <div className="space-y-2">
             {sortedDepts.map(([dept, data]) => {
               const comparison = deptStatsWithComparison[dept] || {};
               const pct = ((data.total / totalCost) * 100).toFixed(1);
               const barWidth = Math.max(5, (data.total / maxCost) * 100);
               
               return (
-                <div key={dept} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 py-1.5 sm:py-2">
-                  {/* Ligne mobile: Nom + Montant */}
-                  <div className="flex items-center justify-between sm:hidden">
-                    <span className="font-medium text-slate-700 text-sm truncate">{dept}</span>
-                    <span className="font-bold text-slate-800 text-sm">
-                      €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
-                    </span>
-                  </div>
-                  
-                  {/* Desktop: Nom du département */}
-                  <div className="hidden sm:block w-32 lg:w-40 flex-shrink-0">
+                <div key={dept} className="flex items-center gap-3 py-2">
+                  {/* Nom du département */}
+                  <div className="w-32 sm:w-40 flex-shrink-0">
                     <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
-                    <span className="text-[10px] sm:text-xs text-slate-400">{data.count} emp.</span>
+                    <span className="text-xs text-slate-400">{data.count} emp.</span>
                   </div>
                   
-                  {/* Barre de progression + stats */}
-                  <div className="flex items-center gap-2 sm:gap-3 flex-1">
-                    <div className="flex-1 h-3 sm:h-4 bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-500" 
-                        style={{ 
-                          width: `${barWidth}%`,
-                          background: `rgb(${getBrandColor()})`
-                        }} 
-                      />
-                    </div>
-                    
-                    {/* Stats sur mobile: sous la barre */}
-                    <div className="flex items-center gap-2 sm:hidden text-[10px]">
-                      <span className="text-slate-500">{pct}%</span>
-                      {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 && (
-                        <span className={`font-semibold ${comparison.variationVsPrevMonth >= 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                          {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
-                        </span>
-                      )}
-                    </div>
+                  {/* Barre de progression */}
+                  <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all duration-500" 
+                      style={{ 
+                        width: `${barWidth}%`,
+                        background: `rgb(${getBrandColor()})`
+                      }} 
+                    />
                   </div>
                   
-                  {/* Stats Desktop */}
-                  <span className="hidden sm:block w-12 text-right text-xs font-medium text-slate-500">{pct}%</span>
+                  {/* Pourcentage */}
+                  <span className="w-12 text-right text-xs font-medium text-slate-500">{pct}%</span>
                   
+                  {/* Variation */}
                   {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 ? (
-                    <span className={`hidden sm:block w-14 text-right text-xs font-semibold ${
+                    <span className={`w-14 text-right text-xs font-semibold ${
                       comparison.variationVsPrevMonth >= 0 ? 'text-red-600' : 'text-emerald-600'
                     }`}>
                       {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
                     </span>
                   ) : (
-                    <span className="hidden sm:block w-14"></span>
+                    <span className="w-14"></span>
                   )}
                   
-                  {/* Montant Desktop */}
-                  <span className="hidden sm:block w-24 text-right font-bold text-slate-800 text-sm">
+                  {/* Montant */}
+                  <span className="w-24 text-right font-bold text-slate-800 text-sm">
                     €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
                   </span>
                 </div>
