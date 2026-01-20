@@ -4433,65 +4433,90 @@ function AppContent() {
           if (employeeCount > 0) {
             console.log(`[Salarize] Syncing ${employeeCount} employees for ${companyName}`);
             
-            // D'abord supprimer tous les employés existants pour cette company
-            const { error: deleteError } = await supabase
+            // ÉTAPE 1: Récupérer les périodes actuelles dans la DB
+            const { data: currentDbEmployees } = await supabase
               .from('employees')
-              .delete()
+              .select('period')
               .eq('company_id', companyId);
             
-            if (deleteError) {
-              console.error('[Salarize] Error deleting old employees:', deleteError);
-            } else {
-              console.log(`[Salarize] Deleted old employees for ${companyName}`);
-            }
+            const dbPeriods = [...new Set((currentDbEmployees || []).map(e => e.period))];
+            const localPeriods = periodsInData;
             
-            // Puis insérer tous les employés
-            const employeesToInsert = latestCompanyData.employees.map(e => ({
-              company_id: companyId,
-              name: e.name,
-              department: e.department || null,
-              function: e.function || null,
-              total_cost: e.totalCost,
-              period: e.period
-            }));
-
-            // Insert in batches of 500 with retry logic
-            const batchSize = 500;
-            let totalInserted = 0;
-            let failedBatches = [];
-            
-            for (let i = 0; i < employeesToInsert.length; i += batchSize) {
-              const batch = employeesToInsert.slice(i, i + batchSize);
-              let retries = 3;
-              let success = false;
-              
-              while (retries > 0 && !success) {
-                const { error: insertError } = await supabase
+            // ÉTAPE 2: Supprimer SEULEMENT les périodes qui ne sont plus dans les données locales
+            const periodsToDelete = dbPeriods.filter(p => !localPeriods.includes(p));
+            if (periodsToDelete.length > 0) {
+              console.log(`[Salarize] Deleting obsolete periods: ${periodsToDelete.join(', ')}`);
+              for (const period of periodsToDelete) {
+                await supabase
                   .from('employees')
-                  .insert(batch);
-                
-                if (insertError) {
-                  retries--;
-                  if (retries === 0) {
-                    console.error('[Salarize] Error inserting employees batch after 3 retries:', insertError);
-                    failedBatches.push({ start: i, count: batch.length });
-                  } else {
-                    console.log(`[Salarize] Retry ${3 - retries}/3 for batch starting at ${i}`);
-                    await new Promise(r => setTimeout(r, 500)); // Wait before retry
-                  }
-                } else {
-                  success = true;
-                  totalInserted += batch.length;
-                  console.log(`[Salarize] Inserted batch ${Math.floor(i / batchSize) + 1}, ${batch.length} employees (total: ${totalInserted})`);
-                }
+                  .delete()
+                  .eq('company_id', companyId)
+                  .eq('period', period);
               }
             }
             
-            if (failedBatches.length > 0) {
-              console.error(`[Salarize] ⚠️ ${failedBatches.length} batch(es) failed to insert`);
+            // ÉTAPE 3: Supprimer et réinsérer période par période (plus sûr)
+            const employeesByPeriod = {};
+            latestCompanyData.employees.forEach(e => {
+              if (!employeesByPeriod[e.period]) employeesByPeriod[e.period] = [];
+              employeesByPeriod[e.period].push(e);
+            });
+            
+            let totalInserted = 0;
+            for (const [period, emps] of Object.entries(employeesByPeriod)) {
+              // Supprimer les employés de cette période
+              const { error: deleteError } = await supabase
+                .from('employees')
+                .delete()
+                .eq('company_id', companyId)
+                .eq('period', period);
+              
+              if (deleteError) {
+                console.error(`[Salarize] Error deleting period ${period}:`, deleteError);
+                continue; // Ne pas continuer si la suppression échoue
+              }
+              
+              // Insérer les employés de cette période
+              const employeesToInsert = emps.map(e => ({
+                company_id: companyId,
+                name: e.name,
+                department: e.department || null,
+                function: e.function || null,
+                total_cost: e.totalCost,
+                period: e.period
+              }));
+              
+              // Insert in batches of 500 with retry logic
+              const batchSize = 500;
+              for (let i = 0; i < employeesToInsert.length; i += batchSize) {
+                const batch = employeesToInsert.slice(i, i + batchSize);
+                let retries = 3;
+                let success = false;
+                
+                while (retries > 0 && !success) {
+                  const { error: insertError } = await supabase
+                    .from('employees')
+                    .insert(batch);
+                  
+                  if (insertError) {
+                    retries--;
+                    if (retries === 0) {
+                      console.error(`[Salarize] Failed to insert batch for period ${period} after 3 retries:`, insertError);
+                    } else {
+                      console.log(`[Salarize] Retry ${3 - retries}/3 for period ${period}`);
+                      await new Promise(r => setTimeout(r, 500));
+                    }
+                  } else {
+                    success = true;
+                    totalInserted += batch.length;
+                  }
+                }
+              }
+              
+              console.log(`[Salarize] Period ${period}: ${emps.length} employees saved`);
             }
             
-            console.log(`[Salarize] ✓ Saved ${totalInserted}/${employeesToInsert.length} employees for ${companyName}`);
+            console.log(`[Salarize] ✓ Saved ${totalInserted}/${employeeCount} employees for ${companyName}`);
           } else {
             // No employees - delete all
             console.log(`[Salarize] No employees, deleting all for ${companyName}`);
@@ -7446,7 +7471,6 @@ L'équipe Salarize`;
             </div>
           </div>
         )}
-      </div>
       </PageTransition>
     );
   }
