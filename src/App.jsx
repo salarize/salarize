@@ -2659,7 +2659,7 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
 
 // Auth Modal - Connexion / Inscription
 function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
-  const [tab, setTab] = useState(defaultTab); // 'login' | 'signup'
+  const [view, setView] = useState(defaultTab); // 'login' | 'signup' | 'forgot' | 'forgot-sent'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -2679,6 +2679,13 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   
   const handleGoogleLogin = async () => {
     try {
+      // Sauvegarder le token d'invitation s'il existe dans l'URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const inviteToken = urlParams.get('invite');
+      if (inviteToken) {
+        sessionStorage.setItem('pending_invite_token', inviteToken);
+      }
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -2780,19 +2787,29 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
     setLoading(false);
   };
   
-  const handleForgotPassword = async () => {
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    
     if (!email) {
-      setError('Veuillez entrer votre email');
+      setError('Veuillez entrer votre adresse email');
+      return;
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Veuillez entrer une adresse email valide');
       return;
     }
     
     setLoading(true);
+    setError('');
+    
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin
       });
       if (error) throw error;
-      setSuccess('Un email de réinitialisation a été envoyé');
+      setView('forgot-sent');
     } catch (err) {
       setError(err.message);
     }
@@ -2801,6 +2818,120 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   
   if (!isOpen) return null;
   
+  // Vue: Email envoyé avec succès
+  if (view === 'forgot-sent') {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-start justify-center pt-20 p-4 overflow-y-auto">
+        <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Email envoyé !</h2>
+            <p className="text-slate-400 mb-6">
+              Un lien de réinitialisation a été envoyé à <strong className="text-white">{email}</strong>. 
+              Vérifiez votre boîte de réception et vos spams.
+            </p>
+            <button
+              onClick={() => { setView('login'); resetForm(); }}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors"
+            >
+              Retour à la connexion
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Vue: Mot de passe oublié - Demande d'email
+  if (view === 'forgot') {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-start justify-center pt-20 p-4 overflow-y-auto">
+        <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
+          <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-4 text-center relative">
+            <button 
+              onClick={onClose}
+              className="absolute right-3 top-3 p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <div className="flex items-center justify-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <h2 className="text-xl font-bold text-white">Mot de passe oublié</h2>
+                <p className="text-slate-400 text-xs">Récupérez votre compte</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-sm flex items-center gap-2">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {error}
+              </div>
+            )}
+            
+            <p className="text-slate-400 text-sm mb-4">
+              Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+            </p>
+            
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <label className="text-sm text-slate-400 block mb-2">Adresse email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
+                  placeholder="vous@exemple.com"
+                  autoFocus
+                />
+              </div>
+              
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white font-medium rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading && (
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                Envoyer le lien
+              </button>
+            </form>
+            
+            <button
+              onClick={() => { setView('login'); setError(''); }}
+              className="w-full mt-4 py-2 text-slate-400 hover:text-white text-sm transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Retour à la connexion
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Vue principale: Login / Signup
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-start justify-center pt-20 p-4 overflow-y-auto">
       <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
@@ -2821,10 +2952,10 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
             </div>
             <div className="text-left">
               <h2 className="text-xl font-bold text-white">
-                {tab === 'login' ? 'Connexion' : 'Créer un compte'}
+                {view === 'login' ? 'Connexion' : 'Créer un compte'}
               </h2>
               <p className="text-slate-400 text-xs">
-                {tab === 'login' ? 'Accédez à votre espace' : 'Rejoignez Salarize'}
+                {view === 'login' ? 'Accédez à votre espace' : 'Rejoignez Salarize'}
               </p>
             </div>
           </div>
@@ -2833,9 +2964,9 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
         {/* Tabs */}
         <div className="flex border-b border-slate-700">
           <button
-            onClick={() => { setTab('login'); resetForm(); }}
+            onClick={() => { setView('login'); resetForm(); }}
             className={`flex-1 py-3 text-sm font-medium transition-colors ${
-              tab === 'login' 
+              view === 'login' 
                 ? 'text-violet-400 border-b-2 border-violet-400' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
@@ -2843,9 +2974,9 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
             Connexion
           </button>
           <button
-            onClick={() => { setTab('signup'); resetForm(); }}
+            onClick={() => { setView('signup'); resetForm(); }}
             className={`flex-1 py-3 text-sm font-medium transition-colors ${
-              tab === 'signup' 
+              view === 'signup' 
                 ? 'text-violet-400 border-b-2 border-violet-400' 
                 : 'text-slate-500 hover:text-slate-300'
             }`}
@@ -2896,8 +3027,8 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
           </div>
           
           {/* Form */}
-          <form onSubmit={tab === 'login' ? handleEmailLogin : handleSignup} className="space-y-4">
-            {tab === 'signup' && (
+          <form onSubmit={view === 'login' ? handleEmailLogin : handleSignup} className="space-y-4">
+            {view === 'signup' && (
               <div>
                 <label className="text-sm text-slate-400 block mb-2">Nom complet</label>
                 <input
@@ -2933,7 +3064,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
                 type="password"
                 id="auth-password"
                 name="password"
-                autoComplete={tab === 'signup' ? 'new-password' : 'current-password'}
+                autoComplete={view === 'signup' ? 'new-password' : 'current-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:border-violet-500 outline-none transition-colors"
@@ -2941,7 +3072,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
               />
             </div>
             
-            {tab === 'signup' && (
+            {view === 'signup' && (
               <div>
                 <label className="text-sm text-slate-400 block mb-2">Confirmer le mot de passe</label>
                 <input
@@ -2957,10 +3088,10 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
               </div>
             )}
             
-            {tab === 'login' && (
+            {view === 'login' && (
               <button
                 type="button"
-                onClick={handleForgotPassword}
+                onClick={() => { setView('forgot'); setError(''); }}
                 className="text-sm text-violet-400 hover:text-violet-300 transition-colors"
               >
                 Mot de passe oublié ?
@@ -2978,7 +3109,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               )}
-              {tab === 'login' ? 'Se connecter' : 'Créer mon compte'}
+              {view === 'login' ? 'Se connecter' : 'Créer mon compte'}
             </button>
           </form>
         </div>
@@ -3554,6 +3685,7 @@ function AppContent() {
   const [lastSaved, setLastSaved] = useState(null);
   const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
   const companiesRef = useRef({}); // Ref pour tracker companies en temps réel (pour imports multiples)
+  const isRecoveryModeRef = useRef(false); // Track si on est en mode reset password
   const [showExportModal, setShowExportModal] = useState(false);
   const [comparePeriod, setComparePeriod] = useState(null);
   const [comparePeriod1, setComparePeriod1] = useState(null);
@@ -3627,6 +3759,9 @@ function AppContent() {
       setShowResetPasswordModal(false);
       setNewPassword('');
       setConfirmPassword('');
+      
+      // Recharger pour charger les données de l'utilisateur
+      window.location.href = window.location.origin;
     } catch (err) {
       setResetPasswordError(err.message);
     }
@@ -3772,11 +3907,25 @@ function AppContent() {
     let mounted = true;
     
     const initAuth = async () => {
-      // Détecter le token dans le hash (flow OAuth)
+      // Détecter le token dans le hash (flow OAuth ou reset password)
       if (window.location.hash && window.location.hash.includes('access_token')) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+        
+        // Si c'est un reset password, afficher le modal
+        if (type === 'recovery' && accessToken && refreshToken) {
+          isRecoveryModeRef.current = true; // Marquer qu'on est en mode recovery
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+          window.history.replaceState(null, '', window.location.pathname);
+          setShowResetPasswordModal(true);
+          setIsLoading(false);
+          return;
+        }
         
         if (accessToken && refreshToken) {
           const { data, error } = await supabase.auth.setSession({
@@ -3855,7 +4004,13 @@ function AppContent() {
         return;
       }
       
+      // Ne pas rediriger si le modal reset password est ouvert
       if (event === 'SIGNED_IN' && session?.user) {
+        // Si on est en mode recovery, ne pas rediriger
+        if (isRecoveryModeRef.current) {
+          return;
+        }
+        
         // Seulement après une nouvelle connexion, aller au dashboard
         setUser(prev => {
           // Si l'user est déjà le même, ne pas mettre à jour
@@ -6525,6 +6680,86 @@ L'équipe Salarize`;
     setActivityLog(prev => [entry, ...prev].slice(0, 100)); // Garder 100 dernières entrées
   }, [user, activeCompany]);
 
+  // ============================================
+  // VUE RESET PASSWORD - PRIORITAIRE
+  // ============================================
+  // Cette vue s'affiche AVANT tout le reste si on est en mode reset password
+  if (showResetPasswordModal) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-6 text-white text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold">Nouveau mot de passe</h2>
+            <p className="text-violet-100 text-sm mt-1">Choisissez votre nouveau mot de passe</p>
+          </div>
+          
+          <div className="p-6">
+            {resetPasswordError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm flex items-center gap-2">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {resetPasswordError}
+              </div>
+            )}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nouveau mot de passe</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
+                  placeholder="Minimum 6 caractères"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Confirmer le mot de passe</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
+                  placeholder="Répétez le mot de passe"
+                />
+              </div>
+              
+              <button
+                onClick={handleUpdatePassword}
+                disabled={resetPasswordLoading || !newPassword || !confirmPassword}
+                className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-medium hover:from-violet-700 hover:to-fuchsia-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {resetPasswordLoading ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Mise à jour...
+                  </>
+                ) : (
+                  'Mettre à jour le mot de passe'
+                )}
+              </button>
+              
+              <p className="text-center text-slate-400 text-xs mt-4">
+                Après la mise à jour, vous serez redirigé vers la page de connexion.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Loading screen
   if (isLoading) {
     return <LoadingSpinner size="lg" text="Salarize" subtext="Chargement de votre espace..." fullScreen />;
@@ -6553,73 +6788,6 @@ L'équipe Salarize`;
           onClose={() => setShowAuthModal(false)}
           onSuccess={handleAuthSuccess}
         />
-        
-        {/* Modal Reset Password */}
-        {showResetPasswordModal && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-              <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-6 text-white text-center">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                </div>
-                <h2 className="text-2xl font-bold">Nouveau mot de passe</h2>
-                <p className="text-violet-100 text-sm mt-1">Entrez votre nouveau mot de passe</p>
-              </div>
-              
-              <div className="p-6">
-                {resetPasswordError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                    {resetPasswordError}
-                  </div>
-                )}
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Nouveau mot de passe</label>
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Confirmer le mot de passe</label>
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                  
-                  <button
-                    onClick={handleUpdatePassword}
-                    disabled={resetPasswordLoading}
-                    className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-medium hover:from-violet-700 hover:to-fuchsia-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {resetPasswordLoading ? (
-                      <>
-                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Mise à jour...
-                      </>
-                    ) : (
-                      'Mettre à jour le mot de passe'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </PageTransition>
     );
   }
@@ -10494,73 +10662,6 @@ L'équipe Salarize`;
         </>
         )}
       </main>
-      
-      {/* Modal Reset Password - Global */}
-      {showResetPasswordModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-6 text-white text-center">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold">Nouveau mot de passe</h2>
-              <p className="text-violet-100 text-sm mt-1">Entrez votre nouveau mot de passe</p>
-            </div>
-            
-            <div className="p-6">
-              {resetPasswordError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                  {resetPasswordError}
-                </div>
-              )}
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nouveau mot de passe</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                    placeholder="••••••••"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Confirmer le mot de passe</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-                    placeholder="••••••••"
-                  />
-                </div>
-                
-                <button
-                  onClick={handleUpdatePassword}
-                  disabled={resetPasswordLoading}
-                  className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-medium hover:from-violet-700 hover:to-fuchsia-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {resetPasswordLoading ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Mise à jour...
-                    </>
-                  ) : (
-                    'Mettre à jour le mot de passe'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
     </PageTransition>
   );
