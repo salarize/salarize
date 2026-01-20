@@ -2679,13 +2679,6 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
   
   const handleGoogleLogin = async () => {
     try {
-      // Sauvegarder le token d'invitation s'il existe dans l'URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const inviteToken = urlParams.get('invite');
-      if (inviteToken) {
-        sessionStorage.setItem('pending_invite_token', inviteToken);
-      }
-      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -2796,7 +2789,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: window.location.origin
       });
       if (error) throw error;
       setSuccess('Un email de réinitialisation a été envoyé');
@@ -3328,12 +3321,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                   {name.charAt(0)}
                 </div>
               )}
-              <span className="truncate flex-1">{name}</span>
-              {companies[name]?.isShared && (
-                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">
-                  {companies[name].memberRole === 'viewer' ? '👁' : '✏️'}
-                </span>
-              )}
+              <span className="truncate">{name}</span>
             </button>
           ))
         )}
@@ -3512,15 +3500,6 @@ function AppContent() {
   // Toast notifications
   const toast = useToast();
   
-  // Sauvegarder le token d'invitation dès le chargement (avant toute redirection OAuth)
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const inviteToken = urlParams.get('invite');
-    if (inviteToken) {
-      sessionStorage.setItem('pending_invite_token', inviteToken);
-    }
-  }, []);
-  
   // Helper pour formater les périodes (2024-03 → Mars 2024)
   const formatPeriod = (period) => {
     if (!period || period === 'Unknown') return period;
@@ -3620,7 +3599,39 @@ function AppContent() {
   const [inviteRole, setInviteRole] = useState('viewer'); // Rôle de l'invité
   const [pendingInvites, setPendingInvites] = useState([]); // Invitations en attente
   const [sendingInvite, setSendingInvite] = useState(false); // État d'envoi de l'invitation
-  const [pendingInvitation, setPendingInvitation] = useState(null); // Invitation reçue à accepter
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false); // Modal reset password
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState('');
+
+  // Fonction pour mettre à jour le mot de passe
+  const handleUpdatePassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      setResetPasswordError('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setResetPasswordError('Les mots de passe ne correspondent pas');
+      return;
+    }
+    
+    setResetPasswordLoading(true);
+    setResetPasswordError('');
+    
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      
+      toast.success('Mot de passe mis à jour avec succès !');
+      setShowResetPasswordModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setResetPasswordError(err.message);
+    }
+    setResetPasswordLoading(false);
+  };
 
   // Fonction pour envoyer une invitation par email
   const sendInvitation = async () => {
@@ -3632,51 +3643,10 @@ function AppContent() {
     setSendingInvite(true);
     
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
-        toast.error('Vous devez être connecté');
-        setSendingInvite(false);
-        return;
-      }
-
-      // Récupérer l'ID de la société
-      const { data: companyData } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('user_id', currentUser.id)
-        .eq('name', activeCompany)
-        .single();
-
-      if (!companyData) {
-        toast.error('Société introuvable');
-        setSendingInvite(false);
-        return;
-      }
-
       // Générer un token unique pour l'invitation
       const inviteToken = crypto.randomUUID();
       const inviteLink = `${window.location.origin}?invite=${inviteToken}`;
       
-      // Sauvegarder l'invitation dans Supabase
-      const { error: insertError } = await supabase
-        .from('invitations')
-        .insert({
-          company_id: companyData.id,
-          company_name: activeCompany,
-          invited_by: currentUser.id,
-          invited_email: inviteEmail.toLowerCase(),
-          role: inviteRole,
-          token: inviteToken,
-          status: 'pending'
-        });
-
-      if (insertError) {
-        console.error('Erreur insertion invitation:', insertError);
-        toast.error('Erreur lors de la création de l\'invitation');
-        setSendingInvite(false);
-        return;
-      }
-
       // Envoyer l'email via EmailJS
       await emailjs.send(
         EMAILJS_SERVICE_ID,
@@ -3707,86 +3677,6 @@ function AppContent() {
       toast.error('Erreur lors de l\'envoi de l\'invitation. Veuillez réessayer.');
     } finally {
       setSendingInvite(false);
-    }
-  };
-
-  // Fonction pour accepter une invitation
-  const acceptInvitation = async () => {
-    if (!pendingInvitation) return;
-    
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
-        toast.error('Vous devez être connecté pour accepter l\'invitation');
-        return;
-      }
-
-      // Ajouter l'utilisateur comme membre de la société
-      const { error: memberError } = await supabase
-        .from('company_members')
-        .insert({
-          company_id: pendingInvitation.company_id,
-          user_id: currentUser.id,
-          role: pendingInvitation.role
-        });
-
-      if (memberError && !memberError.message?.includes('duplicate')) {
-        console.error('Erreur ajout membre:', memberError);
-        toast.error('Erreur lors de l\'acceptation');
-        return;
-      }
-
-      // Mettre à jour le statut de l'invitation
-      await supabase
-        .from('invitations')
-        .update({ 
-          status: 'accepted',
-          accepted_at: new Date().toISOString()
-        })
-        .eq('token', pendingInvitation.token);
-
-      toast.success(`Vous avez maintenant accès à ${pendingInvitation.company_name}`);
-      setPendingInvitation(null);
-      
-      // Recharger la page pour voir la société partagée
-      window.location.reload();
-      
-    } catch (error) {
-      console.error('Erreur acceptation:', error);
-      toast.error('Erreur lors de l\'acceptation de l\'invitation');
-    }
-  };
-
-  // Vérifier s'il y a un token d'invitation dans l'URL
-  const checkInviteToken = async (userEmail) => {
-    const urlParams = new URLSearchParams(window.location.search);
-    let inviteToken = urlParams.get('invite');
-    
-    // Si pas dans l'URL, vérifier sessionStorage (sauvegardé avant OAuth)
-    if (!inviteToken) {
-      inviteToken = sessionStorage.getItem('pending_invite_token');
-      if (inviteToken) {
-        sessionStorage.removeItem('pending_invite_token');
-      }
-    }
-    
-    if (inviteToken) {
-      // Chercher l'invitation correspondante
-      const { data: invitation, error } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('token', inviteToken)
-        .eq('status', 'pending')
-        .single();
-
-      if (invitation && !error) {
-        setPendingInvitation(invitation);
-      } else {
-        toast.error('Invitation invalide ou expirée');
-      }
-      
-      // Nettoyer l'URL
-      window.history.replaceState(null, '', window.location.pathname);
     }
   };
   
@@ -3912,7 +3802,6 @@ function AppContent() {
             });
             setCurrentPage('dashboard');
             loadFromSupabase(user.id);
-            checkInviteToken(user.email);
             setIsLoading(false);
             return;
           }
@@ -3941,7 +3830,6 @@ function AppContent() {
         if (!dataLoadedRef.current) {
           dataLoadedRef.current = true;
           loadFromSupabase(session.user.id);
-          checkInviteToken(session.user.email);
         }
       } else {
         if (!dataLoadedRef.current) {
@@ -3960,6 +3848,12 @@ function AppContent() {
       
       // Ignorer les events qui ne changent pas l'état
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
+      
+      // Détecter le reset password
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowResetPasswordModal(true);
+        return;
+      }
       
       if (event === 'SIGNED_IN' && session?.user) {
         // Seulement après une nouvelle connexion, aller au dashboard
@@ -4019,7 +3913,7 @@ function AppContent() {
     console.log('[Salarize] Loading data from Supabase for user:', userId);
     setIsLoadingData(true);
     try {
-      // Load user's own companies
+      // Load companies
       const { data: companiesData, error: companiesError } = await supabase
         .from('companies')
         .select('*')
@@ -4030,36 +3924,12 @@ function AppContent() {
         throw companiesError;
       }
 
-      // Load shared companies (via company_members)
-      const { data: membershipData } = await supabase
-        .from('company_members')
-        .select('company_id, role')
-        .eq('user_id', userId);
-
-      let sharedCompaniesData = [];
-      if (membershipData && membershipData.length > 0) {
-        const sharedCompanyIds = membershipData.map(m => m.company_id);
-        const { data: sharedData } = await supabase
-          .from('companies')
-          .select('*')
-          .in('id', sharedCompanyIds);
-        
-        if (sharedData) {
-          sharedCompaniesData = sharedData.map(c => ({
-            ...c,
-            isShared: true,
-            memberRole: membershipData.find(m => m.company_id === c.id)?.role || 'viewer'
-          }));
-        }
-      }
-
-      const allCompanies = [...(companiesData || []), ...sharedCompaniesData];
-      console.log('[Salarize] Loaded companies:', allCompanies.length, '(own:', companiesData?.length || 0, ', shared:', sharedCompaniesData.length, ')');
+      console.log('[Salarize] Loaded companies:', companiesData?.length || 0);
 
       const loadedCompanies = {};
       
-      for (const company of allCompanies) {
-        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})${company.isShared ? ' [SHARED]' : ''}`);
+      for (const company of companiesData || []) {
+        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
         
         // Load employees for this company (limite augmentée à 10000)
         const { data: employeesData, error: empError } = await supabase
@@ -4107,9 +3977,7 @@ function AppContent() {
           periods,
           logo: company.logo,
           brandColor: company.brand_color,
-          website: company.website,
-          isShared: company.isShared || false,
-          memberRole: company.memberRole || null
+          website: company.website
         };
       }
 
@@ -6174,32 +6042,27 @@ Ce rapport a été généré par Salarize.
 Cordialement,
 L'équipe Salarize`;
 
-      let emailSent = false;
-      
+      // Envoyer via EmailJS
       try {
-        const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`
-          },
-          body: JSON.stringify({
-            to: shareEmail,
-            subject: emailSubject,
-            text: emailBody,
-            from_name: senderName
-          })
-        });
-        
-        if (response.ok) {
-          emailSent = true;
-          toast.success(`Email envoyé à ${shareEmail}`);
-        }
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          'template_share', // Créer ce template dans EmailJS
+          {
+            to_email: shareEmail,
+            from_name: senderName,
+            company_name: activeCompany,
+            total_cost: `€${totalCostValue.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
+            employee_count: uniqueEmps,
+            periods_count: periodsCount,
+            avg_cost: `€${avgCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
+            top_departments: topDepts,
+            message: shareMessage || 'Aucun message',
+          }
+        );
+        toast.success(`Rapport envoyé à ${shareEmail}`);
       } catch (e) {
-        console.log('Edge Function non disponible');
-      }
-      
-      if (!emailSent) {
+        console.error('EmailJS error:', e);
+        // Fallback mailto
         const mailtoLink = `mailto:${shareEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
         window.location.href = mailtoLink;
         toast.success(`Client email ouvert pour ${shareEmail}`);
@@ -9950,70 +9813,6 @@ L'équipe Salarize`;
           </div>
         )}
         
-        {/* Modal Acceptation Invitation */}
-        {pendingInvitation && (
-          <div 
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
-            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-6 text-white text-center">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h2 className="text-2xl font-bold">Invitation reçue !</h2>
-              </div>
-              
-              <div className="p-6">
-                <p className="text-slate-600 text-center mb-6">
-                  Vous avez été invité à consulter les données salariales de 
-                  <strong className="text-slate-800"> {pendingInvitation.company_name}</strong>
-                </p>
-                
-                <div className="bg-slate-50 rounded-xl p-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                      <svg className={`w-5 h-5 ${pendingInvitation.role === 'viewer' ? 'text-emerald-600' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        {pendingInvitation.role === 'viewer' ? (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        ) : (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        )}
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-800">
-                        {pendingInvitation.role === 'viewer' ? 'Accès Lecteur' : 'Accès Éditeur'}
-                      </p>
-                      <p className="text-sm text-slate-500">
-                        {pendingInvitation.role === 'viewer' 
-                          ? 'Consultation des données uniquement' 
-                          : 'Consultation et modification des données'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setPendingInvitation(null)}
-                    className="flex-1 py-3 border border-slate-200 rounded-xl font-medium hover:bg-slate-100 transition-colors"
-                  >
-                    Refuser
-                  </button>
-                  <button
-                    onClick={acceptInvitation}
-                    className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-medium hover:from-emerald-600 hover:to-teal-600 transition-colors"
-                  >
-                    Accepter
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        
         {/* Panneau Alertes */}
         {showAlertsPanel && (
           <div 
@@ -10628,6 +10427,73 @@ L'équipe Salarize`;
         </>
         )}
       </main>
+      
+      {/* Modal Reset Password - Global */}
+      {showResetPasswordModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-6 text-white text-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold">Nouveau mot de passe</h2>
+              <p className="text-violet-100 text-sm mt-1">Entrez votre nouveau mot de passe</p>
+            </div>
+            
+            <div className="p-6">
+              {resetPasswordError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                  {resetPasswordError}
+                </div>
+              )}
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nouveau mot de passe</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                    placeholder="••••••••"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Confirmer le mot de passe</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                    placeholder="••••••••"
+                  />
+                </div>
+                
+                <button
+                  onClick={handleUpdatePassword}
+                  disabled={resetPasswordLoading}
+                  className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-medium hover:from-violet-700 hover:to-fuchsia-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {resetPasswordLoading ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Mise à jour...
+                    </>
+                  ) : (
+                    'Mettre à jour le mot de passe'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </PageTransition>
   );
