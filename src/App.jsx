@@ -3418,8 +3418,11 @@ function SelectCompanyModal({ companies, newName, setNewName, onSelect, onCancel
 }
 
 // Sidebar component OUTSIDE of App
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, companyRoles }) {
   const [showActions, setShowActions] = useState(false);
+  
+  // Vérifier si l'utilisateur peut modifier la company active
+  const canEdit = !activeCompany || companyRoles?.[activeCompany] === 'owner' || companyRoles?.[activeCompany] === 'editor';
   
   // Calculer employés non assignés
   const unassignedCount = activeCompany && companies[activeCompany] 
@@ -3487,8 +3490,11 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-20">
                   {/* 1. Importer des données - Action principale */}
                   <button
-                    onClick={() => { onImportClick(); setShowActions(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                    onClick={() => { if (canEdit) { onImportClick(); setShowActions(false); } }}
+                    disabled={!canEdit}
+                    className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
+                      canEdit ? 'hover:bg-slate-700' : 'opacity-50 cursor-not-allowed'
+                    }`}
                   >
                     <div className="w-8 h-8 bg-fuchsia-500/20 rounded-lg flex items-center justify-center">
                       <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3497,7 +3503,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                     </div>
                     <div>
                       <p className="font-medium text-white text-sm">Importer des données</p>
-                      <p className="text-slate-400 text-xs">Fichier Excel (.xlsx)</p>
+                      <p className="text-slate-400 text-xs">{canEdit ? 'Fichier Excel (.xlsx)' : 'Mode lecture seule'}</p>
                     </div>
                   </button>
                   
@@ -3514,7 +3520,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                       </div>
                       <div>
                         <p className="font-medium text-white text-sm">Départements</p>
-                        <p className="text-slate-400 text-xs">Réassigner, renommer, fusionner</p>
+                        <p className="text-slate-400 text-xs">{canEdit ? 'Réassigner, renommer, fusionner' : 'Consultation uniquement'}</p>
                       </div>
                     </button>
                   )}
@@ -3535,8 +3541,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                     </div>
                   </button>
                   
-                  {/* 4. Séparateur + Gérer société - Si société active */}
-                  {activeCompany && (
+                  {/* 4. Séparateur + Gérer société - Si société active et pas en mode viewer */}
+                  {activeCompany && canEdit && (
                     <button
                       onClick={() => { onManageData(); setShowActions(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left border-t border-slate-700"
@@ -3559,8 +3565,8 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
           </div>
         </div>
       
-      {/* Alerte employés non assignés */}
-      {unassignedCount > 0 && (
+      {/* Alerte employés non assignés - seulement si peut éditer */}
+      {unassignedCount > 0 && canEdit && (
         <button
           onClick={onManageDepts}
           className="mx-4 mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 hover:bg-amber-500/20 transition-colors"
@@ -3585,24 +3591,37 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         {Object.keys(companies).length === 0 ? (
           <p className="text-slate-600 text-sm">Aucune société</p>
         ) : (
-          Object.keys(companies).map(name => (
-            <button
-              key={name}
-              onClick={() => onSelectCompany(name)}
-              className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
-              }`}
-            >
-              {companies[name]?.logo ? (
-                <img src={companies[name].logo} alt="" className="w-6 h-6 rounded object-cover" />
-              ) : (
-                <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
-                  {name.charAt(0)}
-                </div>
-              )}
-              <span className="truncate">{name}</span>
-            </button>
-          ))
+          Object.keys(companies).map(name => {
+            const role = companyRoles?.[name];
+            const isShared = role === 'viewer' || role === 'editor';
+            return (
+              <button
+                key={name}
+                onClick={() => onSelectCompany(name)}
+                className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                  activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
+                }`}
+              >
+                {companies[name]?.logo ? (
+                  <img src={companies[name].logo} alt="" className="w-6 h-6 rounded object-cover" />
+                ) : (
+                  <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
+                    {name.charAt(0)}
+                  </div>
+                )}
+                <span className="truncate flex-1">{name}</span>
+                {isShared && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    role === 'viewer' 
+                      ? 'bg-amber-500/20 text-amber-400' 
+                      : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {role === 'viewer' ? 'Lecteur' : 'Éditeur'}
+                  </span>
+                )}
+              </button>
+            );
+          })
         )}
       </div>
     </div>
@@ -3887,6 +3906,10 @@ function AppContent() {
   const [pendingInvites, setPendingInvites] = useState([]); // Invitations en attente
   const [sendingInvite, setSendingInvite] = useState(false); // État d'envoi de l'invitation
   
+  // === SYSTÈME DE PARTAGE MULTI-USERS ===
+  const [companyRoles, setCompanyRoles] = useState({}); // { companyName: 'owner' | 'viewer' | 'editor' }
+  const [pendingInvitations, setPendingInvitations] = useState([]); // Invitations reçues en attente
+  
   // Détecter si on arrive d'un lien de reset password IMMÉDIATEMENT
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(() => {
     if (typeof window !== 'undefined' && window.location.hash) {
@@ -3943,27 +3966,83 @@ function AppContent() {
       return;
     }
 
+    if (!activeCompany || !companies[activeCompany]?.id) {
+      toast.error('Aucune entreprise sélectionnée');
+      return;
+    }
+
     setSendingInvite(true);
     
     try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        toast.error('Vous devez être connecté');
+        setSendingInvite(false);
+        return;
+      }
+
+      const companyId = companies[activeCompany].id;
+      
+      // Vérifier si une invitation existe déjà
+      const { data: existingShare } = await supabase
+        .from('company_shares')
+        .select('id, status')
+        .eq('company_id', companyId)
+        .eq('shared_with_email', inviteEmail.toLowerCase())
+        .single();
+
+      if (existingShare) {
+        if (existingShare.status === 'accepted') {
+          toast.error('Cet utilisateur a déjà accès à cette entreprise');
+        } else {
+          toast.error('Une invitation est déjà en attente pour cet email');
+        }
+        setSendingInvite(false);
+        return;
+      }
+
       // Générer un token unique pour l'invitation
       const inviteToken = crypto.randomUUID();
       const inviteLink = `${window.location.origin}?invite=${inviteToken}`;
       
-      // Envoyer l'email via EmailJS
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        {
-          to_email: inviteEmail,
-          from_name: user?.name || user?.email || 'Un utilisateur',
-          company_name: activeCompany,
-          role: inviteRole === 'viewer' ? 'Lecteur (consultation uniquement)' : 'Éditeur (consultation et modification)',
-          invite_link: inviteLink,
-        }
-      );
+      // Sauvegarder dans company_shares
+      const { error: shareError } = await supabase
+        .from('company_shares')
+        .insert({
+          company_id: companyId,
+          owner_id: currentUser.id,
+          shared_with_email: inviteEmail.toLowerCase(),
+          role: inviteRole,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        });
 
-      // Ajouter à la liste des invitations en attente
+      if (shareError) {
+        console.error('Erreur sauvegarde invitation:', shareError);
+        toast.error('Erreur lors de la sauvegarde de l\'invitation');
+        setSendingInvite(false);
+        return;
+      }
+      
+      // Envoyer l'email via EmailJS
+      try {
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          {
+            to_email: inviteEmail,
+            from_name: user?.name || user?.email || 'Un utilisateur',
+            company_name: activeCompany,
+            role: inviteRole === 'viewer' ? 'Lecteur (consultation uniquement)' : 'Éditeur (consultation et modification)',
+            invite_link: inviteLink,
+          }
+        );
+      } catch (emailErr) {
+        console.warn('Email non envoyé mais invitation sauvegardée:', emailErr);
+        // L'invitation est quand même sauvegardée, on continue
+      }
+
+      // Ajouter à la liste des invitations en attente (UI)
       setPendingInvites([...pendingInvites, { 
         email: inviteEmail, 
         role: inviteRole, 
@@ -3996,6 +4075,18 @@ function AppContent() {
   // Debounced search terms for performance
   const debouncedEmpSearch = useDebounce(empSearchTerm, 300);
   const debouncedDeptSearch = useDebounce(deptSearchTerm, 300);
+
+  // Calculer si l'utilisateur peut modifier la company active
+  const isViewer = useMemo(() => {
+    if (!activeCompany || !companyRoles[activeCompany]) return false;
+    return companyRoles[activeCompany] === 'viewer';
+  }, [activeCompany, companyRoles]);
+
+  const canEdit = useMemo(() => {
+    if (!activeCompany) return true;
+    const role = companyRoles[activeCompany];
+    return !role || role === 'owner' || role === 'editor';
+  }, [activeCompany, companyRoles]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -4238,7 +4329,11 @@ function AppContent() {
     console.log('[Salarize] Loading data from Supabase for user:', userId);
     setIsLoadingData(true);
     try {
-      // Load companies
+      // Get user email for shared companies lookup
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userEmail = currentUser?.email?.toLowerCase();
+
+      // Load owned companies
       const { data: companiesData, error: companiesError } = await supabase
         .from('companies')
         .select('*')
@@ -4249,12 +4344,91 @@ function AppContent() {
         throw companiesError;
       }
 
-      console.log('[Salarize] Loaded companies:', companiesData?.length || 0);
+      console.log('[Salarize] Loaded owned companies:', companiesData?.length || 0);
+
+      // Load shared companies (accepted invitations)
+      let sharedCompaniesData = [];
+      const roles = {}; // Track roles for each company
+      
+      if (userEmail) {
+        // First, auto-accept any pending invitations for this user
+        const { data: pendingShares } = await supabase
+          .from('company_shares')
+          .select('id, company_id, role')
+          .eq('shared_with_email', userEmail)
+          .eq('status', 'pending');
+
+        if (pendingShares && pendingShares.length > 0) {
+          console.log('[Salarize] Auto-accepting', pendingShares.length, 'pending invitations');
+          
+          // Update all pending invitations to accepted
+          const { error: updateError } = await supabase
+            .from('company_shares')
+            .update({ 
+              status: 'accepted', 
+              shared_with_id: userId,
+              accepted_at: new Date().toISOString()
+            })
+            .eq('shared_with_email', userEmail)
+            .eq('status', 'pending');
+
+          if (updateError) {
+            console.error('[Salarize] Error accepting invitations:', updateError);
+          }
+        }
+
+        // Now load all accepted shares for this user
+        const { data: acceptedShares, error: sharesError } = await supabase
+          .from('company_shares')
+          .select('company_id, role')
+          .or(`shared_with_email.eq.${userEmail},shared_with_id.eq.${userId}`)
+          .eq('status', 'accepted');
+
+        if (sharesError) {
+          console.error('[Salarize] Error loading shares:', sharesError);
+        } else if (acceptedShares && acceptedShares.length > 0) {
+          console.log('[Salarize] Found', acceptedShares.length, 'shared companies');
+          
+          // Get company IDs from shares
+          const sharedCompanyIds = acceptedShares.map(s => s.company_id);
+          
+          // Store roles by company_id first, we'll convert to company names later
+          const rolesByCompanyId = {};
+          acceptedShares.forEach(s => {
+            rolesByCompanyId[s.company_id] = s.role;
+          });
+          
+          // Load the shared companies
+          const { data: sharedData, error: sharedError } = await supabase
+            .from('companies')
+            .select('*')
+            .in('id', sharedCompanyIds);
+
+          if (sharedError) {
+            console.error('[Salarize] Error loading shared companies:', sharedError);
+          } else {
+            sharedCompaniesData = sharedData || [];
+            // Map roles to company names
+            sharedCompaniesData.forEach(c => {
+              roles[c.name] = rolesByCompanyId[c.id] || 'viewer';
+            });
+          }
+        }
+      }
+
+      // Mark owned companies
+      (companiesData || []).forEach(c => {
+        roles[c.name] = 'owner';
+      });
+
+      // Combine owned and shared companies
+      const allCompanies = [...(companiesData || []), ...sharedCompaniesData];
+      console.log('[Salarize] Total companies to load:', allCompanies.length);
 
       const loadedCompanies = {};
       
-      for (const company of companiesData || []) {
-        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
+      for (const company of allCompanies) {
+        console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id}) - Role: ${roles[company.name]}`);
         
         // Load ALL employees for this company with pagination
         let allEmployeesData = [];
@@ -4329,6 +4503,31 @@ function AppContent() {
 
       setCompanies(loadedCompanies);
       companiesRef.current = loadedCompanies; // Synchroniser la ref
+      setCompanyRoles(roles); // Sauvegarder les rôles
+      
+      // Load pending invites sent by this user
+      const { data: sentInvites } = await supabase
+        .from('company_shares')
+        .select('shared_with_email, role, status, created_at, company_id')
+        .eq('owner_id', userId)
+        .eq('status', 'pending');
+      
+      if (sentInvites && sentInvites.length > 0) {
+        const invitesWithCompanyNames = sentInvites.map(invite => {
+          // Find company name by ID
+          const companyName = Object.keys(loadedCompanies).find(
+            name => loadedCompanies[name].id === invite.company_id
+          );
+          return {
+            email: invite.shared_with_email,
+            role: invite.role,
+            company: companyName || 'Unknown',
+            createdAt: invite.created_at
+          };
+        });
+        setPendingInvites(invitesWithCompanyNames);
+        console.log('[Salarize] Loaded pending invites:', invitesWithCompanyNames.length);
+      }
       
       // Load first company if exists
       const companyNames = Object.keys(loadedCompanies);
@@ -7512,6 +7711,7 @@ L'équipe Salarize`;
             setCurrentPage={setCurrentPage}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
+            companyRoles={companyRoles}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -7614,6 +7814,7 @@ L'équipe Salarize`;
           setCurrentPage={setCurrentPage}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          companyRoles={companyRoles}
         />
         <DashboardHeader 
           user={user} 
@@ -8282,6 +8483,20 @@ L'équipe Salarize`;
                 )}
                 
                 {!showRenameDept && !showMergeDept && !showCreateDept && (
+                  <>
+                  {/* Message pour les viewers */}
+                  {isViewer && (
+                    <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-sm text-amber-700 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Mode lecture seule - Vous ne pouvez pas modifier les départements
+                      </p>
+                    </div>
+                  )}
+                  {canEdit && (
                   <div className="flex gap-2 mb-3">
                     <button
                       onClick={() => setShowCreateDept(true)}
@@ -8304,6 +8519,8 @@ L'équipe Salarize`;
                       🔀 Fusionner
                     </button>
                   </div>
+                  )}
+                  </>
                 )}
                 
                 {/* Create department UI */}
@@ -8351,8 +8568,8 @@ L'équipe Salarize`;
                   </div>
                 )}
                 
-                {/* Bulk assign bar */}
-                {selectedEmployees.size > 0 && (
+                {/* Bulk assign bar - Only for editors */}
+                {selectedEmployees.size > 0 && canEdit && (
                   <div className="mb-3 p-3 bg-violet-50 border border-violet-200 rounded-xl flex items-center gap-3">
                     <div className="flex-1">
                       <span className="text-sm font-medium text-violet-700">
@@ -8461,8 +8678,9 @@ L'équipe Salarize`;
                   </div>
                 ) : (
                   <>
-                    {/* Select all header */}
+                    {/* Select all header - Only show checkbox if can edit */}
                     <div className="flex items-center gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 sticky top-0">
+                      {canEdit && (
                       <input
                         type="checkbox"
                         id="select-all-employees"
@@ -8487,10 +8705,11 @@ L'équipe Salarize`;
                         }}
                         className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                       />
+                      )}
                       <span className="text-sm text-slate-500 flex-1">
-                        {selectedEmployees.size > 0 
+                        {canEdit && selectedEmployees.size > 0 
                           ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}` 
-                          : `Tout sélectionner (${allFilteredEmployeesForDept.length})`}
+                          : canEdit ? `Tout sélectionner (${allFilteredEmployeesForDept.length})` : `${allFilteredEmployeesForDept.length} employé${allFilteredEmployeesForDept.length > 1 ? 's' : ''}`}
                       </span>
                       <span className="text-xs text-slate-400">
                         {deptPage * DEPT_PAGE_SIZE + 1}-{Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length)} sur {allFilteredEmployeesForDept.length}
@@ -8503,7 +8722,8 @@ L'équipe Salarize`;
                         className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}
                         style={{ contain: 'layout style paint' }}
                       >
-                        {/* Checkbox */}
+                        {/* Checkbox - Only for editors */}
+                        {canEdit && (
                         <input
                           type="checkbox"
                           id={`emp-checkbox-${emp.name.replace(/\s+/g, '-')}`}
@@ -8520,6 +8740,7 @@ L'équipe Salarize`;
                           }}
                           className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                         />
+                        )}
                         
                         {/* Avatar */}
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
@@ -8536,7 +8757,9 @@ L'équipe Salarize`;
                         
                         <select
                           value={emp.currentDept || ''}
+                          disabled={!canEdit}
                           onChange={e => {
+                            if (!canEdit) return;
                             const newDept = e.target.value || null;
                             
                             const newMapping = { ...departmentMapping };
@@ -8561,7 +8784,9 @@ L'équipe Salarize`;
                             companiesRef.current = newCompanies; // Update ref immediately
                             debouncedSaveAll(newCompanies, activeCompany);
                           }}
-                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all ${
+                            !canEdit ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                          } ${
                             emp.currentDept 
                               ? 'border-slate-200 bg-white hover:border-slate-300' 
                               : 'border-amber-300 bg-amber-50 text-amber-700'
@@ -8705,6 +8930,17 @@ L'équipe Salarize`;
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{activeCompany}</h1>
+                {/* Badge rôle si partagé */}
+                {companyRoles[activeCompany] && companyRoles[activeCompany] !== 'owner' && (
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    companyRoles[activeCompany] === 'viewer'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {companyRoles[activeCompany] === 'viewer' ? '👁 Lecteur' : '✏️ Éditeur'}
+                  </span>
+                )}
+                {canEdit && (
                 <button
                   onClick={() => setShowCompanySettings(true)}
                   className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
@@ -8715,6 +8951,7 @@ L'équipe Salarize`;
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </button>
+                )}
               </div>
               <div className="flex items-center gap-3 text-sm text-white/60">
                 {companies[activeCompany]?.website && (
@@ -8809,7 +9046,8 @@ L'équipe Salarize`;
                 <span className="hidden sm:inline">Partager</span>
               </button>
               
-              {/* Invite CEO Button */}
+              {/* Invite CEO Button - Only for owners */}
+              {(!companyRoles[activeCompany] || companyRoles[activeCompany] === 'owner') && (
               <button
                 onClick={() => setShowInviteModal(true)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
@@ -8819,6 +9057,7 @@ L'équipe Salarize`;
                 </svg>
                 <span className="hidden sm:inline">Inviter</span>
               </button>
+              )}
               
               {/* Settings Menu */}
               <div className="relative group">
