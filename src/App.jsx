@@ -237,10 +237,78 @@ const PRICING_PLANS = [
   }
 ];
 
-const DEFAULT_DEPARTMENTS = ['Cuisine', 'Admin', 'Livreur', 'Plonge', 'SAV', 'OPÉR/LIVRAI', 'PREPA COMM', 'MISE EN BAR', 'DIRECTION'];
+const DEFAULT_DEPARTMENTS = ['Direction', 'Administration', 'Comptabilité', 'RH', 'IT', 'Commercial', 'Marketing', 'Production', 'Logistique', 'SAV'];
 
-// Couleurs pour les graphiques
-const CHART_COLORS = ['#8B5CF6', '#A78BFA', '#C4B5FD', '#7C3AED', '#6D28D9', '#5B21B6', '#4C1D95', '#DDD6FE', '#EDE9FE', '#F5F3FF'];
+// ============================================
+// DESIGN SYSTEM - Couleurs et styles cohérents
+// ============================================
+const DESIGN = {
+  colors: {
+    primary: {
+      50: '#F5F3FF',
+      100: '#EDE9FE',
+      200: '#DDD6FE',
+      300: '#C4B5FD',
+      400: '#A78BFA',
+      500: '#8B5CF6',
+      600: '#7C3AED',
+      700: '#6D28D9',
+      800: '#5B21B6',
+      900: '#4C1D95',
+    },
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+    info: '#3B82F6',
+  },
+  shadows: {
+    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+    md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+  },
+  radius: {
+    sm: '0.375rem',
+    md: '0.5rem',
+    lg: '0.75rem',
+    xl: '1rem',
+    '2xl': '1.5rem',
+  }
+};
+
+// Couleurs pour les graphiques (palette violet étendue)
+const CHART_COLORS = [
+  '#8B5CF6', // violet-500
+  '#A78BFA', // violet-400
+  '#7C3AED', // violet-600
+  '#6D28D9', // violet-700
+  '#C4B5FD', // violet-300
+  '#5B21B6', // violet-800
+  '#4C1D95', // violet-900
+  '#DDD6FE', // violet-200
+  '#EDE9FE', // violet-100
+  '#F5F3FF', // violet-50
+];
+
+// Messages d'aide et d'onboarding
+const ONBOARDING_MESSAGES = {
+  welcome: {
+    title: 'Bienvenue sur Salarize ! 👋',
+    description: 'Votre outil de gestion salariale pour PME belges',
+  },
+  firstImport: {
+    title: 'Commencez par importer vos données',
+    description: 'Glissez-déposez un fichier Excel exporté depuis votre secrétariat social (Acerta, Securex, SD Worx...)',
+  },
+  emptyDashboard: {
+    title: 'Votre dashboard est prêt',
+    description: 'Importez des données pour voir vos statistiques salariales',
+  },
+  noCompany: {
+    title: 'Créez votre première société',
+    description: 'Ajoutez une société pour commencer à analyser vos coûts salariaux',
+  },
+};
 
 // Page transition wrapper - évite le flash blanc
 function PageTransition({ children, className = '', dark = false }) {
@@ -571,19 +639,55 @@ const EmptyState = React.memo(({
   icon, 
   title, 
   description, 
-  action 
-}) => (
-  <div className="text-center py-12">
-    {icon && (
-      <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-        {icon}
-      </div>
-    )}
-    <h3 className="text-lg font-semibold text-slate-800 mb-2">{title}</h3>
-    {description && <p className="text-slate-500 mb-4 max-w-sm mx-auto">{description}</p>}
-    {action}
-  </div>
-));
+  action,
+  variant = 'default', // 'default', 'compact', 'large'
+  illustration = null, // SVG illustration optionnelle
+  tips = [] // Conseils optionnels
+}) => {
+  const sizes = {
+    default: 'py-12',
+    compact: 'py-6',
+    large: 'py-16',
+  };
+  
+  const iconSizes = {
+    default: 'w-16 h-16',
+    compact: 'w-12 h-12',
+    large: 'w-20 h-20',
+  };
+
+  return (
+    <div className={`text-center ${sizes[variant]}`}>
+      {illustration ? (
+        <div className="mb-6">{illustration}</div>
+      ) : icon ? (
+        <div className={`${iconSizes[variant]} bg-gradient-to-br from-violet-100 to-fuchsia-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm`}>
+          {icon}
+        </div>
+      ) : null}
+      <h3 className={`font-semibold text-slate-800 mb-2 ${variant === 'large' ? 'text-xl' : 'text-lg'}`}>
+        {title}
+      </h3>
+      {description && (
+        <p className="text-slate-500 mb-4 max-w-sm mx-auto leading-relaxed">{description}</p>
+      )}
+      {tips.length > 0 && (
+        <div className="mb-4 text-left max-w-sm mx-auto">
+          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">💡 Conseils</p>
+          <ul className="text-sm text-slate-500 space-y-1">
+            {tips.map((tip, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-violet-400 mt-0.5">•</span>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {action}
+    </div>
+  );
+});
 
 // Number formatting utilities (memoized)
 const formatCurrency = (value, decimals = 2) => {
@@ -732,6 +836,37 @@ function useDebounce(value, delay = 300) {
   }, [value, delay]);
   
   return debouncedValue;
+}
+
+// Hook pour debouncer une fonction callback (utilisé pour saveAll)
+function useDebouncedCallback(callback, delay = 500) {
+  const timeoutRef = useRef(null);
+  const callbackRef = useRef(callback);
+  
+  // Mettre à jour la référence du callback à chaque render
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+  
+  const debouncedFn = useCallback((...args) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      callbackRef.current(...args);
+    }, delay);
+  }, [delay]);
+  
+  // Cleanup au démontage
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+  
+  return debouncedFn;
 }
 
 // Landing Page Header
@@ -2678,7 +2813,10 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
     setSuccess('');
   };
   
+  const [googleLoading, setGoogleLoading] = useState(false);
+  
   const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
     try {
       // Sauvegarder le token d'invitation s'il existe dans l'URL
       const urlParams = new URLSearchParams(window.location.search);
@@ -2700,6 +2838,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
       if (error) throw error;
     } catch (err) {
       setError(err.message);
+      setGoogleLoading(false);
     }
   };
   
@@ -3010,15 +3149,23 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
           {/* Google Button */}
           <button
             onClick={handleGoogleLogin}
-            className="w-full py-3 bg-white hover:bg-slate-100 text-slate-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-3 mb-4"
+            disabled={googleLoading}
+            className="w-full py-3 bg-white hover:bg-slate-100 text-slate-800 font-medium rounded-xl transition-colors flex items-center justify-center gap-3 mb-4 disabled:opacity-70 disabled:cursor-wait"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Continuer avec Google
+            {googleLoading ? (
+              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+            )}
+            {googleLoading ? 'Connexion en cours...' : 'Continuer avec Google'}
           </button>
           
           <div className="flex items-center gap-4 mb-4">
@@ -3482,7 +3629,7 @@ function CompanySettingsModal({ activeCompany, companies, setCompanies, setActiv
     
     // Vérifier si le nouveau nom existe déjà
     if (hasNameChanged && companies[newName]) {
-      alert('Une société avec ce nom existe déjà');
+      toast.error('Une société avec ce nom existe déjà');
       return;
     }
     
@@ -4107,16 +4254,36 @@ function AppContent() {
       for (const company of companiesData || []) {
         console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
         
-        // Load employees for this company (limite augmentée à 10000)
-        const { data: employeesData, error: empError } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('company_id', company.id)
-          .limit(10000);
+        // Load ALL employees for this company with pagination
+        let allEmployeesData = [];
+        let offset = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const { data: batch, error: empError } = await supabase
+            .from('employees')
+            .select('*')
+            .eq('company_id', company.id)
+            .range(offset, offset + pageSize - 1)
+            .order('id');
 
-        if (empError) {
-          console.error('[Salarize] Error loading employees:', empError);
+          if (empError) {
+            console.error('[Salarize] Error loading employees batch:', empError);
+            break;
+          }
+          
+          if (batch && batch.length > 0) {
+            allEmployeesData = [...allEmployeesData, ...batch];
+            console.log(`[Salarize] Loaded batch ${Math.floor(offset / pageSize) + 1}: ${batch.length} employees (total: ${allEmployeesData.length})`);
+            offset += pageSize;
+            hasMore = batch.length === pageSize;
+          } else {
+            hasMore = false;
+          }
         }
+        
+        console.log(`[Salarize] Total employees loaded for ${company.name}: ${allEmployeesData.length}`);
 
         // Load mappings for this company
         const { data: mappingsData, error: mapError } = await supabase
@@ -4134,7 +4301,7 @@ function AppContent() {
           mapping[m.employee_name] = m.department;
         });
 
-        const emps = (employeesData || []).map(e => ({
+        const emps = allEmployeesData.map(e => ({
           name: e.name,
           department: e.department,
           function: e.function,
@@ -4145,6 +4312,7 @@ function AppContent() {
         const periods = [...new Set(emps.map(e => e.period).filter(Boolean))].sort();
 
         console.log(`[Salarize] Company ${company.name}: ${emps.length} employees, ${periods.length} periods`);
+        console.log(`[Salarize] Periods found: ${periods.join(', ')}`);
 
         loadedCompanies[company.name] = {
           id: company.id,
@@ -4257,6 +4425,10 @@ function AppContent() {
           // Sync employees - utiliser les données les plus récentes de la ref
           const latestCompanyData = companiesRef.current[companyName] || companyData;
           const employeeCount = latestCompanyData.employees?.length || 0;
+          const periodsInData = [...new Set((latestCompanyData.employees || []).map(e => e.period).filter(Boolean))].sort();
+          
+          console.log(`[Salarize] Preparing to save ${companyName}: ${employeeCount} employees, ${periodsInData.length} periods`);
+          console.log(`[Salarize] Periods to save: ${periodsInData.join(', ')}`);
           
           if (employeeCount > 0) {
             console.log(`[Salarize] Syncing ${employeeCount} employees for ${companyName}`);
@@ -4283,24 +4455,43 @@ function AppContent() {
               period: e.period
             }));
 
-            // Insert in batches of 500
+            // Insert in batches of 500 with retry logic
             const batchSize = 500;
             let totalInserted = 0;
+            let failedBatches = [];
+            
             for (let i = 0; i < employeesToInsert.length; i += batchSize) {
               const batch = employeesToInsert.slice(i, i + batchSize);
-              const { error: insertError } = await supabase
-                .from('employees')
-                .insert(batch);
+              let retries = 3;
+              let success = false;
               
-              if (insertError) {
-                console.error('[Salarize] Error inserting employees batch:', insertError);
-              } else {
-                totalInserted += batch.length;
-                console.log(`[Salarize] Inserted batch ${Math.floor(i / batchSize) + 1}, ${batch.length} employees (total: ${totalInserted})`);
+              while (retries > 0 && !success) {
+                const { error: insertError } = await supabase
+                  .from('employees')
+                  .insert(batch);
+                
+                if (insertError) {
+                  retries--;
+                  if (retries === 0) {
+                    console.error('[Salarize] Error inserting employees batch after 3 retries:', insertError);
+                    failedBatches.push({ start: i, count: batch.length });
+                  } else {
+                    console.log(`[Salarize] Retry ${3 - retries}/3 for batch starting at ${i}`);
+                    await new Promise(r => setTimeout(r, 500)); // Wait before retry
+                  }
+                } else {
+                  success = true;
+                  totalInserted += batch.length;
+                  console.log(`[Salarize] Inserted batch ${Math.floor(i / batchSize) + 1}, ${batch.length} employees (total: ${totalInserted})`);
+                }
               }
             }
             
-            console.log(`[Salarize] ✓ Saved ${totalInserted} employees for ${companyName}`);
+            if (failedBatches.length > 0) {
+              console.error(`[Salarize] ⚠️ ${failedBatches.length} batch(es) failed to insert`);
+            }
+            
+            console.log(`[Salarize] ✓ Saved ${totalInserted}/${employeesToInsert.length} employees for ${companyName}`);
           } else {
             // No employees - delete all
             console.log(`[Salarize] No employees, deleting all for ${companyName}`);
@@ -4362,6 +4553,11 @@ function AppContent() {
     }
     setLastSaved(new Date());
   };
+
+  // Debounced version for frequent updates (like department changes)
+  const debouncedSaveAll = useDebouncedCallback((newCompanies, active) => {
+    saveAll(newCompanies, active);
+  }, 800);
 
   // Export Excel amélioré avec comparaisons
   const exportToExcel = () => {
@@ -5096,8 +5292,8 @@ function AppContent() {
           }
           
           if (!result || result.employees.length === 0) {
-            setDebugMsg('Aucune donnée');
-            alert('Aucune donnée trouvée dans ce fichier. Formats supportés: Acerta, Securex, ou fichier avec colonnes Nom + Coût.');
+            setDebugMsg('Aucune donnée trouvée');
+            toast.error('Fichier non reconnu. Vérifiez que votre fichier contient des données salariales (colonnes Nom, Brut, Net, Coût...).');
             resolve();
             return;
           }
@@ -6341,9 +6537,11 @@ L'équipe Salarize`;
     };
     
     setCompanies(newCompanies);
+    companiesRef.current = newCompanies; // Update ref immediately
     setEmployees(newEmployees);
     setPeriods(newPeriods);
     saveAll(newCompanies, activeCompany);
+    toast.success(`Période ${formatPeriod(periodToDelete)} supprimée`);
   };
 
   // Computed values with useMemo for performance
@@ -6693,6 +6891,52 @@ L'équipe Salarize`;
     return Object.values(deptEmployees).sort((a, b) => b.total - a.total);
   }, [drillDownDept, employees, departmentMapping]);
 
+  // === OPTIMISATIONS GESTIONNAIRE DÉPARTEMENTS ===
+  // Liste de tous les départements uniques (memoïsée)
+  const allDepartments = useMemo(() => {
+    return [...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort();
+  }, [employees, departmentMapping]);
+
+  // Employés uniques avec leur département actuel (memoïsée)
+  const uniqueEmployeesWithDept = useMemo(() => {
+    const seen = new Map();
+    employees.forEach(e => {
+      if (!seen.has(e.name)) {
+        seen.set(e.name, {
+          ...e,
+          currentDept: e.department || departmentMapping[e.name] || null
+        });
+      }
+    });
+    return [...seen.values()];
+  }, [employees, departmentMapping]);
+
+  // Stats du gestionnaire de départements (memoïsées)
+  const deptManagerStats = useMemo(() => {
+    const total = uniqueEmployeesWithDept.length;
+    const unassigned = uniqueEmployeesWithDept.filter(e => !e.currentDept).length;
+    const assigned = total - unassigned;
+    const deptCount = allDepartments.length;
+    return { total, unassigned, assigned, deptCount };
+  }, [uniqueEmployeesWithDept, allDepartments]);
+
+  // Employés filtrés pour le gestionnaire (memoïsée avec debounce)
+  const filteredEmployeesForDept = useMemo(() => {
+    return uniqueEmployeesWithDept
+      .filter(e => {
+        if (debouncedDeptSearch && !e.name.toLowerCase().includes(debouncedDeptSearch.toLowerCase())) return false;
+        if (deptFilter === 'unassigned') return !e.currentDept;
+        if (deptFilter !== 'all') return e.currentDept === deptFilter;
+        return true;
+      })
+      .sort((a, b) => {
+        // Non assignés en premier
+        if (!a.currentDept && b.currentDept) return -1;
+        if (a.currentDept && !b.currentDept) return 1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [uniqueEmployeesWithDept, debouncedDeptSearch, deptFilter]);
+
   // === FONCTION LOG ACTIVITÉ ===
   const logActivity = useCallback((action, details) => {
     const entry = {
@@ -7002,42 +7246,99 @@ L'équipe Salarize`;
             setCurrentPage={setCurrentPage}
           />
           <div className="pt-24 pb-12 px-6">
-            <div className="max-w-md mx-auto">
+            <div className="max-w-lg mx-auto">
+              {/* Header amélioré */}
               <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">Bienvenue, {user?.name?.split(' ')[0]} 👋</h1>
-                <p className="text-slate-400">Commencez par importer votre premier fichier</p>
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl mb-4 shadow-lg shadow-violet-500/25">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h1 className="text-3xl font-bold text-white mb-2">
+                  Bienvenue, {user?.name?.split(' ')[0]} ! 👋
+                </h1>
+                <p className="text-slate-400 text-lg">
+                  Commençons par analyser vos coûts salariaux
+                </p>
+              </div>
+              
+              {/* Étapes */}
+              <div className="flex items-center justify-center gap-2 mb-6">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-violet-500/20 border border-violet-500/30 rounded-full">
+                  <span className="w-5 h-5 bg-violet-500 text-white text-xs font-bold rounded-full flex items-center justify-center">1</span>
+                  <span className="text-violet-300 text-sm font-medium">Importer</span>
+                </div>
+                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-full opacity-50">
+                  <span className="w-5 h-5 bg-slate-600 text-slate-400 text-xs font-bold rounded-full flex items-center justify-center">2</span>
+                  <span className="text-slate-500 text-sm">Analyser</span>
+                </div>
+                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-full opacity-50">
+                  <span className="w-5 h-5 bg-slate-600 text-slate-400 text-xs font-bold rounded-full flex items-center justify-center">3</span>
+                  <span className="text-slate-500 text-sm">Optimiser</span>
+                </div>
               </div>
             
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-8">
-              <label className="block cursor-pointer">
-                <div className="border-2 border-dashed border-slate-700 hover:border-violet-500 rounded-xl p-12 text-center transition-colors group">
-                  <div className="w-16 h-16 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                    <svg className="w-8 h-8 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
+              {/* Zone d'upload */}
+              <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-slate-800 p-8">
+                <label className="block cursor-pointer">
+                  <div className="border-2 border-dashed border-slate-700 hover:border-violet-500 hover:bg-violet-500/5 rounded-xl p-10 text-center transition-all duration-200 group">
+                    <div className="w-20 h-20 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-violet-500/20 transition-all duration-200">
+                      <svg className="w-10 h-10 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    <p className="text-white font-semibold text-lg mb-2">Importer un fichier Excel</p>
+                    <p className="text-slate-400 text-sm mb-4">Glissez-déposez ou cliquez pour sélectionner</p>
+                    <p className="text-slate-600 text-xs">Formats acceptés : .xlsx, .xls</p>
                   </div>
-                  <p className="text-white font-semibold mb-2">Importer un fichier Excel</p>
-                  <p className="text-slate-500 text-sm">Glissez-déposez ou cliquez pour sélectionner</p>
-                </div>
-                <input 
-                  type="file" 
-                  id="file-upload"
-                  name="file"
-                  accept=".xlsx,.xls"
-                  multiple
-                  onChange={handleFileChange}
-                  className="hidden" 
-                />
-              </label>
+                  <input 
+                    type="file" 
+                    id="file-upload"
+                    name="file"
+                    accept=".xlsx,.xls"
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden" 
+                  />
+                </label>
+                
+                {debugMsg && (
+                  <p className="mt-4 text-sm text-slate-400 text-center">{debugMsg}</p>
+                )}
+              </div>
               
-              {debugMsg && (
-                <p className="mt-4 text-sm text-slate-400 text-center">{debugMsg}</p>
-              )}
+              {/* Fournisseurs supportés */}
+              <div className="mt-6 p-4 bg-slate-900/30 rounded-xl border border-slate-800">
+                <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-3 text-center">Secrétariats sociaux compatibles</p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {['Acerta', 'SD Worx', 'Securex', 'Partena', 'Liantis'].map(provider => (
+                    <span key={provider} className="px-3 py-1 bg-slate-800 text-slate-400 text-xs rounded-full">
+                      {provider}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Aide */}
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setCurrentPage('demo')}
+                  className="inline-flex items-center gap-2 text-slate-400 hover:text-violet-400 text-sm transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  Voir une démonstration
+                </button>
+              </div>
             </div>
-            
-            <p className="text-center text-slate-600 text-sm mt-6">
-              Compatible : Export secrétariat social (Acerta, SD Worx, Securex...), fichiers d'analyse internes
-            </p>
           </div>
         </div>
         
@@ -7184,20 +7485,68 @@ L'équipe Salarize`;
               </div>
               <h3 className="text-2xl font-bold mb-2">{currentAssignment.name}</h3>
               <p className="text-slate-500 mb-6">€{currentAssignment.totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {DEFAULT_DEPARTMENTS.map(d => (
-                  <button 
-                    key={d} 
-                    onClick={() => assignDept(d)} 
-                    className="p-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 font-medium transition-all"
-                  >
-                    {d}
-                  </button>
-                ))}
+              
+              {/* Départements existants de l'entreprise */}
+              {allDepartments.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Départements existants</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {allDepartments.map(d => (
+                      <button 
+                        key={d} 
+                        onClick={() => assignDept(d)} 
+                        className="p-3 border-2 border-violet-200 bg-violet-50 rounded-xl hover:border-violet-500 hover:bg-violet-100 font-medium transition-all text-violet-800"
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Départements suggérés */}
+              <div className="mb-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">
+                  {allDepartments.length > 0 ? 'Ou créer un nouveau' : 'Choisir un département'}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {DEFAULT_DEPARTMENTS.filter(d => !allDepartments.includes(d)).map(d => (
+                    <button 
+                      key={d} 
+                      onClick={() => assignDept(d)} 
+                      className="p-3 border-2 border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 font-medium transition-all"
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button onClick={() => assignDept('Non assigné')} className="text-slate-400 hover:text-slate-600">
-                Passer →
-              </button>
+              
+              {/* Bouton passer */}
+              <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-slate-100">
+                <button 
+                  onClick={() => assignDept('Non assigné')} 
+                  className="text-slate-400 hover:text-slate-600 text-sm"
+                >
+                  Passer cet employé →
+                </button>
+                <button 
+                  onClick={() => {
+                    // Passer tous les employés restants
+                    pendingAssignments.forEach(emp => {
+                      if (emp.name !== currentAssignment.name) {
+                        // Ne rien faire, laisser sans département
+                      }
+                    });
+                    setPendingAssignments([]);
+                    setCurrentAssignment(null);
+                    setView('dashboard');
+                  }} 
+                  className="text-slate-400 hover:text-slate-600 text-sm"
+                >
+                  Terminer plus tard
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -7719,33 +8068,22 @@ L'équipe Salarize`;
                   </button>
                 </div>
                 
-                {/* Stats row */}
+                {/* Stats row - Utilise les valeurs memoïsées */}
                 <div className="flex gap-3 mt-5">
-                  {(() => {
-                    const uniqueEmps = [...new Map(employees.map(e => [e.name, e])).values()];
-                    const unassigned = uniqueEmps.filter(e => !e.department && !departmentMapping[e.name]).length;
-                    const assigned = uniqueEmps.length - unassigned;
-                    const deptCount = new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean)).size;
-                    
-                    return (
-                      <>
-                        <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
-                          <p className="text-2xl font-bold">{uniqueEmps.length}</p>
-                          <p className="text-xs text-slate-400">Employés</p>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
-                          <p className="text-2xl font-bold">{deptCount}</p>
-                          <p className="text-xs text-slate-400">Départements</p>
-                        </div>
-                        {unassigned > 0 && (
-                          <div className="bg-amber-500/20 border border-amber-500/30 backdrop-blur rounded-xl px-4 py-2">
-                            <p className="text-2xl font-bold text-amber-400">{unassigned}</p>
-                            <p className="text-xs text-amber-400/80">Non assignés</p>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                  <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
+                    <p className="text-2xl font-bold">{deptManagerStats.total}</p>
+                    <p className="text-xs text-slate-400">Employés</p>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
+                    <p className="text-2xl font-bold">{deptManagerStats.deptCount}</p>
+                    <p className="text-xs text-slate-400">Départements</p>
+                  </div>
+                  {deptManagerStats.unassigned > 0 && (
+                    <div className="bg-amber-500/20 border border-amber-500/30 backdrop-blur rounded-xl px-4 py-2">
+                      <p className="text-2xl font-bold text-amber-400">{deptManagerStats.unassigned}</p>
+                      <p className="text-xs text-amber-400/80">Non assignés</p>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -7762,7 +8100,7 @@ L'équipe Salarize`;
                         className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
                       >
                         <option value="">Choisir...</option>
-                        {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().map(dept => (
+                        {allDepartments.map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
                         ))}
                       </select>
@@ -7835,7 +8173,7 @@ L'équipe Salarize`;
                         className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
                       >
                         <option value="">Fusionner...</option>
-                        {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().map(dept => (
+                        {allDepartments.map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
                         ))}
                       </select>
@@ -7846,7 +8184,7 @@ L'équipe Salarize`;
                         className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
                       >
                         <option value="">...vers</option>
-                        {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().filter(d => d !== mergeDeptFrom).map(dept => (
+                        {allDepartments.filter(d => d !== mergeDeptFrom).map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
                         ))}
                       </select>
@@ -7983,7 +8321,7 @@ L'équipe Salarize`;
                       className="px-3 py-2 border border-violet-300 rounded-lg text-sm bg-white"
                     >
                       <option value="">Assigner à...</option>
-                      {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().map(dept => (
+                      {allDepartments.map(dept => (
                         <option key={dept} value={dept}>{dept}</option>
                       ))}
                     </select>
@@ -8008,8 +8346,10 @@ L'équipe Salarize`;
                           [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
                         };
                         setCompanies(newCompanies);
+                        companiesRef.current = newCompanies; // Update ref immediately
                         saveAll(newCompanies, activeCompany);
                         
+                        toast.success(`${selectedEmployees.size} employé(s) assigné(s) à ${bulkAssignDept}`);
                         setSelectedEmployees(new Set());
                         setBulkAssignDept('');
                       }}
@@ -8056,160 +8396,138 @@ L'équipe Salarize`;
                   >
                     <option value="all">Tous les dép.</option>
                     <option value="unassigned">⚠️ Non assignés</option>
-                    {[...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort().map(dept => (
+                    {allDepartments.map(dept => (
                       <option key={dept} value={dept}>{dept}</option>
                     ))}
                   </select>
                 </div>
               </div>
               
-              {/* Employee list - Optimisé avec limite d'affichage */}
+              {/* Employee list - Optimisé avec useMemo */}
               <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto" style={{ willChange: 'scroll-position' }}>
-                {(() => {
-                  const allDepts = [...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort();
-                  
-                  const uniqueEmps = [...new Map(employees.map(e => [e.name, e])).values()]
-                    .map(e => ({
-                      ...e,
-                      currentDept: e.department || departmentMapping[e.name] || null
-                    }))
-                    .filter(e => {
-                      if (debouncedDeptSearch && !e.name.toLowerCase().includes(debouncedDeptSearch.toLowerCase())) return false;
-                      if (deptFilter === 'unassigned') return !e.currentDept;
-                      if (deptFilter !== 'all') return e.currentDept === deptFilter;
-                      return true;
-                    })
-                    .sort((a, b) => {
-                      if (!a.currentDept && b.currentDept) return -1;
-                      if (a.currentDept && !b.currentDept) return 1;
-                      return a.name.localeCompare(b.name);
-                    });
-                  
-                  if (uniqueEmps.length === 0) {
-                    return (
-                      <div className="p-12 text-center">
-                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                          <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                        </div>
-                        <p className="text-slate-500 font-medium">Aucun employé trouvé</p>
-                        <p className="text-slate-400 text-sm mt-1">Essayez de modifier vos filtres</p>
-                      </div>
-                    );
-                  }
-                  
-                  // Check if all visible are selected
-                  const allVisibleSelected = uniqueEmps.length > 0 && uniqueEmps.every(e => selectedEmployees.has(e.name));
-                  const someSelected = uniqueEmps.some(e => selectedEmployees.has(e.name));
-                  
-                  return (
-                    <>
-                      {/* Select all header */}
-                      <div className="flex items-center gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 sticky top-0">
+                {filteredEmployeesForDept.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-slate-500 font-medium">Aucun employé trouvé</p>
+                    <p className="text-slate-400 text-sm mt-1">Essayez de modifier vos filtres</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Select all header */}
+                    <div className="flex items-center gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 sticky top-0">
+                      <input
+                        type="checkbox"
+                        id="select-all-employees"
+                        name="selectAllEmployees"
+                        checked={filteredEmployeesForDept.length > 0 && filteredEmployeesForDept.every(e => selectedEmployees.has(e.name))}
+                        ref={el => { 
+                          if (el) {
+                            const allSelected = filteredEmployeesForDept.every(e => selectedEmployees.has(e.name));
+                            const someSelected = filteredEmployeesForDept.some(e => selectedEmployees.has(e.name));
+                            el.indeterminate = someSelected && !allSelected; 
+                          }
+                        }}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedEmployees(new Set([...selectedEmployees, ...filteredEmployeesForDept.map(emp => emp.name)]));
+                          } else {
+                            const newSet = new Set(selectedEmployees);
+                            filteredEmployeesForDept.forEach(emp => newSet.delete(emp.name));
+                            setSelectedEmployees(newSet);
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                      />
+                      <span className="text-sm text-slate-500">
+                        {selectedEmployees.size > 0 
+                          ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}` 
+                          : 'Tout sélectionner'}
+                      </span>
+                    </div>
+                    
+                    {filteredEmployeesForDept.map((emp) => (
+                      <div 
+                        key={emp.name} 
+                        className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}
+                        style={{ contain: 'layout style paint' }}
+                      >
+                        {/* Checkbox */}
                         <input
                           type="checkbox"
-                          id="select-all-employees"
-                          name="selectAllEmployees"
-                          checked={allVisibleSelected}
-                          ref={el => { if (el) el.indeterminate = someSelected && !allVisibleSelected; }}
+                          id={`emp-checkbox-${emp.name.replace(/\s+/g, '-')}`}
+                          name={`empCheckbox_${emp.name.replace(/\s+/g, '_')}`}
+                          checked={selectedEmployees.has(emp.name)}
                           onChange={e => {
+                            const newSet = new Set(selectedEmployees);
                             if (e.target.checked) {
-                              setSelectedEmployees(new Set([...selectedEmployees, ...uniqueEmps.map(emp => emp.name)]));
+                              newSet.add(emp.name);
                             } else {
-                              const newSet = new Set(selectedEmployees);
-                              uniqueEmps.forEach(emp => newSet.delete(emp.name));
-                              setSelectedEmployees(newSet);
+                              newSet.delete(emp.name);
                             }
+                            setSelectedEmployees(newSet);
                           }}
                           className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                         />
-                        <span className="text-sm text-slate-500">
-                          {selectedEmployees.size > 0 
-                            ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}` 
-                            : 'Tout sélectionner'}
-                        </span>
-                      </div>
-                      
-                      {uniqueEmps.map((emp, idx) => (
-                        <div 
-                          key={emp.name} 
-                          className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}
-                          style={{ contain: 'layout style paint' }}
-                        >
-                          {/* Checkbox */}
-                          <input
-                            type="checkbox"
-                            id={`emp-checkbox-${emp.name.replace(/\s+/g, '-')}`}
-                            name={`empCheckbox_${emp.name.replace(/\s+/g, '_')}`}
-                            checked={selectedEmployees.has(emp.name)}
-                            onChange={e => {
-                              const newSet = new Set(selectedEmployees);
-                              if (e.target.checked) {
-                                newSet.add(emp.name);
-                              } else {
-                                newSet.delete(emp.name);
-                              }
-                              setSelectedEmployees(newSet);
-                            }}
-                            className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                          />
-                          
-                          {/* Avatar */}
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
-                            emp.currentDept 
-                              ? 'bg-slate-100 text-slate-600' 
-                              : 'bg-amber-100 text-amber-600'
-                          }`}>
-                            {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-slate-800 truncate">{emp.name}</p>
-                          </div>
-                          
-                          <select
-                            value={emp.currentDept || ''}
-                            onChange={e => {
-                              const newDept = e.target.value || null;
-                              
-                              const newMapping = { ...departmentMapping };
-                              if (newDept) {
-                                newMapping[emp.name] = newDept;
-                              } else {
-                                delete newMapping[emp.name];
-                              }
-                          
-                          const newEmps = employees.map(em => 
-                            em.name === emp.name ? { ...em, department: newDept } : em
-                          );
-                          
-                          setDepartmentMapping(newMapping);
-                          setEmployees(newEmps);
-                          
-                          const newCompanies = {
-                            ...companies,
-                            [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
-                          };
-                          setCompanies(newCompanies);
-                          saveAll(newCompanies, activeCompany);
-                        }}
-                        className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                        
+                        {/* Avatar */}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
                           emp.currentDept 
-                            ? 'border-slate-200 bg-white hover:border-slate-300' 
-                            : 'border-amber-300 bg-amber-50 text-amber-700'
-                        }`}
-                      >
-                        <option value="">— Non assigné —</option>
-                        {allDepts.map(dept => (
-                          <option key={dept} value={dept}>{dept}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                            ? 'bg-slate-100 text-slate-600' 
+                            : 'bg-amber-100 text-amber-600'
+                        }`}>
+                          {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-800 truncate">{emp.name}</p>
+                        </div>
+                        
+                        <select
+                          value={emp.currentDept || ''}
+                          onChange={e => {
+                            const newDept = e.target.value || null;
+                            
+                            const newMapping = { ...departmentMapping };
+                            if (newDept) {
+                              newMapping[emp.name] = newDept;
+                            } else {
+                              delete newMapping[emp.name];
+                            }
+                        
+                            const newEmps = employees.map(em => 
+                              em.name === emp.name ? { ...em, department: newDept } : em
+                            );
+                            
+                            setDepartmentMapping(newMapping);
+                            setEmployees(newEmps);
+                            
+                            const newCompanies = {
+                              ...companies,
+                              [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
+                            };
+                            setCompanies(newCompanies);
+                            companiesRef.current = newCompanies; // Update ref immediately
+                            debouncedSaveAll(newCompanies, activeCompany);
+                          }}
+                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                            emp.currentDept 
+                              ? 'border-slate-200 bg-white hover:border-slate-300' 
+                              : 'border-amber-300 bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          <option value="">— Non assigné —</option>
+                          {allDepartments.map(dept => (
+                            <option key={dept} value={dept}>{dept}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
                   </>
-                  );
-                })()}
+                )}
               </div>
               
               {/* Footer */}
