@@ -3879,6 +3879,8 @@ function AppContent() {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showCreateDept, setShowCreateDept] = useState(false); // Créer un département
   const [newDeptName, setNewDeptName] = useState(''); // Nom du nouveau département
+  const [deptPage, setDeptPage] = useState(0); // Pagination du gestionnaire de départements
+  const DEPT_PAGE_SIZE = 30; // Nombre d'employés par page
   const [showInviteModal, setShowInviteModal] = useState(false); // Inviter un CEO
   const [inviteEmail, setInviteEmail] = useState(''); // Email d'invitation
   const [inviteRole, setInviteRole] = useState('viewer'); // Rôle de l'invité
@@ -6946,7 +6948,8 @@ L'équipe Salarize`;
   }, [uniqueEmployeesWithDept, allDepartments]);
 
   // Employés filtrés pour le gestionnaire (memoïsée avec debounce)
-  const filteredEmployeesForDept = useMemo(() => {
+  // Liste complète filtrée (pour le comptage et "tout sélectionner")
+  const allFilteredEmployeesForDept = useMemo(() => {
     return uniqueEmployeesWithDept
       .filter(e => {
         if (debouncedDeptSearch && !e.name.toLowerCase().includes(debouncedDeptSearch.toLowerCase())) return false;
@@ -6961,6 +6964,23 @@ L'équipe Salarize`;
         return a.name.localeCompare(b.name);
       });
   }, [uniqueEmployeesWithDept, debouncedDeptSearch, deptFilter]);
+
+  // Liste paginée pour l'affichage (PERF: évite de render 500+ éléments)
+  const filteredEmployeesForDept = useMemo(() => {
+    const start = deptPage * DEPT_PAGE_SIZE;
+    return allFilteredEmployeesForDept.slice(start, start + DEPT_PAGE_SIZE);
+  }, [allFilteredEmployeesForDept, deptPage]);
+
+  // Nombre total de pages
+  const deptTotalPages = useMemo(() => 
+    Math.ceil(allFilteredEmployeesForDept.length / DEPT_PAGE_SIZE),
+    [allFilteredEmployeesForDept.length]
+  );
+
+  // Reset page quand les filtres changent
+  useEffect(() => {
+    setDeptPage(0);
+  }, [debouncedDeptSearch, deptFilter]);
 
   // === FONCTION LOG ACTIVITÉ ===
   const logActivity = useCallback((action, details) => {
@@ -8447,29 +8467,33 @@ L'équipe Salarize`;
                         type="checkbox"
                         id="select-all-employees"
                         name="selectAllEmployees"
-                        checked={filteredEmployeesForDept.length > 0 && filteredEmployeesForDept.every(e => selectedEmployees.has(e.name))}
+                        checked={allFilteredEmployeesForDept.length > 0 && allFilteredEmployeesForDept.every(e => selectedEmployees.has(e.name))}
                         ref={el => { 
                           if (el) {
-                            const allSelected = filteredEmployeesForDept.every(e => selectedEmployees.has(e.name));
-                            const someSelected = filteredEmployeesForDept.some(e => selectedEmployees.has(e.name));
+                            const allSelected = allFilteredEmployeesForDept.every(e => selectedEmployees.has(e.name));
+                            const someSelected = allFilteredEmployeesForDept.some(e => selectedEmployees.has(e.name));
                             el.indeterminate = someSelected && !allSelected; 
                           }
                         }}
                         onChange={e => {
                           if (e.target.checked) {
-                            setSelectedEmployees(new Set([...selectedEmployees, ...filteredEmployeesForDept.map(emp => emp.name)]));
+                            // Sélectionner TOUS les employés filtrés (pas juste la page)
+                            setSelectedEmployees(new Set([...selectedEmployees, ...allFilteredEmployeesForDept.map(emp => emp.name)]));
                           } else {
                             const newSet = new Set(selectedEmployees);
-                            filteredEmployeesForDept.forEach(emp => newSet.delete(emp.name));
+                            allFilteredEmployeesForDept.forEach(emp => newSet.delete(emp.name));
                             setSelectedEmployees(newSet);
                           }
                         }}
                         className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                       />
-                      <span className="text-sm text-slate-500">
+                      <span className="text-sm text-slate-500 flex-1">
                         {selectedEmployees.size > 0 
                           ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}` 
-                          : 'Tout sélectionner'}
+                          : `Tout sélectionner (${allFilteredEmployeesForDept.length})`}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {deptPage * DEPT_PAGE_SIZE + 1}-{Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length)} sur {allFilteredEmployeesForDept.length}
                       </span>
                     </div>
                     
@@ -8554,10 +8578,39 @@ L'équipe Salarize`;
                 )}
               </div>
               
+              {/* Pagination */}
+              {deptTotalPages > 1 && (
+                <div className="flex items-center justify-between px-5 py-3 bg-white border-t border-slate-100">
+                  <button
+                    onClick={() => setDeptPage(p => Math.max(0, p - 1))}
+                    disabled={deptPage === 0}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Précédent
+                  </button>
+                  <span className="text-sm text-slate-500">
+                    Page {deptPage + 1} / {deptTotalPages}
+                  </span>
+                  <button
+                    onClick={() => setDeptPage(p => Math.min(deptTotalPages - 1, p + 1))}
+                    disabled={deptPage >= deptTotalPages - 1}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Suivant
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+              
               {/* Footer */}
               <div className="p-4 bg-slate-50 border-t border-slate-200">
                 <button
-                  onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); setSelectedEmployees(new Set()); setBulkAssignDept(''); }}
+                  onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); setSelectedEmployees(new Set()); setBulkAssignDept(''); setDeptPage(0); }}
                   className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors"
                 >
                   Terminé
