@@ -78,7 +78,8 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: sessionOnlyStorage,
     autoRefreshToken: true,
     persistSession: true,
-    storageKey: 'salarize-auth', // Clé custom pour éviter conflits
+    storageKey: 'salarize-auth',
+    detectSessionInUrl: false, // On gère manuellement le hash pour le recovery
   }
 });
 
@@ -3685,7 +3686,12 @@ function AppContent() {
   const [lastSaved, setLastSaved] = useState(null);
   const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
   const companiesRef = useRef({}); // Ref pour tracker companies en temps réel (pour imports multiples)
-  const isRecoveryModeRef = useRef(false); // Track si on est en mode reset password
+  // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
+  const isRecoveryModeRef = useRef(
+    typeof window !== 'undefined' && 
+    window.location.hash && 
+    window.location.hash.includes('type=recovery')
+  );
   const [showExportModal, setShowExportModal] = useState(false);
   const [comparePeriod, setComparePeriod] = useState(null);
   const [comparePeriod1, setComparePeriod1] = useState(null);
@@ -3731,7 +3737,15 @@ function AppContent() {
   const [inviteRole, setInviteRole] = useState('viewer'); // Rôle de l'invité
   const [pendingInvites, setPendingInvites] = useState([]); // Invitations en attente
   const [sendingInvite, setSendingInvite] = useState(false); // État d'envoi de l'invitation
-  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false); // Modal reset password
+  
+  // Détecter si on arrive d'un lien de reset password IMMÉDIATEMENT
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      return hashParams.get('type') === 'recovery';
+    }
+    return false;
+  });
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
@@ -3756,12 +3770,17 @@ function AppContent() {
       if (error) throw error;
       
       toast.success('Mot de passe mis à jour avec succès !');
+      
+      // Réinitialiser l'état
+      isRecoveryModeRef.current = false;
       setShowResetPasswordModal(false);
       setNewPassword('');
       setConfirmPassword('');
       
-      // Recharger pour charger les données de l'utilisateur
-      window.location.href = window.location.origin;
+      // Déconnecter et rediriger vers la page de connexion
+      await supabase.auth.signOut();
+      setCurrentPage('home');
+      
     } catch (err) {
       setResetPasswordError(err.message);
     }
@@ -3914,19 +3933,21 @@ function AppContent() {
         const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
         
-        // Si c'est un reset password, afficher le modal
+        // Si c'est un reset password, juste établir la session et afficher le modal
         if (type === 'recovery' && accessToken && refreshToken) {
-          isRecoveryModeRef.current = true; // Marquer qu'on est en mode recovery
+          console.log('[Salarize] Mode recovery détecté');
           await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken
           });
+          // Nettoyer l'URL mais garder le modal ouvert
           window.history.replaceState(null, '', window.location.pathname);
-          setShowResetPasswordModal(true);
           setIsLoading(false);
+          // Ne pas continuer - le modal s'affiche grâce au state initial
           return;
         }
         
+        // Flow OAuth normal (Google login)
         if (accessToken && refreshToken) {
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -3949,7 +3970,7 @@ function AppContent() {
               created_at: user.created_at,
               provider: user.app_metadata?.provider || 'email'
             });
-            setCurrentPage('dashboard');
+            // Ne pas mettre dashboard ici - loadFromSupabase décidera
             loadFromSupabase(user.id);
             setIsLoading(false);
             return;
@@ -3975,8 +3996,8 @@ function AppContent() {
           created_at: session.user.created_at,
           provider: session.user.app_metadata?.provider || 'email'
         });
-        // Ne charger que si pas déjà chargé
-        if (!dataLoadedRef.current) {
+        // Ne charger que si pas déjà chargé ET si on n'est pas en mode recovery
+        if (!dataLoadedRef.current && !isRecoveryModeRef.current) {
           dataLoadedRef.current = true;
           loadFromSupabase(session.user.id);
         }
@@ -3998,20 +4019,20 @@ function AppContent() {
       // Ignorer les events qui ne changent pas l'état
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
       
-      // Détecter le reset password
+      // Si on est en mode reset password, ignorer TOUS les events de redirection
+      if (isRecoveryModeRef.current) {
+        console.log('[Salarize] Mode recovery actif, ignoring event:', event);
+        return;
+      }
+      
+      // Détecter le reset password via event
       if (event === 'PASSWORD_RECOVERY') {
         setShowResetPasswordModal(true);
         return;
       }
       
-      // Ne pas rediriger si le modal reset password est ouvert
       if (event === 'SIGNED_IN' && session?.user) {
-        // Si on est en mode recovery, ne pas rediriger
-        if (isRecoveryModeRef.current) {
-          return;
-        }
-        
-        // Seulement après une nouvelle connexion, aller au dashboard
+        // Seulement après une nouvelle connexion
         setUser(prev => {
           // Si l'user est déjà le même, ne pas mettre à jour
           if (prev?.id === session.user.id) return prev;
@@ -4024,13 +4045,14 @@ function AppContent() {
             provider: session.user.app_metadata?.provider || 'email'
           };
         });
-        setCurrentPage('dashboard');
+        // Mettre le loading AVANT de charger les données pour éviter le flash
         if (!dataLoadedRef.current) {
           dataLoadedRef.current = true;
+          setIsLoadingData(true);
           loadFromSupabase(session.user.id);
         }
       } else if (event === 'SIGNED_OUT') {
-        dataLoadedRef.current = false; // Reset pour permettre le rechargement après reconnexion
+        dataLoadedRef.current = false;
         setUser(null);
         setCompanies({});
         setActiveCompany(null);
@@ -4038,7 +4060,6 @@ function AppContent() {
         setView('upload');
         setCurrentPage('home');
       }
-      // Ne rien faire pour les autres events (évite les re-renders inutiles)
     });
 
     return () => {
@@ -4144,10 +4165,14 @@ function AppContent() {
       if (companyNames.length > 0) {
         console.log('[Salarize] Loading first company:', companyNames[0]);
         loadCompany(companyNames[0], loadedCompanies);
-        setCurrentPage('dashboard');
       }
+      
+      // Toujours aller au dashboard après le chargement (avec ou sans données)
+      setCurrentPage('dashboard');
     } catch (e) {
       console.error('[Salarize] Error loading from Supabase:', e);
+      // Même en cas d'erreur, aller au dashboard
+      setCurrentPage('dashboard');
     }
     setIsLoadingData(false);
   };
@@ -4556,6 +4581,7 @@ function AppContent() {
   
   const handleAuthSuccess = (userData) => {
     setUser(userData);
+    setIsLoadingData(true); // Prévenir le flash pendant le chargement des données
     sessionStorage.setItem('salarize_user', JSON.stringify(userData));
     setShowAuthModal(false);
   };
@@ -6763,6 +6789,11 @@ L'équipe Salarize`;
   // Loading screen
   if (isLoading) {
     return <LoadingSpinner size="lg" text="Salarize" subtext="Chargement de votre espace..." fullScreen />;
+  }
+
+  // Loading des données (utilisateur connecté mais données en cours de chargement)
+  if (user && isLoadingData) {
+    return <LoadingSpinner size="lg" text="Salarize" subtext="Chargement de vos données..." fullScreen />;
   }
 
   // Landing page (home)
