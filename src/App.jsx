@@ -4733,7 +4733,7 @@ function AppContent() {
               .delete()
               .eq('company_id', companyId);
             
-            // Insert new mappings
+            // Insert new mappings with upsert to avoid duplicates
             const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
               company_id: companyId,
               employee_name: empName,
@@ -4742,7 +4742,7 @@ function AppContent() {
 
             const { error: mapError } = await supabase
               .from('department_mappings')
-              .insert(mappingsToInsert);
+              .upsert(mappingsToInsert, { onConflict: 'company_id,employee_name' });
 
             if (mapError) {
               console.error('[Salarize] Error inserting mappings:', mapError);
@@ -5853,7 +5853,11 @@ function AppContent() {
     setNewCompanyName('');
     setDebugMsg(`✓ ${newEmps.length} nouvelles entrées (total: ${allEmps.length})`);
 
-    if (unassigned.length > 0) {
+    // Ne pas déclencher le flow d'assignation pour les viewers
+    const companyRole = companyRoles[companyName];
+    const userCanEdit = !companyRole || companyRole === 'owner' || companyRole === 'editor';
+    
+    if (unassigned.length > 0 && userCanEdit) {
       setPendingAssignments(unassigned);
       setCurrentAssignment(unassigned[0]);
       setView('assign');
@@ -7694,8 +7698,15 @@ L'équipe Salarize`;
     );
   }
 
-  // Assignment screen
+  // Assignment screen - redirect viewers to dashboard
   if (view === 'assign' && currentAssignment) {
+    // Redirect viewers to dashboard
+    if (isViewer) {
+      setView('dashboard');
+      setPendingAssignments([]);
+      setCurrentAssignment(null);
+      return null;
+    }
     return (
       <PageTransition key="assign">
         <div className="min-h-screen flex">
