@@ -8204,11 +8204,11 @@ L'équipe Salarize`;
                     const isMultiFileImport = fileQueue.length > 1;
                     
                     if (activeCompany && view === 'dashboard') {
-                      // skipSave=true si on est en multi-fichier ET pas le dernier
-                      const skipSave = isMultiFileImport && !isLastFile;
+                      // skipSave=true pour TOUS les fichiers en multi-import, on sauvegarde une seule fois à la fin
+                      const skipSave = isMultiFileImport;
                       importToCompanyDirect(activeCompany, result, skipSave);
                       
-                      // Si c'est le dernier fichier d'un batch, sauvegarder explicitement
+                      // Si c'est le dernier fichier d'un batch, sauvegarder explicitement UNE SEULE FOIS
                       if (isMultiFileImport && isLastFile) {
                         console.log('[Salarize] Last file of batch - saving all data now');
                         saveAll(companiesRef.current, activeCompany);
