@@ -6654,43 +6654,58 @@ L'équipe Salarize`;
   // === NOUVELLES COMPARAISONS AVANCÉES ===
   
   // Période actuelle et périodes de comparaison
+  // Données de comparaison - basées sur le dernier mois importé (toutes périodes confondues)
   const comparisonData = useMemo(() => {
-    if (!chartData || chartData.length === 0) return null;
+    if (!periods || periods.length === 0 || !employees || employees.length === 0) return null;
     
-    const sortedPeriods = [...chartData].sort((a, b) => b.period.localeCompare(a.period));
-    const current = sortedPeriods[0];
+    // Trier toutes les périodes pour trouver la plus récente
+    const sortedAllPeriods = [...periods].sort((a, b) => b.localeCompare(a));
+    const latestPeriod = sortedAllPeriods[0];
     
-    if (!current || !current.period) return null;
+    if (!latestPeriod) return null;
     
-    const currentMonth = current.period.substring(5);
-    const currentYear = parseInt(current.period.substring(0, 4));
+    const latestMonth = latestPeriod.substring(5);
+    const latestYear = parseInt(latestPeriod.substring(0, 4));
     
-    // Mois précédent
-    const prevMonth = sortedPeriods[1] || null;
+    // Calculer le mois précédent
+    let prevMonthNum = parseInt(latestMonth) - 1;
+    let prevYear = latestYear;
+    if (prevMonthNum === 0) {
+      prevMonthNum = 12;
+      prevYear = latestYear - 1;
+    }
+    const prevMonthPeriod = `${prevYear}-${String(prevMonthNum).padStart(2, '0')}`;
     
     // Même mois année précédente
-    const sameMonthLastYear = chartData.find(d => {
-      const month = d.period.substring(5);
-      const year = parseInt(d.period.substring(0, 4));
-      return month === currentMonth && year === currentYear - 1;
-    }) || null;
+    const sameMonthLastYearPeriod = `${latestYear - 1}-${latestMonth}`;
+    
+    // Calculer les totaux pour chaque période
+    const calcTotal = (period) => {
+      return employees
+        .filter(e => e.period === period)
+        .reduce((sum, e) => sum + (e.totalCost || 0), 0);
+    };
+    
+    const currentTotal = calcTotal(latestPeriod);
+    const prevMonthTotal = periods.includes(prevMonthPeriod) ? calcTotal(prevMonthPeriod) : null;
+    const sameMonthLastYearTotal = periods.includes(sameMonthLastYearPeriod) ? calcTotal(sameMonthLastYearPeriod) : null;
     
     // Calculs de variation
     const calcVariation = (current, previous) => {
-      if (!previous || previous.total === 0) return null;
-      return ((current.total - previous.total) / previous.total) * 100;
+      if (previous === null || previous === 0) return null;
+      return ((current - previous) / previous) * 100;
     };
     
     return {
-      current,
-      prevMonth,
-      sameMonthLastYear,
-      variationVsPrevMonth: prevMonth ? calcVariation(current, prevMonth) : null,
-      variationVsLastYear: sameMonthLastYear ? calcVariation(current, sameMonthLastYear) : null,
-      diffVsPrevMonth: prevMonth ? current.total - prevMonth.total : null,
-      diffVsLastYear: sameMonthLastYear ? current.total - sameMonthLastYear.total : null
+      current: { period: latestPeriod, total: currentTotal },
+      prevMonth: prevMonthTotal !== null ? { period: prevMonthPeriod, total: prevMonthTotal } : null,
+      sameMonthLastYear: sameMonthLastYearTotal !== null ? { period: sameMonthLastYearPeriod, total: sameMonthLastYearTotal } : null,
+      variationVsPrevMonth: prevMonthTotal !== null ? calcVariation(currentTotal, prevMonthTotal) : null,
+      variationVsLastYear: sameMonthLastYearTotal !== null ? calcVariation(currentTotal, sameMonthLastYearTotal) : null,
+      diffVsPrevMonth: prevMonthTotal !== null ? currentTotal - prevMonthTotal : null,
+      diffVsLastYear: sameMonthLastYearTotal !== null ? currentTotal - sameMonthLastYearTotal : null
     };
-  }, [chartData]);
+  }, [periods, employees]);
 
   // Stats par département avec comparaisons
   const deptStatsWithComparison = useMemo(() => {
@@ -9132,18 +9147,18 @@ L'équipe Salarize`;
                 </div>
                 <div>
                   <h3 className="font-semibold">vs Mois Précédent</h3>
-                  <p className="text-slate-400 text-xs">{comparisonData.prevMonth ? formatPeriod(comparisonData.prevMonth.period) : 'N/A'}</p>
+                  <p className="text-slate-400 text-xs">{comparisonData.current ? formatPeriod(comparisonData.current.period) : 'N/A'}</p>
                 </div>
               </div>
               
               {comparisonData.prevMonth ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-300">Mois actuel</span>
+                    <span className="text-slate-300">{formatPeriod(comparisonData.current.period)}</span>
                     <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-300">Mois précédent</span>
+                    <span className="text-slate-300">{formatPeriod(comparisonData.prevMonth.period)}</span>
                     <span className="font-bold">€{comparisonData.prevMonth?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="border-t border-slate-700 pt-3">
@@ -9178,18 +9193,18 @@ L'équipe Salarize`;
                 </div>
                 <div>
                   <h3 className="font-semibold">vs Année Précédente</h3>
-                  <p className="text-violet-200 text-xs">{comparisonData.sameMonthLastYear ? formatPeriod(comparisonData.sameMonthLastYear.period) : 'N/A'}</p>
+                  <p className="text-violet-200 text-xs">{comparisonData.current ? formatPeriod(comparisonData.current.period) : 'N/A'}</p>
                 </div>
               </div>
               
               {comparisonData.sameMonthLastYear ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-violet-200">Cette année</span>
+                    <span className="text-violet-200">{formatPeriod(comparisonData.current.period)}</span>
                     <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-violet-200">Année précédente</span>
+                    <span className="text-violet-200">{formatPeriod(comparisonData.sameMonthLastYear.period)}</span>
                     <span className="font-bold">€{comparisonData.sameMonthLastYear?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="border-t border-violet-500/50 pt-3">
