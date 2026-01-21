@@ -530,7 +530,12 @@ function AppContent() {
     console.log('[Salarize] Loading data from Supabase for user:', userId);
     setIsLoadingData(true);
     try {
-      // Load companies
+      // Get user email for invitation lookup
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userEmail = currentUser?.email;
+      console.log('[Salarize] User email:', userEmail);
+
+      // Load user's own companies
       const { data: companiesData, error: companiesError } = await supabase
         .from('companies')
         .select('*')
@@ -541,11 +546,68 @@ function AppContent() {
         throw companiesError;
       }
 
-      console.log('[Salarize] Loaded companies:', companiesData?.length || 0);
+      console.log('[Salarize] Loaded own companies:', companiesData?.length || 0);
+
+      // Load shared companies via invitations
+      let sharedCompaniesData = [];
+      if (userEmail) {
+        // Find all invitations for this email (pending or accepted)
+        const { data: invitations, error: invError } = await supabase
+          .from('invitations')
+          .select('*')
+          .eq('invited_email', userEmail);
+
+        if (invError) {
+          console.error('[Salarize] Error loading invitations:', invError);
+        } else if (invitations && invitations.length > 0) {
+          console.log('[Salarize] Found invitations:', invitations.length);
+
+          // Mark pending invitations as accepted
+          const pendingInvites = invitations.filter(inv => inv.status === 'pending');
+          if (pendingInvites.length > 0) {
+            console.log('[Salarize] Accepting pending invitations:', pendingInvites.length);
+            for (const inv of pendingInvites) {
+              await supabase
+                .from('invitations')
+                .update({
+                  status: 'accepted',
+                  accepted_at: new Date().toISOString()
+                })
+                .eq('id', inv.id);
+            }
+          }
+
+          // Get the company IDs from accepted/pending invitations
+          const sharedCompanyIds = invitations.map(inv => inv.company_id);
+
+          if (sharedCompanyIds.length > 0) {
+            const { data: sharedComps, error: sharedError } = await supabase
+              .from('companies')
+              .select('*')
+              .in('id', sharedCompanyIds);
+
+            if (sharedError) {
+              console.error('[Salarize] Error loading shared companies:', sharedError);
+            } else {
+              sharedCompaniesData = sharedComps || [];
+              console.log('[Salarize] Loaded shared companies:', sharedCompaniesData.length);
+            }
+          }
+        }
+      }
+
+      // Merge own companies + shared companies (avoid duplicates)
+      const ownIds = new Set((companiesData || []).map(c => c.id));
+      const allCompanies = [
+        ...(companiesData || []),
+        ...sharedCompaniesData.filter(c => !ownIds.has(c.id)).map(c => ({ ...c, isShared: true }))
+      ];
+
+      console.log('[Salarize] Total companies to load:', allCompanies.length);
 
       const loadedCompanies = {};
-      
-      for (const company of companiesData || []) {
+
+      for (const company of allCompanies) {
         console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
         
         // Load ALL employees for this company with pagination
@@ -615,7 +677,8 @@ function AppContent() {
           periods,
           logo: company.logo,
           brandColor: company.brand_color,
-          website: company.website
+          website: company.website,
+          isShared: company.isShared || false // Marquer si c'est une société partagée
         };
       }
 
