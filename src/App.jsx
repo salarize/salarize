@@ -482,11 +482,15 @@ function AppContent() {
             provider: session.user.app_metadata?.provider || 'email'
           };
         });
-        // Mettre le loading AVANT de charger les données pour éviter le flash
+        // Charger les données si pas déjà fait
         if (!dataLoadedRef.current) {
           dataLoadedRef.current = true;
           setIsLoadingData(true);
           loadFromSupabase(session.user.id);
+        } else {
+          // Données déjà chargées, s'assurer qu'on va au dashboard
+          setIsLoadingData(false);
+          setCurrentPage('dashboard');
         }
       } else if (event === 'SIGNED_OUT') {
         dataLoadedRef.current = false;
@@ -1092,9 +1096,19 @@ function AppContent() {
   
   const handleAuthSuccess = (userData) => {
     setUser(userData);
-    setIsLoadingData(true); // Prévenir le flash pendant le chargement des données
     sessionStorage.setItem('salarize_user', JSON.stringify(userData));
     setShowAuthModal(false);
+
+    // Charger les données immédiatement après connexion via AuthModal
+    // (le onAuthStateChange peut ne pas se déclencher si déjà connecté)
+    if (userData?.id && !dataLoadedRef.current) {
+      dataLoadedRef.current = true;
+      setIsLoadingData(true);
+      loadFromSupabase(userData.id);
+    } else if (userData?.id && dataLoadedRef.current) {
+      // Données déjà chargées, aller directement au dashboard
+      setCurrentPage('dashboard');
+    }
   };
 
   // Logout
