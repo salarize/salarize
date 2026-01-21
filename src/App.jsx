@@ -176,6 +176,10 @@ function AppContent() {
   const [inviteRole, setInviteRole] = useState('viewer'); // Rôle de l'invité
   const [pendingInvites, setPendingInvites] = useState([]); // Invitations en attente
   const [sendingInvite, setSendingInvite] = useState(false); // État d'envoi de l'invitation
+  const [showManageAccessModal, setShowManageAccessModal] = useState(false); // Modal gestion des accès
+  const [companyInvitations, setCompanyInvitations] = useState([]); // Invitations de la société
+  const [loadingInvitations, setLoadingInvitations] = useState(false); // Chargement des invitations
+  const [updatingRole, setUpdatingRole] = useState(null); // ID de l'invitation en cours de modification
   
   // Détecter si on arrive d'un lien de reset password IMMÉDIATEMENT
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(() => {
@@ -272,7 +276,88 @@ function AppContent() {
       setSendingInvite(false);
     }
   };
-  
+
+  // Charger les invitations de la société active
+  const loadCompanyInvitations = async () => {
+    if (!activeCompany || !companies[activeCompany]?.id) return;
+
+    setLoadingInvitations(true);
+    try {
+      const companyId = companies[activeCompany].id;
+      const { data, error } = await supabase
+        .from('invitations')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[Salarize] Error loading company invitations:', error);
+        toast.error('Erreur lors du chargement des invitations');
+      } else {
+        setCompanyInvitations(data || []);
+      }
+    } catch (e) {
+      console.error('[Salarize] Error:', e);
+    } finally {
+      setLoadingInvitations(false);
+    }
+  };
+
+  // Modifier le rôle d'un invité
+  const updateInvitationRole = async (invitationId, newRole) => {
+    setUpdatingRole(invitationId);
+    try {
+      const { error } = await supabase
+        .from('invitations')
+        .update({ role: newRole })
+        .eq('id', invitationId);
+
+      if (error) {
+        console.error('[Salarize] Error updating invitation role:', error);
+        toast.error('Erreur lors de la modification du rôle');
+      } else {
+        // Mettre à jour localement
+        setCompanyInvitations(prev =>
+          prev.map(inv => inv.id === invitationId ? { ...inv, role: newRole } : inv)
+        );
+        toast.success(`Rôle modifié en ${newRole === 'viewer' ? 'Lecteur' : 'Éditeur'}`);
+      }
+    } catch (e) {
+      console.error('[Salarize] Error:', e);
+      toast.error('Erreur lors de la modification');
+    } finally {
+      setUpdatingRole(null);
+    }
+  };
+
+  // Révoquer l'accès d'un invité
+  const revokeInvitation = async (invitationId, email) => {
+    if (!confirm(`Voulez-vous vraiment révoquer l'accès de ${email} ?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('invitations')
+        .delete()
+        .eq('id', invitationId);
+
+      if (error) {
+        console.error('[Salarize] Error revoking invitation:', error);
+        toast.error('Erreur lors de la révocation');
+      } else {
+        setCompanyInvitations(prev => prev.filter(inv => inv.id !== invitationId));
+        toast.success(`Accès de ${email} révoqué`);
+      }
+    } catch (e) {
+      console.error('[Salarize] Error:', e);
+    }
+  };
+
+  // Ouvrir le modal de gestion des accès
+  const openManageAccessModal = () => {
+    setShowManageAccessModal(true);
+    loadCompanyInvitations();
+  };
+
   // Onboarding
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
@@ -5453,27 +5538,31 @@ L'équipe Salarize`;
                 </div>
               </div>
               
-              {/* Share Button */}
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-all text-sm font-medium text-white border border-white/20"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-                <span className="hidden sm:inline">Partager</span>
-              </button>
-              
-              {/* Invite CEO Button */}
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
-                <span className="hidden sm:inline">Inviter</span>
-              </button>
+              {/* Share Button - masqué pour les viewers */}
+              {!isViewerOnly && (
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-all text-sm font-medium text-white border border-white/20"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  <span className="hidden sm:inline">Partager</span>
+                </button>
+              )}
+
+              {/* Invite CEO Button - masqué pour les viewers */}
+              {!isViewerOnly && (
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                  <span className="hidden sm:inline">Inviter</span>
+                </button>
+              )}
               
               {/* Settings Menu */}
               <div className="relative group">
@@ -5494,6 +5583,20 @@ L'équipe Salarize`;
                         </svg>
                         <span className="text-sm text-slate-700">Sélection périodes</span>
                       </button>
+                    )}
+                    {!isViewerOnly && (
+                      <>
+                        <div className="border-t border-slate-100 my-1"></div>
+                        <button
+                          onClick={openManageAccessModal}
+                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                        >
+                          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          <span className="text-sm text-slate-700">Gerer les acces</span>
+                        </button>
+                      </>
                     )}
                     <div className="border-t border-slate-100 my-1"></div>
                     <button
@@ -6844,10 +6947,163 @@ L'équipe Salarize`;
             </div>
           </div>
         )}
-        
+
+        {/* Modal Gestion des Accès */}
+        {showManageAccessModal && (
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowManageAccessModal(false); }}
+          >
+            <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-violet-600 to-purple-600 p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold">Gestion des acces</h2>
+                      <p className="text-violet-200 text-sm">{activeCompany}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowManageAccessModal(false)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 max-h-[60vh] overflow-y-auto">
+                {/* Propriétaire */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Proprietaire</h3>
+                  <div className="flex items-center gap-3 p-3 bg-violet-50 border border-violet-200 rounded-xl">
+                    <div className="w-10 h-10 bg-violet-500 rounded-full flex items-center justify-center text-white font-bold">
+                      {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-800">{user?.name || 'Vous'}</p>
+                      <p className="text-sm text-slate-500">{user?.email}</p>
+                    </div>
+                    <span className="px-3 py-1 bg-violet-500 text-white text-xs font-medium rounded-full">
+                      Proprietaire
+                    </span>
+                  </div>
+                </div>
+
+                {/* Collaborateurs */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Collaborateurs</h3>
+                    <button
+                      onClick={() => { setShowManageAccessModal(false); setShowInviteModal(true); }}
+                      className="text-sm text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Inviter
+                    </button>
+                  </div>
+
+                  {loadingInvitations ? (
+                    <div className="flex items-center justify-center py-8">
+                      <svg className="w-6 h-6 animate-spin text-violet-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  ) : companyInvitations.length === 0 ? (
+                    <div className="text-center py-8 bg-slate-50 rounded-xl">
+                      <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <p className="text-slate-500 text-sm">Aucun collaborateur invite</p>
+                      <button
+                        onClick={() => { setShowManageAccessModal(false); setShowInviteModal(true); }}
+                        className="mt-3 text-violet-600 hover:text-violet-700 text-sm font-medium"
+                      >
+                        Inviter un collaborateur
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {companyInvitations.map((invitation) => (
+                        <div key={invitation.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                            invitation.status === 'accepted' ? 'bg-emerald-500' : 'bg-slate-400'
+                          }`}>
+                            {invitation.invited_email?.charAt(0)?.toUpperCase() || '?'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-800 truncate">{invitation.invited_email}</p>
+                            <p className="text-xs text-slate-500">
+                              {invitation.status === 'accepted' ? (
+                                <span className="text-emerald-600">Acceptee</span>
+                              ) : (
+                                <span className="text-amber-600">En attente</span>
+                              )}
+                              {' • '}
+                              {new Date(invitation.created_at).toLocaleDateString('fr-FR')}
+                            </p>
+                          </div>
+
+                          {/* Sélecteur de rôle */}
+                          <select
+                            value={invitation.role}
+                            onChange={(e) => updateInvitationRole(invitation.id, e.target.value)}
+                            disabled={updatingRole === invitation.id}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${
+                              invitation.role === 'editor'
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                : 'bg-slate-100 border-slate-200 text-slate-700'
+                            } ${updatingRole === invitation.id ? 'opacity-50' : ''}`}
+                          >
+                            <option value="viewer">Lecteur</option>
+                            <option value="editor">Editeur</option>
+                          </select>
+
+                          {/* Bouton révoquer */}
+                          <button
+                            onClick={() => revokeInvitation(invitation.id, invitation.invited_email)}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Revoquer l'acces"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200">
+                <button
+                  onClick={() => setShowManageAccessModal(false)}
+                  className="w-full py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-medium transition-colors"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Panneau Alertes */}
         {showAlertsPanel && (
-          <div 
+          <div
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
             onClick={(e) => { if (e.target === e.currentTarget) setShowAlertsPanel(false); }}
           >
