@@ -2964,6 +2964,12 @@ L'équipe Salarize`;
     toast.success(`Période ${formatPeriod(periodToDelete)} supprimée`);
   };
 
+  // Vérifier si l'utilisateur est en mode lecture seule (viewer)
+  const isViewerOnly = useMemo(() => {
+    const company = companies[activeCompany];
+    return company?.isShared && company?.sharedRole === 'viewer';
+  }, [companies, activeCompany]);
+
   // Computed values with useMemo for performance
   const filtered = useMemo(() => {
     let filteredPeriods = periods;
@@ -3966,7 +3972,7 @@ L'équipe Salarize`;
     return (
       <PageTransition key="assign">
         <div className="min-h-screen flex">
-          <Sidebar 
+          <Sidebar
             companies={companies}
             activeCompany={activeCompany}
             onSelectCompany={loadCompany}
@@ -3978,6 +3984,7 @@ L'équipe Salarize`;
             setCurrentPage={setCurrentPage}
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
+            isViewerOnly={isViewerOnly}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -4068,7 +4075,7 @@ L'équipe Salarize`;
   return (
     <PageTransition key="dashboard">
       <div className="min-h-screen flex bg-slate-50">
-        <Sidebar 
+        <Sidebar
           companies={companies}
           activeCompany={activeCompany}
           onSelectCompany={(name) => { loadCompany(name); setSidebarOpen(false); }}
@@ -4080,6 +4087,7 @@ L'équipe Salarize`;
           setCurrentPage={setCurrentPage}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          isViewerOnly={isViewerOnly}
         />
         <DashboardHeader 
           user={user} 
@@ -4146,7 +4154,7 @@ L'équipe Salarize`;
       )}
       
       {/* Import Modal with Drag & Drop */}
-      {showImportModal && (
+      {showImportModal && !isViewerOnly && (
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
@@ -4754,7 +4762,7 @@ L'équipe Salarize`;
                   </div>
                 )}
                 
-                {!showRenameDept && !showMergeDept && !showCreateDept && (
+                {!showRenameDept && !showMergeDept && !showCreateDept && !isViewerOnly && (
                   <div className="flex gap-2 mb-3">
                     <button
                       onClick={() => setShowCreateDept(true)}
@@ -4762,20 +4770,32 @@ L'équipe Salarize`;
                     >
                       ➕ Créer
                     </button>
-                    
+
                     <button
                       onClick={() => setShowRenameDept(true)}
                       className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                     >
                       ✏️ Renommer
                     </button>
-                    
+
                     <button
                       onClick={() => setShowMergeDept(true)}
                       className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
                     >
                       🔀 Fusionner
                     </button>
+                  </div>
+                )}
+
+                {/* Message pour les viewers */}
+                {isViewerOnly && (
+                  <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-sm text-amber-700 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Mode lecture seule - Vous ne pouvez pas modifier les données
+                    </p>
                   </div>
                 )}
                 
@@ -5024,7 +5044,9 @@ L'équipe Salarize`;
                         
                         <select
                           value={emp.currentDept || ''}
+                          disabled={isViewerOnly}
                           onChange={e => {
+                            if (isViewerOnly) return;
                             const newDept = e.target.value || null;
                             // Si même département, ne rien faire
                             if (newDept === emp.currentDept) return;
@@ -5042,7 +5064,11 @@ L'équipe Salarize`;
                               empCost: empCost
                             });
                           }}
-                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all ${
+                            isViewerOnly
+                              ? 'cursor-not-allowed opacity-60 bg-slate-100'
+                              : 'cursor-pointer'
+                          } ${
                             emp.currentDept
                               ? 'border-slate-200 bg-white hover:border-slate-300'
                               : 'border-amber-300 bg-amber-50 text-amber-700'
@@ -5316,18 +5342,34 @@ L'équipe Salarize`;
             
             {/* Company Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{activeCompany}</h1>
-                <button
-                  onClick={() => setShowCompanySettings(true)}
-                  className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
-                  title="Paramètres société"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
+                {/* Badge propriétaire ou partagé */}
+                {companies[activeCompany]?.isShared ? (
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                    companies[activeCompany]?.sharedRole === 'editor'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}>
+                    {companies[activeCompany]?.sharedRole === 'editor' ? 'Editeur' : 'Lecture seule'}
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                    Proprietaire
+                  </span>
+                )}
+                {!isViewerOnly && (
+                  <button
+                    onClick={() => setShowCompanySettings(true)}
+                    className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                    title="Parametres societe"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-3 text-sm text-white/60">
                 {companies[activeCompany]?.website && (

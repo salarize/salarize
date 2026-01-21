@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, isViewerOnly }) {
   const [showActions, setShowActions] = useState(false);
 
   const unassignedCount = activeCompany && companies[activeCompany]
@@ -66,20 +66,34 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                   onClick={() => setShowActions(false)}
                 />
                 <div className="absolute top-full left-0 right-0 mt-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-20">
-                  <button
-                    onClick={() => { onImportClick(); setShowActions(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <div className="w-8 h-8 bg-fuchsia-500/20 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
+                  {/* Message pour les viewers */}
+                  {isViewerOnly && (
+                    <div className="px-4 py-3 bg-amber-500/10 border-b border-amber-500/20">
+                      <p className="text-amber-400 text-xs flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Mode lecture seule
+                      </p>
                     </div>
-                    <div>
-                      <p className="font-medium text-white text-sm">Importer des donnees</p>
-                      <p className="text-slate-400 text-xs">Fichier Excel (.xlsx)</p>
-                    </div>
-                  </button>
+                  )}
+
+                  {!isViewerOnly && (
+                    <button
+                      onClick={() => { onImportClick(); setShowActions(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 bg-fuchsia-500/20 rounded-lg flex items-center justify-center">
+                        <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-medium text-white text-sm">Importer des donnees</p>
+                        <p className="text-slate-400 text-xs">Fichier Excel (.xlsx)</p>
+                      </div>
+                    </button>
+                  )}
 
                   {activeCompany && (
                     <button
@@ -93,27 +107,29 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                       </div>
                       <div>
                         <p className="font-medium text-white text-sm">Departements</p>
-                        <p className="text-slate-400 text-xs">Reassigner, renommer, fusionner</p>
+                        <p className="text-slate-400 text-xs">{isViewerOnly ? 'Consulter les departements' : 'Reassigner, renommer, fusionner'}</p>
                       </div>
                     </button>
                   )}
 
-                  <button
-                    onClick={() => { onAddCompany(); setShowActions(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <div className="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="font-medium text-white text-sm">Nouvelle societe</p>
-                      <p className="text-slate-400 text-xs">Creer une societe vide</p>
-                    </div>
-                  </button>
+                  {!isViewerOnly && (
+                    <button
+                      onClick={() => { onAddCompany(); setShowActions(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center">
+                        <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-medium text-white text-sm">Nouvelle societe</p>
+                        <p className="text-slate-400 text-xs">Creer une societe vide</p>
+                      </div>
+                    </button>
+                  )}
 
-                  {activeCompany && (
+                  {activeCompany && !isViewerOnly && (
                     <button
                       onClick={() => { onManageData(); setShowActions(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-left border-t border-slate-700"
@@ -161,6 +177,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></div>
                 <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Mes Societes</p>
+                <span className="ml-auto px-1.5 py-0.5 bg-violet-500/20 text-violet-400 text-[10px] rounded">Proprietaire</span>
               </div>
               {Object.entries(companies).filter(([_, c]) => !c.isShared).map(([name, company]) => (
                 <button
