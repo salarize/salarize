@@ -6,7 +6,11 @@
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: modularize codebase structure\n\n- Extract pages to src/pages/ \\(Landing, Features, Pricing, Demo, Profile, Legal pages\\)\n- Extract dashboard components to src/components/dashboard/ \\(AuthModal, Sidebar, etc.\\)\n- Extract UI components to src/components/ui/ \\(Button, Modal, Skeleton, etc.\\)\n- Extract layout components to src/components/layout/ \\(Footer, PageTransition, ErrorBoundary\\)\n- Extract constants to src/constants/ \\(demo data, pricing, design system\\)\n- Extract config to src/config/ \\(Supabase, EmailJS, storage\\)\n- Extract hooks to src/hooks/ \\(useDebounce, useDebouncedCallback\\)\n- Extract context to src/context/ \\(ToastContext\\)\n- Add STRUCTURE.md documentation for Claude\n- Reduce App.jsx from 10749 to 7131 lines \\(-34%\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

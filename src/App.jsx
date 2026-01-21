@@ -598,9 +598,26 @@ function AppContent() {
 
       // Merge own companies + shared companies (avoid duplicates)
       const ownIds = new Set((companiesData || []).map(c => c.id));
+
+      // Create a map of company_id -> role from invitations
+      const invitationRoles = {};
+      if (userEmail) {
+        const { data: invs } = await supabase
+          .from('invitations')
+          .select('company_id, role')
+          .eq('invited_email', userEmail);
+        (invs || []).forEach(inv => {
+          invitationRoles[inv.company_id] = inv.role;
+        });
+      }
+
       const allCompanies = [
         ...(companiesData || []),
-        ...sharedCompaniesData.filter(c => !ownIds.has(c.id)).map(c => ({ ...c, isShared: true }))
+        ...sharedCompaniesData.filter(c => !ownIds.has(c.id)).map(c => ({
+          ...c,
+          isShared: true,
+          sharedRole: invitationRoles[c.id] || 'viewer'
+        }))
       ];
 
       console.log('[Salarize] Total companies to load:', allCompanies.length);
@@ -678,7 +695,8 @@ function AppContent() {
           logo: company.logo,
           brandColor: company.brand_color,
           website: company.website,
-          isShared: company.isShared || false // Marquer si c'est une société partagée
+          isShared: company.isShared || false,
+          sharedRole: company.sharedRole || null // 'viewer' ou 'editor' si partagée
         };
       }
 

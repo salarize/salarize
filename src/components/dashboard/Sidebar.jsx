@@ -155,31 +155,72 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         )}
 
         <div className="flex-1 p-4 overflow-y-auto">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-1 h-4 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></div>
-            <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Mes Societes</p>
-          </div>
-          {Object.keys(companies).length === 0 ? (
+          {/* Mes sociétés (propres) */}
+          {Object.entries(companies).filter(([_, c]) => !c.isShared).length > 0 && (
+            <>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></div>
+                <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Mes Societes</p>
+              </div>
+              {Object.entries(companies).filter(([_, c]) => !c.isShared).map(([name, company]) => (
+                <button
+                  key={name}
+                  onClick={() => onSelectCompany(name)}
+                  className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                    activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {company?.logo ? (
+                    <img src={company.logo} alt="" className="w-6 h-6 rounded object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
+                      {name.charAt(0)}
+                    </div>
+                  )}
+                  <span className="truncate">{name}</span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Sociétés partagées avec moi */}
+          {Object.entries(companies).filter(([_, c]) => c.isShared).length > 0 && (
+            <>
+              <div className="flex items-center gap-2 mb-3 mt-6">
+                <div className="w-1 h-4 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full"></div>
+                <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Partagees avec moi</p>
+              </div>
+              {Object.entries(companies).filter(([_, c]) => c.isShared).map(([name, company]) => (
+                <button
+                  key={name}
+                  onClick={() => onSelectCompany(name)}
+                  className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                    activeCompany === name ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {company?.logo ? (
+                    <img src={company.logo} alt="" className="w-6 h-6 rounded object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
+                      {name.charAt(0)}
+                    </div>
+                  )}
+                  <span className="truncate flex-1">{name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    company.sharedRole === 'editor'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-slate-600 text-slate-400'
+                  }`}>
+                    {company.sharedRole === 'editor' ? 'Editeur' : 'Lecture'}
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Aucune société */}
+          {Object.keys(companies).length === 0 && (
             <p className="text-slate-600 text-sm">Aucune societe</p>
-          ) : (
-            Object.keys(companies).map(name => (
-              <button
-                key={name}
-                onClick={() => onSelectCompany(name)}
-                className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                  activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
-                }`}
-              >
-                {companies[name]?.logo ? (
-                  <img src={companies[name].logo} alt="" className="w-6 h-6 rounded object-cover" />
-                ) : (
-                  <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
-                    {name.charAt(0)}
-                  </div>
-                )}
-                <span className="truncate">{name}</span>
-              </button>
-            ))
           )}
         </div>
       </div>
