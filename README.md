@@ -2,6 +2,57 @@
 
 Dashboard d'analyse des coûts salariaux pour entreprises belges.
 
+## Design System - Couleurs
+
+### Palette principale Salarize
+- **Primary**: Violet `#8B5CF6` (violet-500) → Fuchsia `#D946EF` (fuchsia-500)
+- **Gradient principal**: `bg-gradient-to-r from-violet-500 to-fuchsia-500`
+- **Gradient header/accents**: `bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600`
+
+### Couleurs de fond (Dark theme)
+- **Background principal**: `bg-slate-950` (#020617)
+- **Cards/Modals**: `bg-slate-900` (#0f172a)
+- **Sections secondaires**: `bg-slate-800` (#1e293b)
+- **Inputs/Selects**: `bg-slate-700` (#334155)
+
+### Couleurs de texte
+- **Texte principal**: `text-white`
+- **Texte secondaire**: `text-slate-300`
+- **Texte tertiaire/labels**: `text-slate-400`
+- **Texte muted**: `text-slate-500`
+
+### Bordures
+- **Bordure principale**: `border-slate-700`
+- **Bordure subtile**: `border-slate-700/50`
+- **Bordure accent**: `border-violet-500/30`
+
+### Couleurs sémantiques
+- **Success**: `from-emerald-500 to-teal-500` (gradients) ou `emerald-500` (solid)
+- **Warning/Non assigné**: `amber-400`, `amber-500/20` (background)
+- **Info**: `blue-500`, `blue-500/10` (background)
+- **Error**: `red-500`, `red-500/10` (background)
+
+### Composants récurrents
+```jsx
+// Bouton principal
+className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl font-semibold hover:opacity-90 shadow-lg shadow-violet-500/25"
+
+// Bouton secondaire
+className="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white rounded-xl"
+
+// Input
+className="bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:border-violet-500"
+
+// Card avec accent
+className="bg-violet-500/10 border border-violet-500/30 rounded-xl"
+
+// Avatar assigné
+className="bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-300 border border-violet-500/20"
+
+// Avatar non assigné
+className="bg-amber-500/20 text-amber-300 border border-amber-500/30"
+```
+
 ## Installation
 
 ```bash

@@ -1,3 +1,41 @@
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════════╗
+ * ║                           SALARIZE - App.jsx                                   ║
+ * ║                 Application principale de gestion salariale                    ║
+ * ╠═══════════════════════════════════════════════════════════════════════════════╣
+ * ║                                                                               ║
+ * ║  [AI-DOC] GUIDE POUR L'ASSISTANT IA                                           ║
+ * ║  ─────────────────────────────────────────────────────────────────────────────║
+ * ║                                                                               ║
+ * ║  Ce fichier contient la logique principale de l'application Salarize.        ║
+ * ║  Cherche les tags suivants pour comprendre rapidement le code:               ║
+ * ║                                                                               ║
+ * ║  🔍 TAGS DE DOCUMENTATION:                                                    ║
+ * ║  - [AI-DOC]              → Explication du fonctionnement                      ║
+ * ║  - [DB-DEPENDENCY]       → Tables/colonnes Supabase requises                  ║
+ * ║  - [DB-MIGRATION-REQUIRED] → Commandes SQL à exécuter si erreur               ║
+ * ║                                                                               ║
+ * ║  📦 SCHÉMA SUPABASE REQUIS:                                                   ║
+ * ║  ─────────────────────────────────────────────────────────────────────────────║
+ * ║  companies: id, user_id, name, logo, brand_color, website                    ║
+ * ║  employees: id, company_id, name, department, function, period, total_cost   ║
+ * ║  department_mappings: id, company_id, employee_name, department              ║
+ * ║  invitations: id, company_id, email, role, status, display_name*, invited_by ║
+ * ║                                                                               ║
+ * ║  * display_name est OPTIONNEL - doit être ajouté manuellement:               ║
+ * ║    ALTER TABLE invitations ADD COLUMN display_name TEXT;                      ║
+ * ║                                                                               ║
+ * ║  🔥 FONCTIONS CLÉS:                                                           ║
+ * ║  - saveToSupabase()      → Sauvegarde toutes les données (ligne ~1120)       ║
+ * ║  - importToCompanyDirect() → Import de fichiers Excel (ligne ~2520)          ║
+ * ║  - quickImportFromPending() → Import rapide sans confirmation (ligne ~2213)  ║
+ * ║  - parseFile()           → Parse les fichiers Acerta/Securex (ligne ~2097)   ║
+ * ║  - loadCompanyInvitations() → Charge les invités (ligne ~290)                ║
+ * ║  - applyPendingChanges() → Sauve les modifs d'invitations (ligne ~339)       ║
+ * ║                                                                               ║
+ * ╚═══════════════════════════════════════════════════════════════════════════════╝
+ */
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -103,6 +141,7 @@ function AppContent() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingPeriodSelection, setPendingPeriodSelection] = useState(null); // { data, detectedPeriods }
+  const [showQuickImportModal, setShowQuickImportModal] = useState(false); // Modal d'import rapide avec liste des fichiers
   const [showDeptManager, setShowDeptManager] = useState(false);
   const [deptSearchTerm, setDeptSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -121,6 +160,7 @@ function AppContent() {
   const [lastSaved, setLastSaved] = useState(null);
   const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
   const companiesRef = useRef({}); // Ref pour tracker companies en temps réel (pour imports multiples)
+  const [companyOrder, setCompanyOrder] = useState([]); // Ordre des sociétés dans la sidebar (drag & drop)
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
   const isRecoveryModeRef = useRef(
     typeof window !== 'undefined' && 
@@ -280,7 +320,13 @@ function AppContent() {
     }
   };
 
-  // Charger les invitations de la société active
+  /**
+   * [AI-DOC] Charge les invitations pour la société active
+   *
+   * [DB-DEPENDENCY] Table: invitations
+   * - Lit: id, company_id, email, role, status, display_name, invited_by, created_at
+   * - display_name peut être null si la colonne n'existe pas encore
+   */
   const loadCompanyInvitations = async () => {
     if (!activeCompany || !companies[activeCompany]?.id) return;
 
@@ -321,7 +367,15 @@ function AppContent() {
     setEditingInviteName(null);
   };
 
-  // Confirmer et appliquer tous les changements
+  /**
+   * [AI-DOC] Applique les modifications d'invitations (rôle + nom personnalisé)
+   *
+   * [DB-DEPENDENCY] Table: invitations
+   * - Écrit: role, display_name
+   *
+   * [DB-MIGRATION-REQUIRED] Si display_name cause une erreur:
+   * ALTER TABLE invitations ADD COLUMN display_name TEXT;
+   */
   const applyPendingChanges = async () => {
     const changes = Object.entries(pendingRoleChanges);
     if (changes.length === 0 && Object.keys(inviteDisplayNames).length === 0) {
@@ -852,7 +906,19 @@ function AppContent() {
 
       setCompanies(loadedCompanies);
       companiesRef.current = loadedCompanies; // Synchroniser la ref
-      
+
+      // Charger l'ordre des sociétés depuis localStorage
+      const savedOrder = localStorage.getItem(`salarize_company_order_${userId}`);
+      if (savedOrder) {
+        try {
+          const parsedOrder = JSON.parse(savedOrder);
+          setCompanyOrder(parsedOrder);
+          console.log('[Salarize] Loaded company order:', parsedOrder);
+        } catch (e) {
+          console.warn('[Salarize] Failed to parse saved company order');
+        }
+      }
+
       // Load first company if exists
       const companyNames = Object.keys(loadedCompanies);
       if (companyNames.length > 0) {
@@ -1062,7 +1128,61 @@ function AppContent() {
     return { issues, warnings, isValid: issues.length === 0 };
   };
 
-  // Save to Supabase - VERSION ROBUSTE
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * 💾 SAUVEGARDE SUPABASE - Fonction principale de persistence
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * [AI-DOC] Cette fonction sauvegarde TOUTES les données en base de données.
+   * Elle est appelée après chaque modification importante (import, assignation, etc.)
+   *
+   * [DB-DEPENDENCY] Tables Supabase requises:
+   * ┌─────────────────────────────────────────────────────────────────────────┐
+   * │ TABLE: companies                                                        │
+   * │ - id (UUID, PK)                                                        │
+   * │ - user_id (UUID, FK → auth.users)                                      │
+   * │ - name (TEXT) - Nom de la société                                      │
+   * │ - logo (TEXT) - URL du logo (nullable)                                 │
+   * │ - brand_color (TEXT) - Couleur de marque hex (nullable)                │
+   * │ - website (TEXT) - Site web (nullable)                                 │
+   * │ - created_at (TIMESTAMP)                                               │
+   * └─────────────────────────────────────────────────────────────────────────┘
+   * ┌─────────────────────────────────────────────────────────────────────────┐
+   * │ TABLE: employees                                                        │
+   * │ - id (UUID, PK)                                                        │
+   * │ - company_id (UUID, FK → companies.id)                                 │
+   * │ - name (TEXT) - Nom de l'employé                                       │
+   * │ - department (TEXT) - Département (nullable = Non assigné)             │
+   * │ - function (TEXT) - Fonction/poste (nullable)                          │
+   * │ - period (TEXT) - Format "YYYY-MM"                                     │
+   * │ - total_cost (NUMERIC) - Coût salarial total                           │
+   * │ - created_at (TIMESTAMP)                                               │
+   * └─────────────────────────────────────────────────────────────────────────┘
+   * ┌─────────────────────────────────────────────────────────────────────────┐
+   * │ TABLE: department_mappings                                              │
+   * │ - id (UUID, PK)                                                        │
+   * │ - company_id (UUID, FK → companies.id)                                 │
+   * │ - employee_name (TEXT) - Clé de mapping                                │
+   * │ - department (TEXT) - Département assigné                              │
+   * └─────────────────────────────────────────────────────────────────────────┘
+   * ┌─────────────────────────────────────────────────────────────────────────┐
+   * │ TABLE: invitations                                                      │
+   * │ - id (UUID, PK)                                                        │
+   * │ - company_id (UUID, FK → companies.id)                                 │
+   * │ - email (TEXT) - Email de l'invité                                     │
+   * │ - role (TEXT) - 'viewer' ou 'editor'                                   │
+   * │ - status (TEXT) - 'pending', 'accepted', 'rejected'                    │
+   * │ - display_name (TEXT) - Nom personnalisé (OPTIONNEL - doit être ajouté)│
+   * │ - invited_by (UUID, FK → auth.users)                                   │
+   * │ - created_at (TIMESTAMP)                                               │
+   * └─────────────────────────────────────────────────────────────────────────┘
+   *
+   * [DB-MIGRATION-REQUIRED] Si tu vois une erreur sur une colonne manquante:
+   * - display_name dans invitations: ALTER TABLE invitations ADD COLUMN display_name TEXT;
+   *
+   * @param {Object} newCompanies - Objet { companyName: { employees, mapping, periods, ... } }
+   * @param {string} activeCompanyName - Nom de la société active
+   */
   const saveToSupabase = async (newCompanies, activeCompanyName) => {
     if (!user?.id) {
       console.log('[Salarize] No user ID, saving to localStorage');
@@ -1143,10 +1263,12 @@ function AppContent() {
         }
 
         // Récupérer l'état actuel de la DB AVANT modification
+        // Note: Supabase limite par défaut à 1000 lignes
         const { data: currentDbEmployees } = await supabase
           .from('employees')
           .select('id, name, period, total_cost')
-          .eq('company_id', companyId);
+          .eq('company_id', companyId)
+          .limit(10000);
 
         const dbState = {
           employeeCount: currentDbEmployees?.length || 0,
@@ -1334,21 +1456,18 @@ function AppContent() {
           }
         }
 
-        // VÉRIFICATION POST-SAUVEGARDE - S'assurer que les données sont bien dans Supabase
-        const { data: verifyEmployees, error: verifyError } = await supabase
+        // VÉRIFICATION POST-SAUVEGARDE - Utiliser COUNT pour éviter la limite de 1000
+        const { count: savedCount, error: verifyError } = await supabase
           .from('employees')
-          .select('id, period')
+          .select('*', { count: 'exact', head: true })
           .eq('company_id', companyId);
 
         if (verifyError) {
           console.error(`[Salarize] ❌ Erreur vérification post-save:`, verifyError);
         } else {
-          const savedCount = verifyEmployees?.length || 0;
-          const savedPeriods = [...new Set((verifyEmployees || []).map(e => e.period))];
           const expectedCount = latestCompanyData.employees?.length || 0;
 
-          console.log(`[Salarize] ✓ Vérification: ${savedCount}/${expectedCount} employés en DB`);
-          console.log(`[Salarize] ✓ Périodes en DB après save: ${savedPeriods.sort().join(', ')}`);
+          console.log(`[Salarize] ✓ Vérification COUNT: ${savedCount}/${expectedCount} employés en DB`);
 
           if (savedCount < expectedCount * 0.9) {
             console.error(`[Salarize] ⚠️ ALERTE: Seulement ${savedCount}/${expectedCount} employés sauvegardés!`);
@@ -1655,6 +1774,15 @@ function AppContent() {
     setCreatedDepartments(c.createdDepartments || []);
     setSelectedPeriods([]);
     setView('dashboard');
+  };
+
+  // Handler pour réorganiser les sociétés dans la sidebar (drag & drop)
+  const handleReorderCompanies = (newOrder) => {
+    setCompanyOrder(newOrder);
+    // Sauvegarder dans localStorage
+    if (user?.id) {
+      localStorage.setItem(`salarize_company_order_${user.id}`, JSON.stringify(newOrder));
+    }
   };
 
   // Détection du type de fichier et de la période depuis le nom
@@ -2192,6 +2320,160 @@ function AppContent() {
       
       reader.readAsArrayBuffer(file);
     });
+  };
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * 🚀 IMPORT RAPIDE - Importe TOUS les fichiers automatiquement
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * [AI-DOC] Cette fonction permet d'importer TOUS les fichiers Excel rapidement:
+   * - Traite le fichier actuel ET tous les fichiers restants dans la queue
+   * - Fait confiance à 100% à la période détectée (pas de modal de confirmation)
+   * - Les employés sans département reconnu sont assignés à "Non assigné" (null)
+   * - Sauvegarde automatiquement en base de données après TOUS les imports
+   *
+   * [DB-DEPENDENCY] Tables Supabase utilisées:
+   * - companies: { id, name, created_by, logo, color, website, employees (JSONB), periods (JSONB), mapping (JSONB) }
+   * - Pas de nouvelles colonnes requises pour cette fonctionnalité
+   */
+  const quickImportFromPending = async () => {
+    if (!pendingPeriodSelection || !activeCompany) {
+      toast.error('Aucune donnée à importer');
+      return;
+    }
+
+    // Fermer le modal immédiatement pour feedback utilisateur
+    const currentPending = { ...pendingPeriodSelection };
+    const currentQueue = [...fileQueue];
+    const startIndex = currentFileIndex;
+
+    setPendingPeriodSelection(null);
+
+    // Compteurs pour le résumé final
+    let totalEmployees = 0;
+    let totalFiles = 0;
+    const importedPeriods = new Set();
+
+    // Fonction helper pour parser et importer un fichier
+    const parseAndImportFile = (file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+
+            let sheetName = wb.SheetNames[0];
+            for (const name of wb.SheetNames) {
+              const lower = name.toLowerCase();
+              if (lower.includes('données') && lower.includes('salaire')) {
+                sheetName = name;
+                break;
+              }
+            }
+
+            const sheet = wb.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            // Parser le fichier
+            let result = parseAcerta(rows);
+            if (!result) result = parseAcertaNL(rows);
+            if (!result) result = parseSecurex(rows, file.name);
+            if (!result) result = parseGeneric(rows, file.name);
+
+            if (!result || result.employees.length === 0) {
+              console.log(`[Salarize] ⚠️ Fichier ignoré (non reconnu): ${file.name}`);
+              resolve(null);
+              return;
+            }
+
+            // Analyser la période
+            const periodAnalysis = analyzePeriodSuggestion(rows, file.name);
+            const suggestedPeriod = periodAnalysis.period;
+            if (result.periods[0] === 'Unknown' && suggestedPeriod) {
+              result.employees.forEach(emp => emp.period = suggestedPeriod);
+              result.periods = [suggestedPeriod];
+            }
+
+            resolve({
+              employees: result.employees,
+              periods: result.periods,
+              suggestedPeriod: result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod,
+              periodConfidence: periodAnalysis.confidence,
+              fileName: file.name
+            });
+          } catch (err) {
+            console.error(`[Salarize] Erreur parsing ${file.name}:`, err);
+            resolve(null);
+          }
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsArrayBuffer(file);
+      });
+    };
+
+    console.log(`[Salarize] 🚀 IMPORT RAPIDE: Démarrage pour ${currentQueue.length > 0 ? currentQueue.length - startIndex : 1} fichier(s)`);
+
+    // 1. Importer le fichier actuellement pending
+    const { employees, suggestedPeriod, periodConfidence } = currentPending;
+    const period = suggestedPeriod && suggestedPeriod !== 'Unknown'
+      ? suggestedPeriod
+      : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+    const updatedEmployees = employees.map(e => ({
+      ...e,
+      period,
+      department: e.department || null
+    }));
+
+    importToCompanyDirect(activeCompany, { employees: updatedEmployees, periods: [period] }, true);
+    totalEmployees += employees.length;
+    totalFiles++;
+    importedPeriods.add(period);
+    console.log(`[Salarize] ✓ Fichier 1: ${employees.length} employés (${period})`);
+
+    // 2. Traiter tous les fichiers restants dans la queue
+    if (currentQueue.length > 0) {
+      for (let i = startIndex + 1; i < currentQueue.length; i++) {
+        const file = currentQueue[i];
+        console.log(`[Salarize] 📄 Traitement fichier ${i + 1}/${currentQueue.length}: ${file.name}`);
+
+        const parsed = await parseAndImportFile(file);
+        if (parsed) {
+          const filePeriod = parsed.suggestedPeriod && parsed.suggestedPeriod !== 'Unknown'
+            ? parsed.suggestedPeriod
+            : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+          const fileEmployees = parsed.employees.map(e => ({
+            ...e,
+            period: filePeriod,
+            department: e.department || null
+          }));
+
+          // Toujours skipSave sauf pour le dernier fichier
+          const isLast = i === currentQueue.length - 1;
+          importToCompanyDirect(activeCompany, { employees: fileEmployees, periods: [filePeriod] }, !isLast);
+
+          totalEmployees += parsed.employees.length;
+          totalFiles++;
+          importedPeriods.add(filePeriod);
+          console.log(`[Salarize] ✓ Fichier ${i + 1}: ${parsed.employees.length} employés (${filePeriod})`);
+        }
+      }
+    }
+
+    // 3. Sauvegarder tout à la fin
+    console.log('[Salarize] 💾 Sauvegarde finale...');
+    await saveAll(companiesRef.current, activeCompany);
+
+    // 4. Nettoyer et afficher le résumé
+    setFileQueue([]);
+    setCurrentFileIndex(0);
+
+    const periodsStr = [...importedPeriods].map(p => formatPeriod(p)).join(', ');
+    toast.success(`⚡ Import rapide terminé: ${totalEmployees} employés (${totalFiles} fichier${totalFiles > 1 ? 's' : ''}) - ${periodsStr}`);
+    console.log(`[Salarize] 🎉 Import rapide terminé: ${totalEmployees} employés, ${totalFiles} fichiers, périodes: ${periodsStr}`);
   };
 
   const parseAcerta = (rows) => {
@@ -3901,10 +4183,11 @@ L'équipe Salarize`;
     return allDepts.sort();
   }, [employees, departmentMapping, filtered, createdDepartments]);
 
-  // Employés uniques avec leur département actuel (memoïsée) - basé sur filtered
+  // Employés uniques avec leur département actuel (memoïsée) - basé sur TOUS les employés
+  // Important: utiliser 'employees' et non 'filtered' pour que le compteur corresponde à la Sidebar
   const uniqueEmployeesWithDept = useMemo(() => {
     const seen = new Map();
-    filtered.forEach(e => {
+    employees.forEach(e => {
       if (!seen.has(e.name)) {
         seen.set(e.name, {
           ...e,
@@ -3913,7 +4196,7 @@ L'équipe Salarize`;
       }
     });
     return [...seen.values()];
-  }, [filtered, departmentMapping]);
+  }, [employees, departmentMapping]);
 
   // Stats du gestionnaire de départements (memoïsées)
   const deptManagerStats = useMemo(() => {
@@ -4490,6 +4773,8 @@ L'équipe Salarize`;
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             isViewerOnly={isViewerOnly}
+            companyOrder={companyOrder}
+            onReorderCompanies={handleReorderCompanies}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -4593,6 +4878,8 @@ L'équipe Salarize`;
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           isViewerOnly={isViewerOnly}
+          companyOrder={companyOrder}
+          onReorderCompanies={handleReorderCompanies}
         />
         <DashboardHeader 
           user={user} 
@@ -4894,7 +5181,7 @@ L'équipe Salarize`;
                   )}
                 </div>
               )}
-              
+
               {/* Sélecteur de période */}
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -5036,97 +5323,228 @@ L'équipe Salarize`;
                 </button>
               </div>
               
-              {/* Ignorer - très discret, séparé */}
-              {fileQueue.length > 1 && (
-                <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+              {/* Bouton Import Rapide en bas - affiché quand confiance haute */}
+              {pendingPeriodSelection.periodConfidence >= 0.8 && activeCompany && view === 'dashboard' && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
                   <button
-                    onClick={async () => {
-                      if (currentFileIndex < fileQueue.length - 1) {
-                        const nextIndex = currentFileIndex + 1;
-                        setCurrentFileIndex(nextIndex);
-                        setPendingPeriodSelection(null);
-                        setTimeout(async () => {
-                          await parseFile(fileQueue[nextIndex]);
-                        }, 300);
-                      } else {
-                        setPendingPeriodSelection(null);
-                        setFileQueue([]);
-                        setCurrentFileIndex(0);
-                      }
-                    }}
-                    className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                    onClick={() => setShowQuickImportModal(true)}
+                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
                   >
-                    Ignorer ce fichier →
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Import Rapide
+                    {fileQueue.length > 1 && (
+                      <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                        {fileQueue.length} fichiers
+                      </span>
+                    )}
                   </button>
+                  <p className="text-center text-slate-400 text-xs mt-2">
+                    Importe tous les fichiers automatiquement
+                  </p>
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
-      
+
+      {/* Modal Import Rapide - Liste tous les fichiers à importer */}
+      {showQuickImportModal && pendingPeriodSelection && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-md z-[60] flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowQuickImportModal(false); }}
+        >
+          <div className="bg-slate-900 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-700/50">
+            {/* Header avec gradient violet/fuchsia Salarize */}
+            <div className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600" />
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full" />
+              </div>
+              <div className="relative p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Import Rapide</h3>
+                    <p className="text-white/70 text-sm">Importer tous les fichiers en un clic</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Explication */}
+            <div className="p-4 bg-violet-500/10 border-b border-violet-500/20">
+              <p className="text-violet-300 text-sm flex items-start gap-2">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                  <strong className="text-violet-200">Import automatique:</strong> Les périodes sont détectées automatiquement.
+                  Les employés sans département seront placés dans "Non assigné".
+                </span>
+              </p>
+            </div>
+
+            {/* Liste des fichiers */}
+            <div className="p-5 max-h-80 overflow-y-auto bg-slate-800/30">
+              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">
+                Fichiers à importer ({fileQueue.length > 0 ? fileQueue.length : 1})
+              </p>
+
+              <div className="space-y-2">
+                {/* Fichier actuel (toujours affiché) */}
+                <div className="flex items-center gap-3 p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl">
+                  <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white truncate">{pendingPeriodSelection.fileName}</p>
+                    <p className="text-violet-300 text-sm">
+                      {pendingPeriodSelection.employees.length} employés • {formatPeriod(pendingPeriodSelection.suggestedPeriod)}
+                    </p>
+                  </div>
+                  <div className="px-2.5 py-1 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Prêt
+                  </div>
+                </div>
+
+                {/* Fichiers restants dans la queue */}
+                {fileQueue.slice(currentFileIndex + 1).map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl">
+                    <div className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-300 truncate">{file.name}</p>
+                      <p className="text-slate-500 text-sm">En attente de traitement</p>
+                    </div>
+                    <div className="px-2.5 py-1 bg-slate-700 text-slate-400 text-xs font-medium rounded-full">
+                      En attente
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="p-5 bg-slate-800/80 border-t border-slate-700/50 flex gap-3">
+              <button
+                onClick={() => setShowQuickImportModal(false)}
+                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white rounded-xl font-medium transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  setShowQuickImportModal(false);
+                  quickImportFromPending();
+                }}
+                className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-500/25"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Importer {fileQueue.length > 1 ? `${fileQueue.length} fichiers` : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Department Manager Modal */}
       {showDeptManager && (
-        <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 overflow-y-auto"
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 overflow-y-auto"
           onClick={(e) => { if (e.target === e.currentTarget) { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}}
         >
           <div className="min-h-full flex items-start justify-center p-4 pt-8 pb-8">
-            <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden">
-              {/* Header gradient */}
-              <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 p-6 text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Départements</h2>
-                    <p className="text-slate-400 text-sm mt-1">{activeCompany}</p>
-                  </div>
-                  <button 
-                    onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}
-                    className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+            <div className="bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-700/50">
+              {/* Header avec gradient violet/fuchsia */}
+              <div className="relative overflow-hidden">
+                {/* Background gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600" />
+                {/* Pattern décoratif */}
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full" />
+                  <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white rounded-full" />
                 </div>
-                
-                {/* Stats row - Utilise les valeurs memoïsées */}
-                <div className="flex gap-3 mt-5">
-                  <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
-                    <p className="text-2xl font-bold">{deptManagerStats.total}</p>
-                    <p className="text-xs text-slate-400">Employés</p>
-                  </div>
-                  <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2">
-                    <p className="text-2xl font-bold">{deptManagerStats.deptCount}</p>
-                    <p className="text-xs text-slate-400">Départements</p>
-                  </div>
-                  {deptManagerStats.unassigned > 0 && (
-                    <div className="bg-amber-500/20 border border-amber-500/30 backdrop-blur rounded-xl px-4 py-2">
-                      <p className="text-2xl font-bold text-amber-400">{deptManagerStats.unassigned}</p>
-                      <p className="text-xs text-amber-400/80">Non assignés</p>
+
+                <div className="relative p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold tracking-tight text-white">Départements</h2>
+                      <p className="text-white/70 text-sm mt-1">{activeCompany}</p>
                     </div>
-                  )}
+                    <button
+                      onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}
+                      className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Stats row - Design moderne */}
+                  <div className="flex gap-3 mt-5">
+                    <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3 flex-1">
+                      <p className="text-3xl font-bold text-white">{deptManagerStats.total}</p>
+                      <p className="text-xs text-white/70 font-medium">Employés</p>
+                    </div>
+                    <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3 flex-1">
+                      <p className="text-3xl font-bold text-white">{deptManagerStats.deptCount}</p>
+                      <p className="text-xs text-white/70 font-medium">Départements</p>
+                    </div>
+                    {deptManagerStats.unassigned > 0 && (
+                      <div className="bg-amber-400/20 border border-amber-400/30 backdrop-blur-sm rounded-2xl px-5 py-3 flex-1">
+                        <p className="text-3xl font-bold text-amber-300">{deptManagerStats.unassigned}</p>
+                        <p className="text-xs text-amber-300/80 font-medium">Non assignés</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
               {/* Actions & Search */}
-              <div className="p-4 bg-slate-50 border-b border-slate-200">
+              <div className="p-4 bg-slate-800/50 border-b border-slate-700/50">
                 {/* Rename department UI */}
                 {showRenameDept && (
-                  <div className="mb-3 p-3 bg-white border border-slate-200 rounded-xl">
-                    <p className="text-sm font-medium text-slate-700 mb-2">✏️ Renommer un département</p>
-                    <div className="flex gap-2 mb-2">
+                  <div className="mb-3 p-4 bg-slate-800 border border-slate-600 rounded-2xl">
+                    <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Renommer un département
+                    </p>
+                    <div className="flex gap-2 mb-3">
                       <select
                         value={renameDeptOld}
                         onChange={e => setRenameDeptOld(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white focus:border-violet-500 outline-none"
                       >
                         <option value="">Choisir...</option>
                         {allDepartments.map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
                         ))}
                       </select>
-                      <span className="flex items-center text-slate-400">→</span>
+                      <span className="flex items-center text-slate-500">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                      </span>
                       <input
                         type="text"
                         id="rename-dept-new"
@@ -5134,32 +5552,32 @@ L'équipe Salarize`;
                         placeholder="Nouveau nom..."
                         value={renameDeptNew}
                         onChange={e => setRenameDeptNew(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white placeholder-slate-400 focus:border-violet-500 outline-none"
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowRenameDept(false); setRenameDeptOld(''); setRenameDeptNew(''); }}
-                        className="flex-1 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+                        className="flex-1 py-2.5 text-sm text-slate-300 hover:bg-slate-700 rounded-xl transition-colors"
                       >
                         Annuler
                       </button>
                       <button
                         onClick={() => {
                           if (!renameDeptOld || !renameDeptNew || renameDeptOld === renameDeptNew) return;
-                          
+
                           const newMapping = { ...departmentMapping };
                           Object.keys(newMapping).forEach(name => {
                             if (newMapping[name] === renameDeptOld) {
                               newMapping[name] = renameDeptNew;
                             }
                           });
-                          
+
                           const newEmps = employees.map(e => ({
                             ...e,
                             department: e.department === renameDeptOld ? renameDeptNew : e.department
                           }));
-                          
+
                           // Mettre à jour createdDepartments si le département renommé y était
                           const updatedCreatedDepts = createdDepartments.map(d => d === renameDeptOld ? renameDeptNew : d);
                           setCreatedDepartments(updatedCreatedDepts);
@@ -5179,35 +5597,44 @@ L'équipe Salarize`;
                           setRenameDeptNew('');
                         }}
                         disabled={!renameDeptOld || !renameDeptNew}
-                        className="flex-1 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                       >
                         Renommer
                       </button>
                     </div>
                   </div>
                 )}
-                
+
                 {/* Merge department UI */}
                 {showMergeDept && (
-                  <div className="mb-3 p-3 bg-white border border-purple-200 rounded-xl">
-                    <p className="text-sm font-medium text-slate-700 mb-2">🔀 Fusionner des départements</p>
-                    <p className="text-xs text-slate-500 mb-3">Tous les employés du premier département seront déplacés vers le second.</p>
-                    <div className="flex gap-2 mb-2">
+                  <div className="mb-3 p-4 bg-slate-800 border border-purple-500/30 rounded-2xl">
+                    <p className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                      Fusionner des départements
+                    </p>
+                    <p className="text-xs text-slate-400 mb-3">Tous les employés du premier département seront déplacés vers le second.</p>
+                    <div className="flex gap-2 mb-3">
                       <select
                         value={mergeDeptFrom}
                         onChange={e => setMergeDeptFrom(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white focus:border-purple-500 outline-none"
                       >
                         <option value="">Fusionner...</option>
                         {allDepartments.map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
                         ))}
                       </select>
-                      <span className="flex items-center text-slate-400">→</span>
+                      <span className="flex items-center text-slate-500">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                      </span>
                       <select
                         value={mergeDeptTo}
                         onChange={e => setMergeDeptTo(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white focus:border-purple-500 outline-none"
                       >
                         <option value="">...vers</option>
                         {allDepartments.filter(d => d !== mergeDeptFrom).map(dept => (
@@ -5218,26 +5645,26 @@ L'équipe Salarize`;
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowMergeDept(false); setMergeDeptFrom(''); setMergeDeptTo(''); }}
-                        className="flex-1 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+                        className="flex-1 py-2.5 text-sm text-slate-300 hover:bg-slate-700 rounded-xl transition-colors"
                       >
                         Annuler
                       </button>
                       <button
                         onClick={() => {
                           if (!mergeDeptFrom || !mergeDeptTo || mergeDeptFrom === mergeDeptTo) return;
-                          
+
                           const newMapping = { ...departmentMapping };
                           Object.keys(newMapping).forEach(name => {
                             if (newMapping[name] === mergeDeptFrom) {
                               newMapping[name] = mergeDeptTo;
                             }
                           });
-                          
+
                           const newEmps = employees.map(e => ({
                             ...e,
                             department: e.department === mergeDeptFrom ? mergeDeptTo : e.department
                           }));
-                          
+
                           const count = employees.filter(e => (e.department || departmentMapping[e.name]) === mergeDeptFrom).length;
 
                           // Supprimer le département fusionné de createdDepartments
@@ -5259,43 +5686,52 @@ L'équipe Salarize`;
                           setMergeDeptTo('');
                         }}
                         disabled={!mergeDeptFrom || !mergeDeptTo}
-                        className="flex-1 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Fusionner
                       </button>
                     </div>
                   </div>
                 )}
-                
+
                 {!showRenameDept && !showMergeDept && !showCreateDept && !isViewerOnly && (
-                  <div className="flex gap-2 mb-3">
+                  <div className="flex gap-2 mb-4">
                     <button
                       onClick={() => setShowCreateDept(true)}
-                      className="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-medium hover:bg-emerald-600 transition-all shadow-sm"
+                      className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
                     >
-                      ➕ Créer
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Créer
                     </button>
 
                     <button
                       onClick={() => setShowRenameDept(true)}
-                      className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                      className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm font-semibold text-white transition-all flex items-center justify-center gap-2"
                     >
-                      ✏️ Renommer
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Renommer
                     </button>
 
                     <button
                       onClick={() => setShowMergeDept(true)}
-                      className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                      className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm font-semibold text-white transition-all flex items-center justify-center gap-2"
                     >
-                      🔀 Fusionner
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                      Fusionner
                     </button>
                   </div>
                 )}
 
                 {/* Message pour les viewers */}
                 {isViewerOnly && (
-                  <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <p className="text-sm text-amber-700 flex items-center gap-2">
+                  <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                    <p className="text-sm text-amber-400 flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
@@ -5303,12 +5739,17 @@ L'équipe Salarize`;
                     </p>
                   </div>
                 )}
-                
+
                 {/* Create department UI */}
                 {showCreateDept && (
-                  <div className="mb-3 p-3 bg-white border border-emerald-200 rounded-xl">
-                    <p className="text-sm font-medium text-slate-700 mb-2">➕ Créer un nouveau département</p>
-                    <div className="flex gap-2 mb-2">
+                  <div className="mb-3 p-4 bg-slate-800 border border-emerald-500/30 rounded-2xl">
+                    <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Créer un nouveau département
+                    </p>
+                    <div className="flex gap-2 mb-3">
                       <input
                         type="text"
                         id="new-dept-name"
@@ -5316,14 +5757,14 @@ L'équipe Salarize`;
                         placeholder="Nom du département..."
                         value={newDeptName}
                         onChange={e => setNewDeptName(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white placeholder-slate-400 focus:border-emerald-500 outline-none"
                         autoFocus
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowCreateDept(false); setNewDeptName(''); }}
-                        className="flex-1 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+                        className="flex-1 py-2.5 text-sm text-slate-300 hover:bg-slate-700 rounded-xl transition-colors"
                       >
                         Annuler
                       </button>
@@ -5351,27 +5792,27 @@ L'équipe Salarize`;
                           setNewDeptName('');
                         }}
                         disabled={!newDeptName.trim()}
-                        className="flex-1 py-2 bg-emerald-500 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                       >
                         Créer
                       </button>
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">Le département sera immédiatement disponible dans les listes.</p>
+                    <p className="text-xs text-slate-400 mt-2">Le département sera immédiatement disponible dans les listes.</p>
                   </div>
                 )}
                 
                 {/* Bulk assign bar */}
                 {selectedEmployees.size > 0 && (
-                  <div className="mb-3 p-3 bg-violet-50 border border-violet-200 rounded-xl flex items-center gap-3">
+                  <div className="mb-4 p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl flex items-center gap-3">
                     <div className="flex-1">
-                      <span className="text-sm font-medium text-violet-700">
+                      <span className="text-sm font-medium text-violet-300">
                         {selectedEmployees.size} employé{selectedEmployees.size > 1 ? 's' : ''} sélectionné{selectedEmployees.size > 1 ? 's' : ''}
                       </span>
                     </div>
                     <select
                       value={bulkAssignDept}
                       onChange={e => setBulkAssignDept(e.target.value)}
-                      className="px-3 py-2 border border-violet-300 rounded-lg text-sm bg-white"
+                      className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white focus:border-violet-500 outline-none"
                     >
                       <option value="">Assigner à...</option>
                       {allDepartments.map(dept => (
@@ -5381,7 +5822,7 @@ L'équipe Salarize`;
                     <button
                       onClick={() => {
                         if (!bulkAssignDept) return;
-                        
+
                         const newMapping = { ...departmentMapping };
                         const newEmps = employees.map(e => {
                           if (selectedEmployees.has(e.name)) {
@@ -5390,10 +5831,10 @@ L'équipe Salarize`;
                           }
                           return e;
                         });
-                        
+
                         setDepartmentMapping(newMapping);
                         setEmployees(newEmps);
-                        
+
                         // Retirer le département des createdDepartments s'il y est (il a maintenant des employés)
                         const updatedCreatedDepts = createdDepartments.filter(d => d !== bulkAssignDept);
                         setCreatedDepartments(updatedCreatedDepts);
@@ -5411,13 +5852,13 @@ L'équipe Salarize`;
                         setBulkAssignDept('');
                       }}
                       disabled={!bulkAssignDept}
-                      className="px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-violet-700 transition-colors"
+                      className="px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                     >
                       Appliquer
                     </button>
                     <button
                       onClick={() => { setSelectedEmployees(new Set()); setBulkAssignDept(''); }}
-                      className="p-2 text-violet-500 hover:bg-violet-100 rounded-lg transition-colors"
+                      className="p-2 text-violet-400 hover:bg-slate-700 rounded-xl transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -5425,7 +5866,7 @@ L'équipe Salarize`;
                     </button>
                   </div>
                 )}
-                
+
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5438,21 +5879,21 @@ L'équipe Salarize`;
                       placeholder="Rechercher un employé..."
                       value={deptSearchTerm}
                       onChange={e => setDeptSearchTerm(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-slate-400 focus:ring-2 focus:ring-slate-100 outline-none transition-all"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:border-violet-500 outline-none transition-all"
                     />
                   </div>
-                  
+
                   <select
                     value={deptFilter === 'unassigned' ? 'unassigned' : deptFilter}
                     onChange={e => setDeptFilter(e.target.value)}
-                    className={`w-44 px-3 py-3 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                      deptFilter !== 'all' 
-                        ? 'border-slate-400 bg-slate-100' 
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
+                    className={`w-44 px-3 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                      deptFilter !== 'all'
+                        ? 'bg-violet-500/20 border-violet-500/50 text-violet-300'
+                        : 'bg-slate-700 border-slate-600 text-white hover:border-slate-500'
+                    } border`}
                   >
                     <option value="all">Tous les dép.</option>
-                    <option value="unassigned">⚠️ Non assignés</option>
+                    <option value="unassigned">Non assignés</option>
                     {allDepartments.map(dept => (
                       <option key={dept} value={dept}>{dept}</option>
                     ))}
@@ -5461,31 +5902,31 @@ L'équipe Salarize`;
               </div>
               
               {/* Employee list - Optimisé avec useMemo */}
-              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto" style={{ willChange: 'scroll-position' }}>
+              <div className="divide-y divide-slate-700/50 max-h-96 overflow-y-auto bg-slate-800/30" style={{ willChange: 'scroll-position' }}>
                 {filteredEmployeesForDept.length === 0 ? (
                   <div className="p-12 text-center">
-                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
                     </div>
-                    <p className="text-slate-500 font-medium">Aucun employé trouvé</p>
-                    <p className="text-slate-400 text-sm mt-1">Essayez de modifier vos filtres</p>
+                    <p className="text-slate-300 font-medium">Aucun employé trouvé</p>
+                    <p className="text-slate-500 text-sm mt-1">Essayez de modifier vos filtres</p>
                   </div>
                 ) : (
                   <>
                     {/* Select all header */}
-                    <div className="flex items-center gap-4 px-5 py-3 bg-slate-50 border-b border-slate-200 sticky top-0">
+                    <div className="flex items-center gap-4 px-5 py-3 bg-slate-800/80 border-b border-slate-700 sticky top-0 backdrop-blur-sm">
                       <input
                         type="checkbox"
                         id="select-all-employees"
                         name="selectAllEmployees"
                         checked={allFilteredEmployeesForDept.length > 0 && allFilteredEmployeesForDept.every(e => selectedEmployees.has(e.name))}
-                        ref={el => { 
+                        ref={el => {
                           if (el) {
                             const allSelected = allFilteredEmployeesForDept.every(e => selectedEmployees.has(e.name));
                             const someSelected = allFilteredEmployeesForDept.some(e => selectedEmployees.has(e.name));
-                            el.indeterminate = someSelected && !allSelected; 
+                            el.indeterminate = someSelected && !allSelected;
                           }
                         }}
                         onChange={e => {
@@ -5498,22 +5939,22 @@ L'équipe Salarize`;
                             setSelectedEmployees(newSet);
                           }
                         }}
-                        className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                        className="w-4 h-4 rounded border-slate-500 bg-slate-700 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900"
                       />
-                      <span className="text-sm text-slate-500 flex-1">
-                        {selectedEmployees.size > 0 
-                          ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}` 
+                      <span className="text-sm text-slate-400 flex-1">
+                        {selectedEmployees.size > 0
+                          ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}`
                           : `Tout sélectionner (${allFilteredEmployeesForDept.length})`}
                       </span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-slate-500">
                         {deptPage * DEPT_PAGE_SIZE + 1}-{Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length)} sur {allFilteredEmployeesForDept.length}
                       </span>
                     </div>
-                    
+
                     {filteredEmployeesForDept.map((emp) => (
-                      <div 
-                        key={emp.name} 
-                        className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 ${selectedEmployees.has(emp.name) ? 'bg-violet-50' : ''}`}
+                      <div
+                        key={emp.name}
+                        className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-700/50 transition-colors ${selectedEmployees.has(emp.name) ? 'bg-violet-500/10' : ''}`}
                         style={{ contain: 'layout style paint' }}
                       >
                         {/* Checkbox */}
@@ -5531,22 +5972,22 @@ L'équipe Salarize`;
                             }
                             setSelectedEmployees(newSet);
                           }}
-                          className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                          className="w-4 h-4 rounded border-slate-500 bg-slate-700 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900"
                         />
-                        
+
                         {/* Avatar */}
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
-                          emp.currentDept 
-                            ? 'bg-slate-100 text-slate-600' 
-                            : 'bg-amber-100 text-amber-600'
+                          emp.currentDept
+                            ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-300 border border-violet-500/20'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}>
                           {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
-                        
+
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-800 truncate">{emp.name}</p>
+                          <p className="font-medium text-white truncate">{emp.name}</p>
                         </div>
-                        
+
                         <select
                           value={emp.currentDept || ''}
                           disabled={isViewerOnly}
@@ -5569,15 +6010,15 @@ L'équipe Salarize`;
                               empCost: empCost
                             });
                           }}
-                          className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all ${
+                          className={`w-44 px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                             isViewerOnly
-                              ? 'cursor-not-allowed opacity-60 bg-slate-100'
+                              ? 'cursor-not-allowed opacity-60 bg-slate-700 border-slate-600'
                               : 'cursor-pointer'
                           } ${
                             emp.currentDept
-                              ? 'border-slate-200 bg-white hover:border-slate-300'
-                              : 'border-amber-300 bg-amber-50 text-amber-700'
-                          }`}
+                              ? 'bg-slate-700 border-slate-600 text-white hover:border-slate-500'
+                              : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                          } border`}
                         >
                           <option value="">— Non assigné —</option>
                           {allDepartments.map(dept => (
@@ -5592,24 +6033,24 @@ L'équipe Salarize`;
               
               {/* Pagination */}
               {deptTotalPages > 1 && (
-                <div className="flex items-center justify-between px-5 py-3 bg-white border-t border-slate-100">
+                <div className="flex items-center justify-between px-5 py-3 bg-slate-800/50 border-t border-slate-700/50">
                   <button
                     onClick={() => setDeptPage(p => Math.max(0, p - 1))}
                     disabled={deptPage === 0}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                     Précédent
                   </button>
-                  <span className="text-sm text-slate-500">
+                  <span className="text-sm text-slate-400">
                     Page {deptPage + 1} / {deptTotalPages}
                   </span>
                   <button
                     onClick={() => setDeptPage(p => Math.min(deptTotalPages - 1, p + 1))}
                     disabled={deptPage >= deptTotalPages - 1}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     Suivant
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5618,12 +6059,12 @@ L'équipe Salarize`;
                   </button>
                 </div>
               )}
-              
+
               {/* Footer */}
-              <div className="p-4 bg-slate-50 border-t border-slate-200">
+              <div className="p-4 bg-slate-800/80 border-t border-slate-700/50">
                 <button
                   onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); setSelectedEmployees(new Set()); setBulkAssignDept(''); setDeptPage(0); }}
-                  className="w-full py-3 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors"
+                  className="w-full py-3.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-violet-500/25"
                 >
                   Terminé
                 </button>
@@ -5749,12 +6190,14 @@ L'équipe Salarize`;
                   console.log(`[Salarize] Companies ref updated, mapping entries:`, Object.keys(newCompanies[activeCompany].mapping || {}).length);
                   console.log(`[Salarize] Mapping value for ${empName}:`, newCompanies[activeCompany].mapping?.[empName]);
 
-                  // Sauvegarder et attendre la fin
-                  await saveAll(newCompanies, activeCompany);
-                  console.log(`[Salarize] === DEPARTMENT CHANGE SAVED ===`);
-
-                  toast.success(`${empName} transféré vers ${newDept || 'Non assigné'}`);
+                  // Fermer le modal IMMÉDIATEMENT
                   setPendingDeptChange(null);
+                  toast.success(`${empName} transféré vers ${newDept || 'Non assigné'}`);
+
+                  // Sauvegarder en arrière-plan
+                  saveAll(newCompanies, activeCompany).then(() => {
+                    console.log(`[Salarize] === DEPARTMENT CHANGE SAVED ===`);
+                  });
                 }}
                 className="flex-1 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition-colors"
               >

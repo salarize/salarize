@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, isViewerOnly }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, isViewerOnly, companyOrder, onReorderCompanies }) {
   const [showActions, setShowActions] = useState(false);
+  const [draggedCompany, setDraggedCompany] = useState(null);
+  const [dragOverCompany, setDragOverCompany] = useState(null);
 
   const unassignedCount = activeCompany && companies[activeCompany]
     ? new Set(
@@ -10,6 +12,93 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
           .map(e => e.name)
       ).size
     : 0;
+
+  // Trier les sociétés selon l'ordre personnalisé
+  const getOrderedCompanies = (companiesList, isShared) => {
+    if (!companiesList) return [];
+    const filtered = Object.entries(companiesList).filter(([_, c]) => isShared ? c.isShared : !c.isShared);
+
+    if (!companyOrder || companyOrder.length === 0) {
+      return filtered;
+    }
+
+    // Trier selon l'ordre sauvegardé
+    return filtered.sort((a, b) => {
+      const indexA = companyOrder.indexOf(a[0]);
+      const indexB = companyOrder.indexOf(b[0]);
+      // Si pas dans l'ordre, mettre à la fin
+      if (indexA === -1 && indexB === -1) return 0;
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+  };
+
+  const handleDragStart = (e, companyName) => {
+    setDraggedCompany(companyName);
+    e.dataTransfer.effectAllowed = 'move';
+    // Ajouter une classe pour le style pendant le drag
+    e.target.style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e) => {
+    e.target.style.opacity = '1';
+    setDraggedCompany(null);
+    setDragOverCompany(null);
+  };
+
+  const handleDragOver = (e, companyName) => {
+    e.preventDefault();
+    if (draggedCompany && draggedCompany !== companyName) {
+      setDragOverCompany(companyName);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverCompany(null);
+  };
+
+  const handleDrop = (e, targetCompany, isShared) => {
+    e.preventDefault();
+
+    if (!draggedCompany || draggedCompany === targetCompany) {
+      setDraggedCompany(null);
+      setDragOverCompany(null);
+      return;
+    }
+
+    // Obtenir la liste ordonnée actuelle pour ce type (shared ou propres)
+    const orderedList = getOrderedCompanies(companies, isShared).map(([name]) => name);
+
+    // Trouver les indices
+    const fromIndex = orderedList.indexOf(draggedCompany);
+    const toIndex = orderedList.indexOf(targetCompany);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedCompany(null);
+      setDragOverCompany(null);
+      return;
+    }
+
+    // Créer le nouvel ordre
+    const newOrder = [...orderedList];
+    newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, draggedCompany);
+
+    // Appeler le callback pour sauvegarder l'ordre
+    if (onReorderCompanies) {
+      // Combiner avec les autres sociétés (l'autre type)
+      const otherType = getOrderedCompanies(companies, !isShared).map(([name]) => name);
+      const fullOrder = isShared ? [...otherType, ...newOrder] : [...newOrder, ...otherType];
+      onReorderCompanies(fullOrder);
+    }
+
+    setDraggedCompany(null);
+    setDragOverCompany(null);
+  };
+
+  const myCompanies = getOrderedCompanies(companies, false);
+  const sharedCompanies = getOrderedCompanies(companies, true);
 
   return (
     <>
@@ -172,65 +261,111 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
 
         <div className="flex-1 p-4 overflow-y-auto">
           {/* Mes sociétés (propres) */}
-          {Object.entries(companies).filter(([_, c]) => !c.isShared).length > 0 && (
+          {myCompanies.length > 0 && (
             <>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></div>
                 <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Mes Societes</p>
                 <span className="ml-auto px-1.5 py-0.5 bg-violet-500/20 text-violet-400 text-[10px] rounded">Proprietaire</span>
               </div>
-              {Object.entries(companies).filter(([_, c]) => !c.isShared).map(([name, company]) => (
-                <button
+              {myCompanies.map(([name, company]) => (
+                <div
                   key={name}
-                  onClick={() => onSelectCompany(name)}
-                  className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                    activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
+                  draggable={!isViewerOnly}
+                  onDragStart={(e) => handleDragStart(e, name)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handleDragOver(e, name)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, name, false)}
+                  className={`relative transition-all duration-200 ${
+                    dragOverCompany === name ? 'transform scale-[1.02]' : ''
                   }`}
                 >
-                  {company?.logo ? (
-                    <img src={company.logo} alt="" className="w-6 h-6 rounded object-cover" />
-                  ) : (
-                    <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
-                      {name.charAt(0)}
-                    </div>
+                  {/* Indicateur de drop */}
+                  {dragOverCompany === name && draggedCompany !== name && (
+                    <div className="absolute -top-1 left-0 right-0 h-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full" />
                   )}
-                  <span className="truncate">{name}</span>
-                </button>
+                  <button
+                    onClick={() => onSelectCompany(name)}
+                    className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                      activeCompany === name ? 'bg-violet-500/20 text-violet-400' : 'hover:bg-slate-800 text-slate-300'
+                    } ${draggedCompany === name ? 'opacity-50' : ''} ${!isViewerOnly ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  >
+                    {/* Icône de drag */}
+                    {!isViewerOnly && (
+                      <div className="w-4 h-4 flex flex-col justify-center items-center gap-0.5 opacity-40 hover:opacity-100 transition-opacity flex-shrink-0">
+                        <div className="w-3 h-0.5 bg-current rounded-full"></div>
+                        <div className="w-3 h-0.5 bg-current rounded-full"></div>
+                      </div>
+                    )}
+                    {company?.logo ? (
+                      <img src={company.logo} alt="" className="w-6 h-6 rounded object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
+                        {name.charAt(0)}
+                      </div>
+                    )}
+                    <span className="truncate">{name}</span>
+                  </button>
+                </div>
               ))}
             </>
           )}
 
           {/* Sociétés partagées avec moi */}
-          {Object.entries(companies).filter(([_, c]) => c.isShared).length > 0 && (
+          {sharedCompanies.length > 0 && (
             <>
               <div className="flex items-center gap-2 mb-3 mt-6">
                 <div className="w-1 h-4 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full"></div>
                 <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">Partagees avec moi</p>
               </div>
-              {Object.entries(companies).filter(([_, c]) => c.isShared).map(([name, company]) => (
-                <button
+              {sharedCompanies.map(([name, company]) => (
+                <div
                   key={name}
-                  onClick={() => onSelectCompany(name)}
-                  className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                    activeCompany === name ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-slate-800 text-slate-300'
+                  draggable={!isViewerOnly}
+                  onDragStart={(e) => handleDragStart(e, name)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handleDragOver(e, name)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, name, true)}
+                  className={`relative transition-all duration-200 ${
+                    dragOverCompany === name ? 'transform scale-[1.02]' : ''
                   }`}
                 >
-                  {company?.logo ? (
-                    <img src={company.logo} alt="" className="w-6 h-6 rounded object-cover" />
-                  ) : (
-                    <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
-                      {name.charAt(0)}
-                    </div>
+                  {/* Indicateur de drop */}
+                  {dragOverCompany === name && draggedCompany !== name && (
+                    <div className="absolute -top-1 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" />
                   )}
-                  <span className="truncate flex-1">{name}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                    company.sharedRole === 'editor'
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-slate-600 text-slate-400'
-                  }`}>
-                    {company.sharedRole === 'editor' ? 'Editeur' : 'Lecture'}
-                  </span>
-                </button>
+                  <button
+                    onClick={() => onSelectCompany(name)}
+                    className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                      activeCompany === name ? 'bg-emerald-500/20 text-emerald-400' : 'hover:bg-slate-800 text-slate-300'
+                    } ${draggedCompany === name ? 'opacity-50' : ''} ${!isViewerOnly ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                  >
+                    {/* Icône de drag */}
+                    {!isViewerOnly && (
+                      <div className="w-4 h-4 flex flex-col justify-center items-center gap-0.5 opacity-40 hover:opacity-100 transition-opacity flex-shrink-0">
+                        <div className="w-3 h-0.5 bg-current rounded-full"></div>
+                        <div className="w-3 h-0.5 bg-current rounded-full"></div>
+                      </div>
+                    )}
+                    {company?.logo ? (
+                      <img src={company.logo} alt="" className="w-6 h-6 rounded object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded bg-slate-700 flex items-center justify-center text-xs font-bold">
+                        {name.charAt(0)}
+                      </div>
+                    )}
+                    <span className="truncate flex-1">{name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      company.sharedRole === 'editor'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-slate-600 text-slate-400'
+                    }`}>
+                      {company.sharedRole === 'editor' ? 'Editeur' : 'Lecture'}
+                    </span>
+                  </button>
+                </div>
               ))}
             </>
           )}
