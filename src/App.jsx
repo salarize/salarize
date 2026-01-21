@@ -167,7 +167,9 @@ function AppContent() {
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showCreateDept, setShowCreateDept] = useState(false); // Créer un département
   const [newDeptName, setNewDeptName] = useState(''); // Nom du nouveau département
+  const [createdDepartments, setCreatedDepartments] = useState([]); // Départements créés manuellement
   const [deptPage, setDeptPage] = useState(0); // Pagination du gestionnaire de départements
+  const [pendingDeptChange, setPendingDeptChange] = useState(null); // { empName, oldDept, newDept, empCost } pour confirmation
   const DEPT_PAGE_SIZE = 30; // Nombre d'employés par page
   const [showInviteModal, setShowInviteModal] = useState(false); // Inviter un CEO
   const [inviteEmail, setInviteEmail] = useState(''); // Email d'invitation
@@ -673,14 +675,21 @@ function AppContent() {
         (mappingsData || []).forEach(m => {
           mapping[m.employee_name] = m.department;
         });
+        console.log(`[Salarize] Loaded ${Object.keys(mapping).length} mappings for ${company.name}:`, mapping);
 
-        const emps = allEmployeesData.map(e => ({
-          name: e.name,
-          department: e.department,
-          function: e.function,
-          totalCost: parseFloat(e.total_cost) || 0,
-          period: e.period
-        }));
+        const emps = allEmployeesData.map(e => {
+          const finalDept = mapping[e.name] || e.department;
+          if (mapping[e.name] && mapping[e.name] !== e.department) {
+            console.log(`[Salarize] Employee ${e.name}: using mapping "${mapping[e.name]}" instead of DB "${e.department}"`);
+          }
+          return {
+            name: e.name,
+            department: finalDept,  // Priorité au mapping
+            function: e.function,
+            totalCost: parseFloat(e.total_cost) || 0,
+            period: e.period
+          };
+        });
 
         const periods = [...new Set(emps.map(e => e.period).filter(Boolean))].sort();
 
@@ -801,9 +810,10 @@ function AppContent() {
           const latestCompanyData = companiesRef.current[companyName] || companyData;
           const employeeCount = latestCompanyData.employees?.length || 0;
           const periodsInData = [...new Set((latestCompanyData.employees || []).map(e => e.period).filter(Boolean))].sort();
-          
+
           console.log(`[Salarize] Preparing to save ${companyName}: ${employeeCount} employees, ${periodsInData.length} periods`);
           console.log(`[Salarize] Periods to save: ${periodsInData.join(', ')}`);
+          console.log(`[Salarize] Mapping from ref for ${companyName}:`, latestCompanyData.mapping);
           
           if (employeeCount > 0) {
             console.log(`[Salarize] Syncing ${employeeCount} employees for ${companyName}`);
@@ -855,7 +865,7 @@ function AppContent() {
               const employeesToInsert = emps.map(e => ({
                 company_id: companyId,
                 name: e.name,
-                department: e.department || null,
+                department: e.department || latestCompanyData.mapping?.[e.name] || null,
                 function: e.function || null,
                 total_cost: e.totalCost,
                 period: e.period
@@ -898,21 +908,22 @@ function AppContent() {
             await supabase.from('employees').delete().eq('company_id', companyId);
           }
 
-          // Sync department mappings
+          // Sync department mappings - TOUJOURS supprimer les anciens mappings
+          await supabase
+            .from('department_mappings')
+            .delete()
+            .eq('company_id', companyId);
+
           const mappingEntries = Object.entries(latestCompanyData.mapping || {});
+          console.log(`[Salarize] Mapping entries to save:`, mappingEntries);
           if (mappingEntries.length > 0) {
-            // Delete existing mappings
-            await supabase
-              .from('department_mappings')
-              .delete()
-              .eq('company_id', companyId);
-            
             // Insert new mappings
             const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
               company_id: companyId,
               employee_name: empName,
               department: dept
             }));
+            console.log(`[Salarize] Mappings to insert:`, mappingsToInsert);
 
             const { error: mapError } = await supabase
               .from('department_mappings')
@@ -920,8 +931,11 @@ function AppContent() {
 
             if (mapError) {
               console.error('[Salarize] Error inserting mappings:', mapError);
+            } else {
+              console.log(`[Salarize] ✓ Successfully inserted ${mappingsToInsert.length} mappings`);
             }
           }
+          console.log(`[Salarize] Synced ${mappingEntries.length} department mappings for ${companyName}`);
         }
 
         console.log('[Salarize] ✓ Save completed successfully');
@@ -945,9 +959,9 @@ function AppContent() {
   };
 
   // Unified save function
-  const saveAll = (newCompanies, active) => {
+  const saveAll = async (newCompanies, active) => {
     if (user?.id) {
-      saveToSupabase(newCompanies, active);
+      return await saveToSupabase(newCompanies, active);
     } else {
       saveToLocalStorage(newCompanies, active);
     }
@@ -1209,6 +1223,7 @@ function AppContent() {
     setEmployees(c.employees || []);
     setDepartmentMapping(c.mapping || {});
     setPeriods(c.periods || []);
+    setCreatedDepartments(c.createdDepartments || []);
     setSelectedPeriods([]);
     setView('dashboard');
   };
@@ -2950,28 +2965,65 @@ L'équipe Salarize`;
   };
 
   // Computed values with useMemo for performance
-  const filtered = useMemo(() => 
-    selectedPeriods.length === 0 
-      ? employees 
-      : employees.filter(e => selectedPeriods.includes(e.period)),
-    [employees, selectedPeriods]
-  );
+  const filtered = useMemo(() => {
+    let filteredPeriods = periods;
+
+    // Si des périodes spécifiques sont sélectionnées
+    if (selectedPeriods.length > 0) {
+      filteredPeriods = periods.filter(p => selectedPeriods.includes(p));
+    }
+    // Sinon appliquer les filtres rapides
+    else if (periodFilter !== 'all') {
+      const sortedPeriods = [...periods].sort((a, b) => b.localeCompare(a));
+      const now = new Date();
+      const currentYear = now.getFullYear();
+
+      if (periodFilter === '3m') {
+        filteredPeriods = sortedPeriods.slice(0, 3);
+      } else if (periodFilter === '6m') {
+        filteredPeriods = sortedPeriods.slice(0, 6);
+      } else if (periodFilter === '12m') {
+        filteredPeriods = sortedPeriods.slice(0, 12);
+      } else if (periodFilter === 'ytd') {
+        filteredPeriods = periods.filter(p => p.startsWith(String(currentYear)));
+      }
+    }
+
+    // Aussi filtrer par année si sélectionnée
+    if (selectedYear !== 'all') {
+      filteredPeriods = filteredPeriods.filter(p => p.startsWith(selectedYear));
+    }
+
+    return employees.filter(e => filteredPeriods.includes(e.period));
+  }, [employees, periods, selectedPeriods, periodFilter, selectedYear]);
   
   const totalCost = useMemo(() => 
     filtered.reduce((s, e) => s + e.totalCost, 0),
     [filtered]
   );
   
-  const uniqueNames = useMemo(() => 
+  const uniqueNames = useMemo(() =>
     new Set(filtered.map(e => e.name)).size,
     [filtered]
   );
-  
+
   // Nombre de périodes dans les données filtrées
-  const filteredPeriodsCount = useMemo(() => 
+  const filteredPeriodsCount = useMemo(() =>
     new Set(filtered.map(e => e.period)).size,
     [filtered]
   );
+
+  // Moyenne d'employés par période
+  const avgEmployeesPerPeriod = useMemo(() => {
+    if (filteredPeriodsCount === 0) return 0;
+    const periodCounts = {};
+    filtered.forEach(e => {
+      if (!periodCounts[e.period]) periodCounts[e.period] = new Set();
+      periodCounts[e.period].add(e.name);
+    });
+    const totalEmployeesAcrossPeriods = Object.values(periodCounts).reduce((sum, set) => sum + set.size, 0);
+    return Math.round(totalEmployeesAcrossPeriods / filteredPeriodsCount);
+  }, [filtered, filteredPeriodsCount]);
   
   // Coût moyen mensuel par employé
   const avgMonthlyCostPerEmployee = useMemo(() => {
@@ -3136,15 +3188,20 @@ L'équipe Salarize`;
       }
     });
     
-    // Calculer les variations
+    // Calculer les variations et filtrer les départements vides
     Object.keys(stats).forEach(dept => {
       const s = stats[dept];
+      // Supprimer les départements sans coût dans la période actuelle
+      if (s.current === 0 && s.prevMonth === 0 && s.sameMonthLastYear === 0) {
+        delete stats[dept];
+        return;
+      }
       s.variationVsPrevMonth = s.prevMonth > 0 ? ((s.current - s.prevMonth) / s.prevMonth) * 100 : null;
       s.variationVsLastYear = s.sameMonthLastYear > 0 ? ((s.current - s.sameMonthLastYear) / s.sameMonthLastYear) * 100 : null;
       s.diffVsPrevMonth = s.prevMonth > 0 ? s.current - s.prevMonth : null;
       s.diffVsLastYear = s.sameMonthLastYear > 0 ? s.current - s.sameMonthLastYear : null;
     });
-    
+
     return stats;
   }, [employees, chartData, departmentMapping]);
   
@@ -3155,6 +3212,10 @@ L'équipe Salarize`;
       if (!stats[d]) stats[d] = { total: 0, count: 0 };
       stats[d].total += e.totalCost;
       stats[d].count++;
+    });
+    // Filtrer les départements avec un coût total de 0
+    Object.keys(stats).forEach(dept => {
+      if (stats[dept].total === 0) delete stats[dept];
     });
     return stats;
   }, [filtered, departmentMapping]);
@@ -3314,13 +3375,25 @@ L'équipe Salarize`;
   // === OPTIMISATIONS GESTIONNAIRE DÉPARTEMENTS ===
   // Liste de tous les départements uniques (memoïsée)
   const allDepartments = useMemo(() => {
-    return [...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))].sort();
-  }, [employees, departmentMapping]);
+    // Get all departments from employees
+    const depts = [...new Set(employees.map(e => e.department || departmentMapping[e.name]).filter(Boolean))];
 
-  // Employés uniques avec leur département actuel (memoïsée)
+    // Filter out departments with no employees (based on filtered data)
+    const deptsWithEmployees = depts.filter(dept => {
+      const hasEmployees = filtered.some(e => (e.department || departmentMapping[e.name]) === dept);
+      return hasEmployees;
+    });
+
+    // Add manually created departments that don't have employees yet
+    const allDepts = [...new Set([...deptsWithEmployees, ...createdDepartments])];
+
+    return allDepts.sort();
+  }, [employees, departmentMapping, filtered, createdDepartments]);
+
+  // Employés uniques avec leur département actuel (memoïsée) - basé sur filtered
   const uniqueEmployeesWithDept = useMemo(() => {
     const seen = new Map();
-    employees.forEach(e => {
+    filtered.forEach(e => {
       if (!seen.has(e.name)) {
         seen.set(e.name, {
           ...e,
@@ -3329,7 +3402,7 @@ L'équipe Salarize`;
       }
     });
     return [...seen.values()];
-  }, [employees, departmentMapping]);
+  }, [filtered, departmentMapping]);
 
   // Stats du gestionnaire de départements (memoïsées)
   const deptManagerStats = useMemo(() => {
@@ -4574,16 +4647,20 @@ L'équipe Salarize`;
                             department: e.department === renameDeptOld ? renameDeptNew : e.department
                           }));
                           
+                          // Mettre à jour createdDepartments si le département renommé y était
+                          const updatedCreatedDepts = createdDepartments.map(d => d === renameDeptOld ? renameDeptNew : d);
+                          setCreatedDepartments(updatedCreatedDepts);
+
                           setDepartmentMapping(newMapping);
                           setEmployees(newEmps);
-                          
+
                           const newCompanies = {
                             ...companies,
-                            [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
+                            [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping, createdDepartments: updatedCreatedDepts }
                           };
                           setCompanies(newCompanies);
                           saveAll(newCompanies, activeCompany);
-                          
+
                           setShowRenameDept(false);
                           setRenameDeptOld('');
                           setRenameDeptNew('');
@@ -4649,17 +4726,21 @@ L'équipe Salarize`;
                           }));
                           
                           const count = employees.filter(e => (e.department || departmentMapping[e.name]) === mergeDeptFrom).length;
-                          
+
+                          // Supprimer le département fusionné de createdDepartments
+                          const updatedCreatedDepts = createdDepartments.filter(d => d !== mergeDeptFrom);
+                          setCreatedDepartments(updatedCreatedDepts);
+
                           setDepartmentMapping(newMapping);
                           setEmployees(newEmps);
-                          
+
                           const newCompanies = {
                             ...companies,
-                            [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
+                            [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping, createdDepartments: updatedCreatedDepts }
                           };
                           setCompanies(newCompanies);
                           saveAll(newCompanies, activeCompany);
-                          
+
                           setShowMergeDept(false);
                           setMergeDeptFrom('');
                           setMergeDeptTo('');
@@ -4724,12 +4805,23 @@ L'équipe Salarize`;
                       <button
                         onClick={() => {
                           if (!newDeptName.trim()) return;
-                          
-                          // Le département existe déjà dans le mapping ? Non, on l'ajoute juste pour qu'il soit disponible
-                          // En fait, les départements sont créés automatiquement quand on assigne un employé
-                          // Donc on va juste afficher un message de succès et le département sera disponible dans les selects
-                          toast.success(`Département "${newDeptName.trim()}" disponible pour assignation`);
-                          
+
+                          // Ajouter le département à la liste des départements créés manuellement
+                          const deptName = newDeptName.trim();
+                          if (!createdDepartments.includes(deptName) && !allDepartments.includes(deptName)) {
+                            const newCreatedDepts = [...createdDepartments, deptName];
+                            setCreatedDepartments(newCreatedDepts);
+
+                            // Sauvegarder dans la société
+                            const newCompanies = {
+                              ...companies,
+                              [activeCompany]: { ...companies[activeCompany], createdDepartments: newCreatedDepts }
+                            };
+                            setCompanies(newCompanies);
+                            saveAll(newCompanies, activeCompany);
+                          }
+                          toast.success(`Département "${deptName}" créé et disponible pour assignation`);
+
                           setShowCreateDept(false);
                           setNewDeptName('');
                         }}
@@ -4739,7 +4831,7 @@ L'équipe Salarize`;
                         Créer
                       </button>
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">Note: Le département sera visible une fois qu'un employé y sera assigné.</p>
+                    <p className="text-xs text-slate-500 mt-2">Le département sera immédiatement disponible dans les listes.</p>
                   </div>
                 )}
                 
@@ -4777,14 +4869,18 @@ L'équipe Salarize`;
                         setDepartmentMapping(newMapping);
                         setEmployees(newEmps);
                         
+                        // Retirer le département des createdDepartments s'il y est (il a maintenant des employés)
+                        const updatedCreatedDepts = createdDepartments.filter(d => d !== bulkAssignDept);
+                        setCreatedDepartments(updatedCreatedDepts);
+
                         const newCompanies = {
                           ...companies,
-                          [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
+                          [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping, createdDepartments: updatedCreatedDepts }
                         };
                         setCompanies(newCompanies);
                         companiesRef.current = newCompanies; // Update ref immediately
                         saveAll(newCompanies, activeCompany);
-                        
+
                         toast.success(`${selectedEmployees.size} employé(s) assigné(s) à ${bulkAssignDept}`);
                         setSelectedEmployees(new Set());
                         setBulkAssignDept('');
@@ -4930,32 +5026,25 @@ L'équipe Salarize`;
                           value={emp.currentDept || ''}
                           onChange={e => {
                             const newDept = e.target.value || null;
-                            
-                            const newMapping = { ...departmentMapping };
-                            if (newDept) {
-                              newMapping[emp.name] = newDept;
-                            } else {
-                              delete newMapping[emp.name];
-                            }
-                        
-                            const newEmps = employees.map(em => 
-                              em.name === emp.name ? { ...em, department: newDept } : em
-                            );
-                            
-                            setDepartmentMapping(newMapping);
-                            setEmployees(newEmps);
-                            
-                            const newCompanies = {
-                              ...companies,
-                              [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping }
-                            };
-                            setCompanies(newCompanies);
-                            companiesRef.current = newCompanies; // Update ref immediately
-                            debouncedSaveAll(newCompanies, activeCompany);
+                            // Si même département, ne rien faire
+                            if (newDept === emp.currentDept) return;
+
+                            // Calculer le coût total de l'employé sur les périodes filtrées (cohérent avec le dashboard)
+                            const empCost = filtered
+                              .filter(em => em.name === emp.name)
+                              .reduce((sum, em) => sum + (em.totalCost || 0), 0);
+
+                            // Ouvrir le modal de confirmation
+                            setPendingDeptChange({
+                              empName: emp.name,
+                              oldDept: emp.currentDept,
+                              newDept: newDept,
+                              empCost: empCost
+                            });
                           }}
                           className={`w-44 px-3 py-2 border rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                            emp.currentDept 
-                              ? 'border-slate-200 bg-white hover:border-slate-300' 
+                            emp.currentDept
+                              ? 'border-slate-200 bg-white hover:border-slate-300'
                               : 'border-amber-300 bg-amber-50 text-amber-700'
                           }`}
                         >
@@ -5012,7 +5101,139 @@ L'équipe Salarize`;
           </div>
         </div>
       )}
-      
+
+      {/* Modal de confirmation de changement de département */}
+      {pendingDeptChange && (
+        <div
+          className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+          onClick={() => setPendingDeptChange(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 p-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">Confirmer le transfert</h3>
+                  <p className="text-white/70 text-sm">Changement de département</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-5">
+              <div className="text-center mb-4">
+                <p className="text-slate-800 font-semibold text-lg">{pendingDeptChange.empName}</p>
+              </div>
+
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className={`px-4 py-2 rounded-xl text-sm font-medium ${
+                  pendingDeptChange.oldDept
+                    ? 'bg-slate-100 text-slate-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {pendingDeptChange.oldDept || 'Non assigné'}
+                </div>
+                <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+                <div className={`px-4 py-2 rounded-xl text-sm font-medium ${
+                  pendingDeptChange.newDept
+                    ? 'bg-violet-100 text-violet-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {pendingDeptChange.newDept || 'Non assigné'}
+                </div>
+              </div>
+
+              {/* Info sur le coût */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-blue-800 text-sm font-medium">Impact sur les statistiques</p>
+                    <p className="text-blue-600 text-xs mt-1">
+                      Le coût de <strong>€{pendingDeptChange.empCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</strong> sera transféré
+                      {pendingDeptChange.oldDept && ` de "${pendingDeptChange.oldDept}"`} vers "{pendingDeptChange.newDept || 'Non assigné'}".
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-slate-500 text-xs text-center">
+                Cette action modifiera les statistiques du dashboard.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 p-5 bg-slate-50 border-t border-slate-100">
+              <button
+                onClick={() => setPendingDeptChange(null)}
+                className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  const { empName, newDept } = pendingDeptChange;
+                  console.log(`[Salarize] === DEPARTMENT CHANGE START ===`);
+                  console.log(`[Salarize] Employee: ${empName}, New Dept: ${newDept}`);
+
+                  const newMapping = { ...departmentMapping };
+                  if (newDept) {
+                    newMapping[empName] = newDept;
+                  } else {
+                    delete newMapping[empName];
+                  }
+                  console.log(`[Salarize] New mapping for ${empName}:`, newMapping[empName]);
+
+                  const newEmps = employees.map(em =>
+                    em.name === empName ? { ...em, department: newDept } : em
+                  );
+                  console.log(`[Salarize] Updated ${newEmps.filter(e => e.name === empName).length} employee records`);
+
+                  // Retirer le département des createdDepartments s'il y est
+                  const updatedCreatedDepts = newDept ? createdDepartments.filter(d => d !== newDept) : createdDepartments;
+                  setCreatedDepartments(updatedCreatedDepts);
+
+                  setDepartmentMapping(newMapping);
+                  setEmployees(newEmps);
+
+                  const newCompanies = {
+                    ...companies,
+                    [activeCompany]: { ...companies[activeCompany], employees: newEmps, mapping: newMapping, createdDepartments: updatedCreatedDepts }
+                  };
+                  setCompanies(newCompanies);
+                  companiesRef.current = newCompanies;
+
+                  console.log(`[Salarize] Companies ref updated, mapping entries:`, Object.keys(newCompanies[activeCompany].mapping || {}).length);
+                  console.log(`[Salarize] Mapping value for ${empName}:`, newCompanies[activeCompany].mapping?.[empName]);
+
+                  // Sauvegarder et attendre la fin
+                  await saveAll(newCompanies, activeCompany);
+                  console.log(`[Salarize] === DEPARTMENT CHANGE SAVED ===`);
+
+                  toast.success(`${empName} transféré vers ${newDept || 'Non assigné'}`);
+                  setPendingDeptChange(null);
+                }}
+                className="flex-1 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition-colors"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="lg:ml-64 pt-4 lg:pt-6 flex-1 p-4 lg:p-6">
         {/* Loading overlay quand on recharge les données */}
         {isLoadingData && employees.length > 0 && (
@@ -5249,8 +5470,8 @@ L'équipe Salarize`;
           </div>
         </div>
         
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* KPI Cards - 3 colonnes */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
@@ -5261,8 +5482,9 @@ L'équipe Salarize`;
               <span className="text-sm font-medium text-slate-500">Coût Total</span>
             </div>
             <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+            <p className="text-xs text-slate-400 mt-1">~€{filteredPeriodsCount > 0 ? (totalCost / filteredPeriodsCount).toLocaleString('fr-BE', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : 0} / mois</p>
           </div>
-          
+
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
@@ -5272,10 +5494,10 @@ L'équipe Salarize`;
               </div>
               <span className="text-sm font-medium text-slate-500">Employés</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">{uniqueNames}</p>
-            <p className="text-xs text-slate-400 mt-1">Actifs sur la période</p>
+            <p className="text-2xl font-bold text-slate-800">{avgEmployeesPerPeriod}</p>
+            <p className="text-xs text-slate-400 mt-1">moyenne / mois</p>
           </div>
-          
+
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
@@ -5286,20 +5508,6 @@ L'équipe Salarize`;
               <span className="text-sm font-medium text-slate-500">Départements</span>
             </div>
             <p className="text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
-            <p className="text-xs text-slate-400 mt-1">{[...new Set(filtered.map(e => e.department).filter(Boolean))][0] || 'Aucun'} en tête</p>
-          </div>
-          
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium text-slate-500">Coût Moyen</span>
-            </div>
-            <p className="text-2xl font-bold text-slate-800">€{avgMonthlyCostPerEmployee.toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-            <p className="text-xs text-slate-400 mt-1">Mensuel par employé</p>
           </div>
         </div>
 
