@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(findstr:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(timeout:*)"
+    ]
+  }
+}
