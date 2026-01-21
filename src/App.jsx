@@ -9099,7 +9099,7 @@ L'équipe Salarize`;
                       }, 0);
                       
                       return (
-                        <details key={year} className="bg-slate-50 rounded-lg" open>
+                        <details key={year} className="bg-slate-50 rounded-lg" open={true}>
                           <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100 rounded-lg">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-slate-800">{year}</span>
@@ -9385,52 +9385,59 @@ L'équipe Salarize`;
         {/* Departments - Avec analyse comparative */}
         {visibleKpis.deptBreakdown && (
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-5">
             <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Filtre de période (mois) */}
               {periods.length > 0 && (
                 <select
                   value={deptSelectedPeriod || ''}
                   onChange={e => setDeptSelectedPeriod(e.target.value || null)}
-                  className="px-2 sm:px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-xs sm:text-sm"
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white text-sm font-medium"
                 >
                   {[...periods].sort((a, b) => b.localeCompare(a)).map(p => (
                     <option key={p} value={p}>{formatPeriod(p)}</option>
                   ))}
                 </select>
               )}
-              <span className="text-xs text-slate-400 hidden sm:inline">{sortedDepts.length} dép.</span>
             </div>
           </div>
           
-          {/* Cartes comparatives des totaux */}
+          {/* Cartes comparatives des totaux - Design amélioré */}
           {deptComparison && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              {/* Période actuelle */}
-              <div className="bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl p-4 text-white">
-                <p className="text-violet-200 text-xs mb-1">{formatPeriod(deptComparison.selectedPeriod)}</p>
-                <p className="text-xl font-bold">€{deptComparison.currentTotal?.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {/* Période actuelle - Violet */}
+              <div className="bg-violet-50 border-2 border-violet-200 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full bg-violet-500"></div>
+                  <p className="text-violet-600 text-xs font-medium">{formatPeriod(deptComparison.selectedPeriod)}</p>
+                </div>
+                <p className="text-2xl font-bold text-violet-700">€{deptComparison.currentTotal?.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
               </div>
               
-              {/* Mois précédent */}
-              <div className={`rounded-xl p-4 ${deptComparison.prevMonthPeriod ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                <p className={`text-xs mb-1 ${deptComparison.prevMonthPeriod ? 'text-slate-400' : ''}`}>
-                  {deptComparison.prevMonthPeriod ? formatPeriod(deptComparison.prevMonthPeriod) : 'Mois précédent'}
-                </p>
-                <p className="text-xl font-bold">
+              {/* Mois précédent - Bleu */}
+              <div className={`rounded-xl p-4 ${deptComparison.prevMonthPeriod ? 'bg-blue-50 border-2 border-blue-200' : 'bg-slate-50 border-2 border-slate-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-3 h-3 rounded-full ${deptComparison.prevMonthPeriod ? 'bg-blue-500' : 'bg-slate-300'}`}></div>
+                  <p className={`text-xs font-medium ${deptComparison.prevMonthPeriod ? 'text-blue-600' : 'text-slate-400'}`}>
+                    {deptComparison.prevMonthPeriod ? formatPeriod(deptComparison.prevMonthPeriod) : 'Mois précédent'}
+                  </p>
+                </div>
+                <p className={`text-2xl font-bold ${deptComparison.prevMonthPeriod ? 'text-blue-700' : 'text-slate-300'}`}>
                   {deptComparison.prevMonthTotal !== null 
                     ? `€${deptComparison.prevMonthTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}`
                     : 'N/A'}
                 </p>
               </div>
               
-              {/* Même mois année précédente */}
-              <div className={`rounded-xl p-4 ${deptComparison.lastYearPeriod ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                <p className={`text-xs mb-1 ${deptComparison.lastYearPeriod ? 'text-slate-400' : ''}`}>
-                  {deptComparison.lastYearPeriod ? formatPeriod(deptComparison.lastYearPeriod) : 'Année précédente'}
-                </p>
-                <p className="text-xl font-bold">
+              {/* Année précédente - Cyan */}
+              <div className={`rounded-xl p-4 ${deptComparison.lastYearPeriod ? 'bg-cyan-50 border-2 border-cyan-200' : 'bg-slate-50 border-2 border-slate-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-3 h-3 rounded-full ${deptComparison.lastYearPeriod ? 'bg-cyan-500' : 'bg-slate-300'}`}></div>
+                  <p className={`text-xs font-medium ${deptComparison.lastYearPeriod ? 'text-cyan-600' : 'text-slate-400'}`}>
+                    {deptComparison.lastYearPeriod ? formatPeriod(deptComparison.lastYearPeriod) : 'Année précédente'}
+                  </p>
+                </div>
+                <p className={`text-2xl font-bold ${deptComparison.lastYearPeriod ? 'text-cyan-700' : 'text-slate-300'}`}>
                   {deptComparison.lastYearTotal !== null 
                     ? `€${deptComparison.lastYearTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}`
                     : 'N/A'}
@@ -9439,129 +9446,113 @@ L'équipe Salarize`;
             </div>
           )}
           
-          {/* Header de colonnes */}
-          <div className="hidden lg:flex items-center gap-2 py-2 mb-2 border-b border-slate-100 text-xs font-medium text-slate-400">
-            <div className="w-36 flex-shrink-0">Département</div>
-            <div className="flex-1">Répartition</div>
-            <div className="w-20 text-center">{deptComparison ? formatPeriod(deptComparison.selectedPeriod).split(' ')[0] : 'Actuel'}</div>
-            <div className="w-20 text-center">{deptComparison?.prevMonthPeriod ? formatPeriod(deptComparison.prevMonthPeriod).split(' ')[0] : 'M-1'}</div>
-            <div className="w-20 text-center">{deptComparison?.lastYearPeriod ? formatPeriod(deptComparison.lastYearPeriod).split(' ')[0].substring(0,3) + ' ' + (parseInt(deptComparison.selectedPeriod?.substring(0,4)) - 1) : 'N-1'}</div>
-            <div className="w-16 text-right">Évol.</div>
-          </div>
-          
-          <div className="space-y-2">
-            {deptComparison && Object.entries(deptComparison.departments)
-              .sort((a, b) => (b[1].current?.percentage || 0) - (a[1].current?.percentage || 0))
-              .map(([dept, data]) => {
-                const currentPct = data.current?.percentage || 0;
-                const prevPct = data.prevMonth?.percentage || 0;
-                const lastYearPct = data.lastYear?.percentage || 0;
-                const maxPct = Math.max(currentPct, prevPct, lastYearPct, 1);
-                
-                return (
-                  <div key={dept} className="py-2 border-b border-slate-50 last:border-0">
-                    {/* Desktop */}
-                    <div className="hidden lg:flex items-center gap-2">
-                      <div className="w-36 flex-shrink-0">
-                        <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
-                        <span className="text-xs text-slate-400">{data.current?.count || 0} emp.</span>
-                      </div>
-                      
-                      {/* Barres comparatives */}
-                      <div className="flex-1 space-y-1">
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full bg-violet-500 transition-all" 
-                            style={{ width: `${(currentPct / maxPct) * 100}%` }} 
-                          />
-                        </div>
-                        {data.prevMonth && (
-                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full bg-slate-400 transition-all" 
-                              style={{ width: `${(prevPct / maxPct) * 100}%` }} 
-                            />
-                          </div>
-                        )}
-                        {data.lastYear && (
-                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full bg-slate-300 transition-all" 
-                              style={{ width: `${(lastYearPct / maxPct) * 100}%` }} 
-                            />
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Pourcentages */}
-                      <div className="w-20 text-center">
-                        <span className="font-bold text-violet-600 text-sm">{currentPct.toFixed(1)}%</span>
-                      </div>
-                      <div className="w-20 text-center">
-                        <span className="text-slate-500 text-sm">{data.prevMonth ? `${prevPct.toFixed(1)}%` : '-'}</span>
-                      </div>
-                      <div className="w-20 text-center">
-                        <span className="text-slate-400 text-sm">{data.lastYear ? `${lastYearPct.toFixed(1)}%` : '-'}</span>
-                      </div>
-                      
-                      {/* Évolution vs mois précédent */}
-                      <div className="w-16 text-right">
-                        {data.pctChange !== null ? (
-                          <span className={`text-xs font-semibold ${data.pctChange >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                            {data.pctChange >= 0 ? '↑' : '↓'}{Math.abs(data.pctChange).toFixed(1)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">-</span>
-                        )}
-                      </div>
-                    </div>
+          {/* Tableau des départements - Design amélioré */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Département</th>
+                  <th className="text-left py-3 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell" style={{width: '30%'}}>Part</th>
+                  <th className="text-right py-3 px-2 text-xs font-semibold text-violet-600 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-violet-500"></span>
+                      Actuel
+                    </span>
+                  </th>
+                  <th className="text-right py-3 px-2 text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      M-1
+                    </span>
+                  </th>
+                  <th className="text-right py-3 px-2 text-xs font-semibold text-cyan-600 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+                      N-1
+                    </span>
+                  </th>
+                  <th className="text-right py-3 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Δ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deptComparison && Object.entries(deptComparison.departments)
+                  .sort((a, b) => (b[1].current?.percentage || 0) - (a[1].current?.percentage || 0))
+                  .map(([dept, data], index) => {
+                    const currentPct = data.current?.percentage || 0;
+                    const prevPct = data.prevMonth?.percentage || 0;
+                    const lastYearPct = data.lastYear?.percentage || 0;
+                    const currentTotal = data.current?.total || 0;
+                    const prevTotal = data.prevMonth?.total || 0;
+                    const lastYearTotal = data.lastYear?.total || 0;
                     
-                    {/* Mobile */}
-                    <div className="lg:hidden">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="font-medium text-slate-700 text-sm">{dept}</span>
-                          <span className="text-xs text-slate-400 ml-2">{data.current?.count || 0} emp.</span>
-                        </div>
-                        <span className="font-bold text-violet-600">{currentPct.toFixed(1)}%</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        {data.prevMonth && (
-                          <span>M-1: {prevPct.toFixed(1)}%</span>
-                        )}
-                        {data.lastYear && (
-                          <span>N-1: {lastYearPct.toFixed(1)}%</span>
-                        )}
-                        {data.pctChange !== null && (
-                          <span className={`font-semibold ${data.pctChange >= 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                            {data.pctChange >= 0 ? '↑' : '↓'}{Math.abs(data.pctChange).toFixed(1)}pt
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-          
-          {/* Légende */}
-          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-4 text-xs text-slate-400">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-violet-500"></div>
-              <span>{deptComparison ? formatPeriod(deptComparison.selectedPeriod) : 'Actuel'}</span>
-            </div>
-            {deptComparison?.prevMonthPeriod && (
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded bg-slate-400"></div>
-                <span>{formatPeriod(deptComparison.prevMonthPeriod)}</span>
-              </div>
-            )}
-            {deptComparison?.lastYearPeriod && (
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-2 rounded bg-slate-300"></div>
-                <span>{formatPeriod(deptComparison.lastYearPeriod)}</span>
-              </div>
-            )}
+                    return (
+                      <tr key={dept} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                        {/* Département */}
+                        <td className="py-3 px-2">
+                          <div className="font-medium text-slate-800">{dept}</div>
+                          <div className="text-xs text-slate-400">{data.current?.count || 0} employés</div>
+                        </td>
+                        
+                        {/* Barre de progression */}
+                        <td className="py-3 px-2 hidden md:table-cell">
+                          <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-violet-400 transition-all duration-500" 
+                              style={{ width: `${Math.min(currentPct * 2, 100)}%` }} 
+                            />
+                          </div>
+                        </td>
+                        
+                        {/* Actuel (Violet) */}
+                        <td className="py-3 px-2 text-right">
+                          <div className="font-bold text-violet-600">{currentPct.toFixed(1)}%</div>
+                          <div className="text-xs text-slate-500">€{currentTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                        </td>
+                        
+                        {/* M-1 (Bleu) */}
+                        <td className="py-3 px-2 text-right">
+                          {data.prevMonth ? (
+                            <>
+                              <div className="font-medium text-blue-600">{prevPct.toFixed(1)}%</div>
+                              <div className="text-xs text-slate-400">€{prevTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                            </>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        
+                        {/* N-1 (Cyan) */}
+                        <td className="py-3 px-2 text-right">
+                          {data.lastYear ? (
+                            <>
+                              <div className="font-medium text-cyan-600">{lastYearPct.toFixed(1)}%</div>
+                              <div className="text-xs text-slate-400">€{lastYearTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                            </>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        
+                        {/* Évolution */}
+                        <td className="py-3 px-2 text-right">
+                          {data.pctChange !== null ? (
+                            <span className={`inline-flex items-center gap-0.5 px-2 py-1 rounded-full text-xs font-bold ${
+                              data.pctChange >= 0 
+                                ? 'bg-red-100 text-red-600' 
+                                : 'bg-emerald-100 text-emerald-600'
+                            }`}>
+                              {data.pctChange >= 0 ? '↑' : '↓'}
+                              {Math.abs(data.pctChange).toFixed(1)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
           </div>
         </div>
         )}
