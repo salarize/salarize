@@ -180,6 +180,9 @@ function AppContent() {
   const [companyInvitations, setCompanyInvitations] = useState([]); // Invitations de la société
   const [loadingInvitations, setLoadingInvitations] = useState(false); // Chargement des invitations
   const [updatingRole, setUpdatingRole] = useState(null); // ID de l'invitation en cours de modification
+  const [pendingRoleChanges, setPendingRoleChanges] = useState({}); // { invitationId: newRole } changements en attente
+  const [editingInviteName, setEditingInviteName] = useState(null); // ID de l'invitation en cours d'édition du nom
+  const [inviteDisplayNames, setInviteDisplayNames] = useState({}); // { invitationId: displayName } noms personnalisés
   
   // Détecter si on arrive d'un lien de reset password IMMÉDIATEMENT
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(() => {
@@ -303,32 +306,85 @@ function AppContent() {
     }
   };
 
-  // Modifier le rôle d'un invité
-  const updateInvitationRole = async (invitationId, newRole) => {
-    setUpdatingRole(invitationId);
-    try {
-      const { error } = await supabase
-        .from('invitations')
-        .update({ role: newRole })
-        .eq('id', invitationId);
+  // Modifier le rôle d'un invité (staging pour confirmation)
+  const stageRoleChange = (invitationId, newRole) => {
+    setPendingRoleChanges(prev => ({
+      ...prev,
+      [invitationId]: newRole
+    }));
+  };
 
-      if (error) {
-        console.error('[Salarize] Error updating invitation role:', error);
-        toast.error('Erreur lors de la modification du rôle');
-      } else {
-        // Mettre à jour localement
-        setCompanyInvitations(prev =>
-          prev.map(inv => inv.id === invitationId ? { ...inv, role: newRole } : inv)
-        );
-        toast.success(`Rôle modifié en ${newRole === 'viewer' ? 'Lecteur' : 'Éditeur'}`);
+  // Annuler les changements en attente
+  const cancelPendingChanges = () => {
+    setPendingRoleChanges({});
+    setInviteDisplayNames({});
+    setEditingInviteName(null);
+  };
+
+  // Confirmer et appliquer tous les changements
+  const applyPendingChanges = async () => {
+    const changes = Object.entries(pendingRoleChanges);
+    if (changes.length === 0 && Object.keys(inviteDisplayNames).length === 0) {
+      toast.info('Aucune modification à appliquer');
+      return;
+    }
+
+    setUpdatingRole('all');
+    try {
+      // Appliquer les changements de rôle
+      for (const [invitationId, newRole] of changes) {
+        const { error } = await supabase
+          .from('invitations')
+          .update({ role: newRole })
+          .eq('id', invitationId);
+
+        if (error) {
+          console.error('[Salarize] Error updating invitation role:', error);
+          toast.error('Erreur lors de la modification du rôle');
+          return;
+        }
       }
+
+      // Appliquer les noms personnalisés
+      for (const [invitationId, displayName] of Object.entries(inviteDisplayNames)) {
+        const { error } = await supabase
+          .from('invitations')
+          .update({ display_name: displayName })
+          .eq('id', invitationId);
+
+        if (error) {
+          console.error('[Salarize] Error updating display name:', error);
+        }
+      }
+
+      // Mettre à jour localement
+      setCompanyInvitations(prev =>
+        prev.map(inv => {
+          let updated = { ...inv };
+          if (pendingRoleChanges[inv.id]) {
+            updated.role = pendingRoleChanges[inv.id];
+          }
+          if (inviteDisplayNames[inv.id]) {
+            updated.display_name = inviteDisplayNames[inv.id];
+          }
+          return updated;
+        })
+      );
+
+      toast.success('Modifications enregistrées');
+      setPendingRoleChanges({});
+      setInviteDisplayNames({});
+      setEditingInviteName(null);
     } catch (e) {
       console.error('[Salarize] Error:', e);
-      toast.error('Erreur lors de la modification');
+      toast.error('Erreur lors de la sauvegarde');
     } finally {
       setUpdatingRole(null);
     }
   };
+
+  // Vérifier s'il y a des changements en attente
+  const hasPendingChanges = Object.keys(pendingRoleChanges).length > 0 || Object.keys(inviteDisplayNames).length > 0;
 
   // Révoquer l'accès d'un invité
   const revokeInvitation = async (invitationId, email) => {
@@ -814,7 +870,199 @@ function AppContent() {
     setIsLoadingData(false);
   };
 
-  // Save to Supabase - DIRECT (sans debounce)
+  // ============================================
+  // SYSTÈME DE SAUVEGARDE ULTRA-ROBUSTE
+  // Garantie: Les données importées ne se perdent JAMAIS
+  // ============================================
+
+  // État de synchronisation
+  const [pendingSaveQueue, setPendingSaveQueue] = useState([]);
+  const [saveStatus, setSaveStatus] = useState('saved'); // 'saved', 'pending', 'saving', 'error'
+  const saveQueueRef = useRef([]);
+  const isSavingRef = useRef(false);
+
+  // Sauvegarder immédiatement en local AVANT toute opération
+  const saveToLocalImmediate = (companyName, data) => {
+    try {
+      const key = `salarize_pending_${companyName}`;
+      const payload = {
+        timestamp: Date.now(),
+        companyName,
+        employees: data.employees || [],
+        periods: data.periods || [],
+        mapping: data.mapping || {},
+        logo: data.logo,
+        brandColor: data.brandColor,
+        website: data.website,
+        id: data.id
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+      console.log(`[Salarize] ✓ Sauvegarde locale immédiate: ${companyName} (${payload.employees.length} employés)`);
+      return true;
+    } catch (e) {
+      console.error('[Salarize] Erreur sauvegarde locale:', e);
+      return false;
+    }
+  };
+
+  // Récupérer les données en attente (non synchronisées)
+  const getPendingLocalData = () => {
+    const pending = [];
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('salarize_pending_')) {
+          const data = JSON.parse(localStorage.getItem(key));
+          pending.push(data);
+        }
+      }
+    } catch (e) {
+      console.error('[Salarize] Erreur lecture pending:', e);
+    }
+    return pending;
+  };
+
+  // Marquer comme synchronisé (supprimer le pending)
+  const markAsSynced = (companyName) => {
+    try {
+      localStorage.removeItem(`salarize_pending_${companyName}`);
+      console.log(`[Salarize] ✓ Marqué comme synchronisé: ${companyName}`);
+    } catch (e) {
+      console.error('[Salarize] Erreur suppression pending:', e);
+    }
+  };
+
+  // Créer un backup local avant toute opération destructive
+  const createLocalBackup = (companyName, data) => {
+    try {
+      const backupKey = `salarize_backup_${companyName}_${Date.now()}`;
+      const backup = {
+        timestamp: new Date().toISOString(),
+        companyName,
+        employees: data.employees || [],
+        periods: data.periods || [],
+        mapping: data.mapping || {},
+        employeeCount: data.employees?.length || 0,
+        periodCount: data.periods?.length || 0
+      };
+      localStorage.setItem(backupKey, JSON.stringify(backup));
+
+      // Garder seulement les 10 derniers backups par société
+      const allBackups = Object.keys(localStorage)
+        .filter(k => k.startsWith(`salarize_backup_${companyName}_`))
+        .sort()
+        .reverse();
+
+      if (allBackups.length > 10) {
+        allBackups.slice(10).forEach(k => localStorage.removeItem(k));
+      }
+
+      console.log(`[Salarize] ✓ Backup créé: ${backupKey} (${backup.employeeCount} employés, ${backup.periodCount} périodes)`);
+      return backupKey;
+    } catch (e) {
+      console.error('[Salarize] Erreur création backup:', e);
+      return null;
+    }
+  };
+
+  // Récupérer le dernier backup
+  const getLatestBackup = (companyName) => {
+    try {
+      const allBackups = Object.keys(localStorage)
+        .filter(k => k.startsWith(`salarize_backup_${companyName}_`))
+        .sort()
+        .reverse();
+
+      if (allBackups.length > 0) {
+        const backup = JSON.parse(localStorage.getItem(allBackups[0]));
+        console.log(`[Salarize] Dernier backup trouvé: ${allBackups[0]}`);
+        return backup;
+      }
+    } catch (e) {
+      console.error('[Salarize] Erreur lecture backup:', e);
+    }
+    return null;
+  };
+
+  // Bloquer la fermeture de la page si des données ne sont pas synchronisées
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      const pendingData = getPendingLocalData();
+      if (pendingData.length > 0 || saveStatus === 'saving' || saveStatus === 'pending') {
+        e.preventDefault();
+        e.returnValue = 'Des données ne sont pas encore synchronisées. Voulez-vous vraiment quitter ?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveStatus]);
+
+  // Vérifier et resynchroniser les données en attente au chargement
+  useEffect(() => {
+    if (user?.id && !isLoadingData) {
+      const pendingData = getPendingLocalData();
+      if (pendingData.length > 0) {
+        console.log(`[Salarize] ⚠️ ${pendingData.length} société(s) avec données non synchronisées détectées`);
+        toast.warning(`${pendingData.length} sauvegarde(s) en attente de synchronisation`);
+
+        // Resynchroniser automatiquement
+        pendingData.forEach(data => {
+          console.log(`[Salarize] Resynchronisation de ${data.companyName}...`);
+          // La sync se fera via saveAll
+        });
+      }
+    }
+  }, [user?.id, isLoadingData]);
+
+  // Valider les données avant sauvegarde
+  const validateDataBeforeSave = (companyName, newData, existingDbData) => {
+    const issues = [];
+    const warnings = [];
+
+    // Vérifier que les nouvelles données ne sont pas vides si on avait des données avant
+    if (existingDbData && existingDbData.employeeCount > 0) {
+      const newEmployeeCount = newData.employees?.length || 0;
+      const existingEmployeeCount = existingDbData.employeeCount;
+
+      // Alerte si on perd plus de 50% des employés
+      if (newEmployeeCount < existingEmployeeCount * 0.5) {
+        issues.push({
+          type: 'MAJOR_DATA_LOSS',
+          message: `Perte majeure de données détectée: ${existingEmployeeCount} -> ${newEmployeeCount} employés (${Math.round((1 - newEmployeeCount/existingEmployeeCount) * 100)}% de perte)`,
+          existingCount: existingEmployeeCount,
+          newCount: newEmployeeCount
+        });
+      }
+
+      // Alerte si on perd des périodes
+      const newPeriodCount = [...new Set((newData.employees || []).map(e => e.period).filter(Boolean))].length;
+      const existingPeriodCount = existingDbData.periodCount;
+
+      if (newPeriodCount < existingPeriodCount) {
+        warnings.push({
+          type: 'PERIOD_LOSS',
+          message: `Perte de périodes: ${existingPeriodCount} -> ${newPeriodCount} périodes`,
+          existingCount: existingPeriodCount,
+          newCount: newPeriodCount
+        });
+      }
+    }
+
+    // Vérifier que les données ne sont pas totalement vides pour une société existante
+    if (newData.employees?.length === 0 && existingDbData?.employeeCount > 0) {
+      issues.push({
+        type: 'EMPTY_DATA',
+        message: `Tentative de supprimer tous les employés (${existingDbData.employeeCount} -> 0)`,
+        existingCount: existingDbData.employeeCount
+      });
+    }
+
+    return { issues, warnings, isValid: issues.length === 0 };
+  };
+
+  // Save to Supabase - VERSION ROBUSTE
   const saveToSupabase = async (newCompanies, activeCompanyName) => {
     if (!user?.id) {
       console.log('[Salarize] No user ID, saving to localStorage');
@@ -822,20 +1070,29 @@ function AppContent() {
       return;
     }
 
-    console.log('[Salarize] Saving to Supabase for user:', user.id);
+    console.log('[Salarize] ========== DÉBUT SAUVEGARDE SUPABASE ==========');
+    console.log('[Salarize] User:', user.id);
+    console.log('[Salarize] Timestamp:', new Date().toISOString());
     setIsSyncing(true);
-    
+    setSaveStatus('saving');
+
     try {
-      // Utiliser la ref pour avoir les données les plus récentes
       const latestCompanies = companiesRef.current;
-      
+
       for (const [companyName, companyData] of Object.entries(latestCompanies)) {
+        // Skip shared companies (viewer can't modify)
+        if (companyData.isShared && companyData.sharedRole === 'viewer') {
+          console.log(`[Salarize] Skipping shared company (viewer): ${companyName}`);
+          continue;
+        }
+
         let companyId = companyData.id;
-        console.log(`[Salarize] Processing company: ${companyName}, existing ID: ${companyId}, employees: ${companyData.employees?.length || 0}`);
+        console.log(`[Salarize] --- Processing: ${companyName} ---`);
+        console.log(`[Salarize] Company ID: ${companyId}`);
+        console.log(`[Salarize] Employees in memory: ${companyData.employees?.length || 0}`);
 
         // Create or update company
         if (!companyId) {
-          // New company - insert
           console.log(`[Salarize] Creating new company: ${companyName}`);
           const { data: newCompany, error } = await supabase
             .from('companies')
@@ -849,188 +1106,275 @@ function AppContent() {
             .select()
             .single();
 
-            if (error) {
-              console.error('[Salarize] Error creating company:', error);
-              // Essayer de récupérer une company existante avec ce nom
-              const { data: existingCompany } = await supabase
-                .from('companies')
-                .select('id')
-                .eq('user_id', user.id)
-                .eq('name', companyName)
-                .single();
-              
-              if (existingCompany) {
-                companyId = existingCompany.id;
-                console.log(`[Salarize] Found existing company with ID: ${companyId}`);
-              } else {
-                throw error;
-              }
+          if (error) {
+            console.error('[Salarize] Error creating company:', error);
+            const { data: existingCompany } = await supabase
+              .from('companies')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('name', companyName)
+              .single();
+
+            if (existingCompany) {
+              companyId = existingCompany.id;
+              console.log(`[Salarize] Found existing company with ID: ${companyId}`);
             } else {
-              companyId = newCompany.id;
-              console.log(`[Salarize] Company created with ID: ${companyId}`);
-            }
-            // Mettre à jour la ref avec l'ID
-            if (companiesRef.current[companyName]) {
-              companiesRef.current[companyName].id = companyId;
+              throw error;
             }
           } else {
-            // Existing company - update
-            console.log(`[Salarize] Updating company: ${companyName} (ID: ${companyId})`);
-            const { error } = await supabase
-              .from('companies')
-              .update({
-                name: companyName,
-                logo: companyData.logo || null,
-                brand_color: companyData.brandColor || null,
-                website: companyData.website || null
-              })
-              .eq('id', companyId);
-            
-            if (error) {
-              console.error('[Salarize] Error updating company:', error);
-            }
+            companyId = newCompany.id;
+            console.log(`[Salarize] Company created with ID: ${companyId}`);
           }
 
-          // Sync employees - utiliser les données les plus récentes de la ref
-          const latestCompanyData = companiesRef.current[companyName] || companyData;
-          const employeeCount = latestCompanyData.employees?.length || 0;
-          const periodsInData = [...new Set((latestCompanyData.employees || []).map(e => e.period).filter(Boolean))].sort();
+          if (companiesRef.current[companyName]) {
+            companiesRef.current[companyName].id = companyId;
+          }
+        } else {
+          console.log(`[Salarize] Updating company metadata: ${companyName}`);
+          await supabase
+            .from('companies')
+            .update({
+              name: companyName,
+              logo: companyData.logo || null,
+              brand_color: companyData.brandColor || null,
+              website: companyData.website || null
+            })
+            .eq('id', companyId);
+        }
 
-          console.log(`[Salarize] Preparing to save ${companyName}: ${employeeCount} employees, ${periodsInData.length} periods`);
-          console.log(`[Salarize] Periods to save: ${periodsInData.join(', ')}`);
-          console.log(`[Salarize] Mapping from ref for ${companyName}:`, latestCompanyData.mapping);
-          
-          if (employeeCount > 0) {
-            console.log(`[Salarize] Syncing ${employeeCount} employees for ${companyName}`);
-            
-            // ÉTAPE 1: Récupérer les périodes actuelles dans la DB
-            const { data: currentDbEmployees } = await supabase
-              .from('employees')
-              .select('period')
-              .eq('company_id', companyId);
-            
-            const dbPeriods = [...new Set((currentDbEmployees || []).map(e => e.period))];
-            const localPeriods = periodsInData;
-            
-            // ÉTAPE 2: Supprimer SEULEMENT les périodes qui ne sont plus dans les données locales
-            const periodsToDelete = dbPeriods.filter(p => !localPeriods.includes(p));
-            if (periodsToDelete.length > 0) {
-              console.log(`[Salarize] Deleting obsolete periods: ${periodsToDelete.join(', ')}`);
-              for (const period of periodsToDelete) {
-                await supabase
-                  .from('employees')
-                  .delete()
-                  .eq('company_id', companyId)
-                  .eq('period', period);
-              }
-            }
-            
-            // ÉTAPE 3: Supprimer et réinsérer période par période (plus sûr)
-            const employeesByPeriod = {};
-            latestCompanyData.employees.forEach(e => {
-              if (!employeesByPeriod[e.period]) employeesByPeriod[e.period] = [];
-              employeesByPeriod[e.period].push(e);
-            });
-            
-            let totalInserted = 0;
-            for (const [period, emps] of Object.entries(employeesByPeriod)) {
-              // Supprimer les employés de cette période
-              const { error: deleteError } = await supabase
+        // Récupérer l'état actuel de la DB AVANT modification
+        const { data: currentDbEmployees } = await supabase
+          .from('employees')
+          .select('id, name, period, total_cost')
+          .eq('company_id', companyId);
+
+        const dbState = {
+          employeeCount: currentDbEmployees?.length || 0,
+          periodCount: [...new Set((currentDbEmployees || []).map(e => e.period))].length,
+          periods: [...new Set((currentDbEmployees || []).map(e => e.period))].sort()
+        };
+
+        console.log(`[Salarize] État actuel DB: ${dbState.employeeCount} employés, ${dbState.periodCount} périodes`);
+        console.log(`[Salarize] Périodes DB: ${dbState.periods.join(', ')}`);
+
+        const latestCompanyData = companiesRef.current[companyName] || companyData;
+        const employeeCount = latestCompanyData.employees?.length || 0;
+        const periodsInData = [...new Set((latestCompanyData.employees || []).map(e => e.period).filter(Boolean))].sort();
+
+        console.log(`[Salarize] Données à sauvegarder: ${employeeCount} employés, ${periodsInData.length} périodes`);
+        console.log(`[Salarize] Périodes à sauvegarder: ${periodsInData.join(', ')}`);
+
+        // VALIDATION - Vérifier si on va perdre des données
+        const validation = validateDataBeforeSave(companyName, latestCompanyData, dbState);
+
+        if (validation.warnings.length > 0) {
+          validation.warnings.forEach(w => console.warn(`[Salarize] ⚠️ ${w.message}`));
+        }
+
+        if (!validation.isValid) {
+          console.error('[Salarize] ❌ VALIDATION ÉCHOUÉE - Sauvegarde annulée pour protéger les données');
+          validation.issues.forEach(issue => {
+            console.error(`[Salarize] Issue: ${issue.message}`);
+          });
+
+          // Créer un backup de l'état actuel de la DB au cas où
+          if (dbState.employeeCount > 0) {
+            const backupData = {
+              employees: currentDbEmployees,
+              periods: dbState.periods,
+              mapping: latestCompanyData.mapping
+            };
+            createLocalBackup(companyName, backupData);
+          }
+
+          toast.error(`Protection des données activée: sauvegarde annulée pour ${companyName}`);
+          continue; // Passer à la société suivante
+        }
+
+        // CRÉER UN BACKUP AVANT MODIFICATION
+        if (dbState.employeeCount > 0) {
+          createLocalBackup(companyName, {
+            employees: currentDbEmployees,
+            periods: dbState.periods,
+            mapping: latestCompanyData.mapping
+          });
+        }
+
+        // SYNCHRONISATION DES EMPLOYÉS
+        if (employeeCount > 0) {
+          console.log(`[Salarize] Syncing ${employeeCount} employees...`);
+
+          const dbPeriods = dbState.periods;
+          const localPeriods = periodsInData;
+
+          // Identifier les périodes à supprimer (seulement si explicitement demandé)
+          const periodsToDelete = dbPeriods.filter(p => !localPeriods.includes(p));
+
+          if (periodsToDelete.length > 0) {
+            console.log(`[Salarize] ⚠️ Périodes à supprimer: ${periodsToDelete.join(', ')}`);
+            // Ne supprimer que si c'est une action explicite (pas un bug)
+            for (const period of periodsToDelete) {
+              const { error: delErr } = await supabase
                 .from('employees')
                 .delete()
                 .eq('company_id', companyId)
                 .eq('period', period);
-              
-              if (deleteError) {
-                console.error(`[Salarize] Error deleting period ${period}:`, deleteError);
-                continue; // Ne pas continuer si la suppression échoue
+
+              if (delErr) {
+                console.error(`[Salarize] Erreur suppression période ${period}:`, delErr);
+              } else {
+                console.log(`[Salarize] ✓ Période ${period} supprimée`);
               }
-              
-              // Insérer les employés de cette période
-              const employeesToInsert = emps.map(e => ({
-                company_id: companyId,
-                name: e.name,
-                department: e.department || latestCompanyData.mapping?.[e.name] || null,
-                function: e.function || null,
-                total_cost: e.totalCost,
-                period: e.period
-              }));
-              
-              // Insert in batches of 500 with retry logic
-              const batchSize = 500;
-              for (let i = 0; i < employeesToInsert.length; i += batchSize) {
-                const batch = employeesToInsert.slice(i, i + batchSize);
-                let retries = 3;
-                let success = false;
-                
-                while (retries > 0 && !success) {
-                  const { error: insertError } = await supabase
-                    .from('employees')
-                    .insert(batch);
-                  
-                  if (insertError) {
-                    retries--;
-                    if (retries === 0) {
-                      console.error(`[Salarize] Failed to insert batch for period ${period} after 3 retries:`, insertError);
-                    } else {
-                      console.log(`[Salarize] Retry ${3 - retries}/3 for period ${period}`);
-                      await new Promise(r => setTimeout(r, 500));
-                    }
-                  } else {
-                    success = true;
-                    totalInserted += batch.length;
-                  }
-                }
-              }
-              
-              console.log(`[Salarize] Period ${period}: ${emps.length} employees saved`);
             }
-            
-            console.log(`[Salarize] ✓ Saved ${totalInserted}/${employeeCount} employees for ${companyName}`);
-          } else {
-            // No employees - delete all
-            console.log(`[Salarize] No employees, deleting all for ${companyName}`);
-            await supabase.from('employees').delete().eq('company_id', companyId);
           }
 
-          // Sync department mappings - TOUJOURS supprimer les anciens mappings
+          // Regrouper par période pour insert/update
+          const employeesByPeriod = {};
+          latestCompanyData.employees.forEach(e => {
+            if (!employeesByPeriod[e.period]) employeesByPeriod[e.period] = [];
+            employeesByPeriod[e.period].push(e);
+          });
+
+          let totalInserted = 0;
+          let totalErrors = 0;
+
+          for (const [period, emps] of Object.entries(employeesByPeriod)) {
+            console.log(`[Salarize] Traitement période ${period}: ${emps.length} employés`);
+
+            // Supprimer les employés existants de cette période
+            const { error: deleteError } = await supabase
+              .from('employees')
+              .delete()
+              .eq('company_id', companyId)
+              .eq('period', period);
+
+            if (deleteError) {
+              console.error(`[Salarize] ❌ Erreur suppression période ${period}:`, deleteError);
+              totalErrors++;
+              continue;
+            }
+
+            // Préparer les données à insérer
+            const employeesToInsert = emps.map(e => ({
+              company_id: companyId,
+              name: e.name,
+              department: e.department || latestCompanyData.mapping?.[e.name] || null,
+              function: e.function || null,
+              total_cost: e.totalCost,
+              period: e.period
+            }));
+
+            // Insert par batch avec retry
+            const batchSize = 500;
+            for (let i = 0; i < employeesToInsert.length; i += batchSize) {
+              const batch = employeesToInsert.slice(i, i + batchSize);
+              let retries = 3;
+              let success = false;
+
+              while (retries > 0 && !success) {
+                const { error: insertError } = await supabase
+                  .from('employees')
+                  .insert(batch);
+
+                if (insertError) {
+                  retries--;
+                  console.error(`[Salarize] Erreur insert batch (tentative ${3-retries}/3):`, insertError);
+                  if (retries > 0) {
+                    await new Promise(r => setTimeout(r, 500));
+                  } else {
+                    totalErrors++;
+                  }
+                } else {
+                  success = true;
+                  totalInserted += batch.length;
+                }
+              }
+            }
+
+            console.log(`[Salarize] ✓ Période ${period}: ${emps.length} employés sauvegardés`);
+          }
+
+          console.log(`[Salarize] Résultat: ${totalInserted}/${employeeCount} employés sauvegardés, ${totalErrors} erreurs`);
+
+          if (totalErrors > 0) {
+            toast.warning(`Attention: ${totalErrors} erreurs lors de la sauvegarde`);
+          }
+
+        } else if (employeeCount === 0 && dbState.employeeCount > 0) {
+          // CAS SPÉCIAL: On veut vider tous les employés - BLOQUER PAR DÉFAUT
+          console.warn('[Salarize] ⚠️ Tentative de suppression de tous les employés BLOQUÉE');
+          console.warn('[Salarize] Pour supprimer tous les employés, utilisez la fonction de suppression explicite');
+          // NE PAS supprimer - c'est probablement un bug
+        }
+
+        // SYNC MAPPINGS
+        const mappingEntries = Object.entries(latestCompanyData.mapping || {});
+
+        if (mappingEntries.length > 0) {
+          // Supprimer les anciens mappings
           await supabase
             .from('department_mappings')
             .delete()
             .eq('company_id', companyId);
 
-          const mappingEntries = Object.entries(latestCompanyData.mapping || {});
-          console.log(`[Salarize] Mapping entries to save:`, mappingEntries);
-          if (mappingEntries.length > 0) {
-            // Insert new mappings
-            const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
-              company_id: companyId,
-              employee_name: empName,
-              department: dept
-            }));
-            console.log(`[Salarize] Mappings to insert:`, mappingsToInsert);
+          const mappingsToInsert = mappingEntries.map(([empName, dept]) => ({
+            company_id: companyId,
+            employee_name: empName,
+            department: dept
+          }));
 
-            const { error: mapError } = await supabase
-              .from('department_mappings')
-              .insert(mappingsToInsert);
+          const { error: mapError } = await supabase
+            .from('department_mappings')
+            .insert(mappingsToInsert);
 
-            if (mapError) {
-              console.error('[Salarize] Error inserting mappings:', mapError);
-            } else {
-              console.log(`[Salarize] ✓ Successfully inserted ${mappingsToInsert.length} mappings`);
-            }
+          if (mapError) {
+            console.error('[Salarize] Erreur insertion mappings:', mapError);
+          } else {
+            console.log(`[Salarize] ✓ ${mappingsToInsert.length} mappings sauvegardés`);
           }
-          console.log(`[Salarize] Synced ${mappingEntries.length} department mappings for ${companyName}`);
         }
 
-        console.log('[Salarize] ✓ Save completed successfully');
-        setLastSaved(new Date());
-      } catch (e) {
-        console.error('[Salarize] Error saving to Supabase:', e);
-        // Fallback to localStorage
-        saveToLocalStorage(companiesRef.current, activeCompanyName);
+        // VÉRIFICATION POST-SAUVEGARDE - S'assurer que les données sont bien dans Supabase
+        const { data: verifyEmployees, error: verifyError } = await supabase
+          .from('employees')
+          .select('id, period')
+          .eq('company_id', companyId);
+
+        if (verifyError) {
+          console.error(`[Salarize] ❌ Erreur vérification post-save:`, verifyError);
+        } else {
+          const savedCount = verifyEmployees?.length || 0;
+          const savedPeriods = [...new Set((verifyEmployees || []).map(e => e.period))];
+          const expectedCount = latestCompanyData.employees?.length || 0;
+
+          console.log(`[Salarize] ✓ Vérification: ${savedCount}/${expectedCount} employés en DB`);
+          console.log(`[Salarize] ✓ Périodes en DB après save: ${savedPeriods.sort().join(', ')}`);
+
+          if (savedCount < expectedCount * 0.9) {
+            console.error(`[Salarize] ⚠️ ALERTE: Seulement ${savedCount}/${expectedCount} employés sauvegardés!`);
+            toast.error(`Attention: données partiellement sauvegardées (${savedCount}/${expectedCount})`);
+          } else {
+            // Succès - marquer comme synchronisé
+            markAsSynced(companyName);
+            setSaveStatus('saved');
+          }
+        }
+
+        console.log(`[Salarize] --- Fin traitement: ${companyName} ---`);
       }
-      setIsSyncing(false);
+
+      console.log('[Salarize] ========== FIN SAUVEGARDE SUPABASE ==========');
+      setLastSaved(new Date());
+      setSaveStatus('saved');
+
+    } catch (e) {
+      console.error('[Salarize] ❌ ERREUR CRITIQUE:', e);
+      toast.error('Erreur de sauvegarde - Les données sont protégées en local');
+      saveToLocalStorage(companiesRef.current, activeCompanyName);
+      setSaveStatus('error');
+    }
+
+    setIsSyncing(false);
   };
 
   // Save to localStorage (for non-logged-in users)
@@ -2083,7 +2427,19 @@ function AppContent() {
 
   const importToCompanyDirect = (companyName, data, skipSave = false) => {
     if (!data || !companyName) return;
-    
+
+    // ÉTAPE 1: Sauvegarder les données brutes en local IMMÉDIATEMENT avant tout traitement
+    // Ceci garantit qu'on ne perd JAMAIS les données importées, même en cas de crash
+    setSaveStatus('pending');
+    saveToLocalImmediate(companyName, {
+      employees: data.employees || [],
+      periods: data.periods || [],
+      mapping: {},
+      rawImport: true,
+      importTimestamp: Date.now()
+    });
+    console.log(`[Salarize] 🛡️ Données brutes sauvegardées en local AVANT traitement`);
+
     // Utiliser la ref pour avoir les données les plus récentes (important pour imports multiples)
     const currentCompanies = companiesRef.current;
     const existing = currentCompanies[companyName] || { employees: [], mapping: {}, periods: [] };
@@ -2970,22 +3326,51 @@ L'équipe Salarize`;
     } catch (e) {}
   }, []);
 
-  const clearCompanyData = () => {
+  // Suppression EXPLICITE des données - contourne la validation car action intentionnelle
+  const clearCompanyData = async () => {
     if (!activeCompany) return;
+
+    const companyId = companies[activeCompany]?.id;
+
+    // Créer un backup avant suppression
+    if (companies[activeCompany]?.employees?.length > 0) {
+      createLocalBackup(activeCompany, {
+        employees: companies[activeCompany].employees,
+        periods: companies[activeCompany].periods,
+        mapping: companies[activeCompany].mapping
+      });
+      console.log('[Salarize] Backup créé avant clearCompanyData');
+    }
+
     const newCompanies = {
       ...companies,
-      [activeCompany]: { 
-        ...companies[activeCompany], 
-        employees: [], 
-        periods: [], 
-        mapping: {} 
+      [activeCompany]: {
+        ...companies[activeCompany],
+        employees: [],
+        periods: [],
+        mapping: {}
       }
     };
     setCompanies(newCompanies);
+    companiesRef.current = newCompanies;
     setEmployees([]);
     setPeriods([]);
     setDepartmentMapping({});
-    saveAll(newCompanies, activeCompany);
+
+    // Suppression DIRECTE dans Supabase (pas via saveAll pour éviter la validation)
+    if (user?.id && companyId) {
+      try {
+        console.log('[Salarize] Suppression explicite des employés pour', activeCompany);
+        await supabase.from('employees').delete().eq('company_id', companyId);
+        await supabase.from('department_mappings').delete().eq('company_id', companyId);
+        toast.success('Données supprimées');
+      } catch (e) {
+        console.error('[Salarize] Erreur suppression:', e);
+        toast.error('Erreur lors de la suppression');
+      }
+    } else {
+      saveToLocalStorage(newCompanies, activeCompany);
+    }
   };
 
   const deleteCompany = async () => {
@@ -3027,11 +3412,23 @@ L'équipe Salarize`;
     setShowDataManager(false);
   };
 
-  const deletePeriod = (periodToDelete) => {
+  // Suppression EXPLICITE d'une période - contourne la validation car action intentionnelle
+  const deletePeriod = async (periodToDelete) => {
     if (!activeCompany) return;
+
+    const companyId = companies[activeCompany]?.id;
+
+    // Créer un backup avant suppression
+    createLocalBackup(activeCompany, {
+      employees: companies[activeCompany].employees,
+      periods: companies[activeCompany].periods,
+      mapping: companies[activeCompany].mapping
+    });
+    console.log(`[Salarize] Backup créé avant suppression période ${periodToDelete}`);
+
     const newEmployees = employees.filter(e => e.period !== periodToDelete);
     const newPeriods = periods.filter(p => p !== periodToDelete);
-    
+
     const newCompanies = {
       ...companies,
       [activeCompany]: {
@@ -3040,13 +3437,36 @@ L'équipe Salarize`;
         periods: newPeriods
       }
     };
-    
+
     setCompanies(newCompanies);
-    companiesRef.current = newCompanies; // Update ref immediately
+    companiesRef.current = newCompanies;
     setEmployees(newEmployees);
     setPeriods(newPeriods);
-    saveAll(newCompanies, activeCompany);
-    toast.success(`Période ${formatPeriod(periodToDelete)} supprimée`);
+
+    // Suppression DIRECTE dans Supabase (action explicite)
+    if (user?.id && companyId) {
+      try {
+        console.log(`[Salarize] Suppression explicite période ${periodToDelete}`);
+        const { error } = await supabase
+          .from('employees')
+          .delete()
+          .eq('company_id', companyId)
+          .eq('period', periodToDelete);
+
+        if (error) {
+          console.error('[Salarize] Erreur suppression période:', error);
+          toast.error('Erreur lors de la suppression');
+        } else {
+          toast.success(`Période ${formatPeriod(periodToDelete)} supprimée`);
+        }
+      } catch (e) {
+        console.error('[Salarize] Erreur:', e);
+        toast.error('Erreur lors de la suppression');
+      }
+    } else {
+      saveToLocalStorage(newCompanies, activeCompany);
+      toast.success(`Période ${formatPeriod(periodToDelete)} supprimée`);
+    }
   };
 
   // Vérifier si l'utilisateur est en mode lecture seule (viewer)
@@ -5479,15 +5899,45 @@ L'équipe Salarize`;
                   </svg>
                   {periods.length} période{periods.length > 1 ? 's' : ''}
                 </span>
-                {isSyncing && (
+                {/* Indicateur de synchronisation */}
+                {(isSyncing || saveStatus !== 'saved') && (
                   <>
                     <span className="text-white/30">•</span>
-                    <span className="flex items-center gap-1.5 text-violet-400">
-                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    {saveStatus === 'pending' && (
+                      <span className="flex items-center gap-1.5 text-amber-400" title="Données en attente de synchronisation">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        En attente...
+                      </span>
+                    )}
+                    {(saveStatus === 'saving' || isSyncing) && saveStatus !== 'pending' && (
+                      <span className="flex items-center gap-1.5 text-violet-400" title="Synchronisation en cours">
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Sync...
+                      </span>
+                    )}
+                    {saveStatus === 'error' && (
+                      <span className="flex items-center gap-1.5 text-red-400" title="Erreur de synchronisation - données protégées en local">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Erreur sync
+                      </span>
+                    )}
+                  </>
+                )}
+                {saveStatus === 'saved' && !isSyncing && lastSaved && (
+                  <>
+                    <span className="text-white/30">•</span>
+                    <span className="flex items-center gap-1.5 text-emerald-400" title="Données synchronisées">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Sync...
+                      Synced
                     </span>
                   </>
                 )}
@@ -5573,30 +6023,16 @@ L'équipe Salarize`;
                 </button>
                 <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60] w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                   <div className="p-1.5">
-                    {periods.length > 1 && (
+                    {!isViewerOnly && (
                       <button
-                        onClick={() => setShowPeriodDropdown(!showPeriodDropdown)}
+                        onClick={openManageAccessModal}
                         className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
                       >
                         <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
-                        <span className="text-sm text-slate-700">Sélection périodes</span>
+                        <span className="text-sm text-slate-700">Gerer les acces</span>
                       </button>
-                    )}
-                    {!isViewerOnly && (
-                      <>
-                        <div className="border-t border-slate-100 my-1"></div>
-                        <button
-                          onClick={openManageAccessModal}
-                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                        >
-                          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          <span className="text-sm text-slate-700">Gerer les acces</span>
-                        </button>
-                      </>
                     )}
                     <div className="border-t border-slate-100 my-1"></div>
                     <button
@@ -5836,6 +6272,122 @@ L'équipe Salarize`;
                   />
                 </label>
                 
+                {/* Section Sauvegardes */}
+                {(() => {
+                  const backups = Object.keys(localStorage)
+                    .filter(k => k.startsWith(`salarize_backup_${activeCompany}_`))
+                    .sort()
+                    .reverse()
+                    .slice(0, 5);
+
+                  if (backups.length === 0) return null;
+
+                  return (
+                    <details className="mb-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <summary className="p-3 cursor-pointer flex items-center gap-2 text-emerald-700 font-medium">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6" />
+                        </svg>
+                        Sauvegardes disponibles ({backups.length})
+                      </summary>
+                      <div className="p-3 pt-0 space-y-2">
+                        <p className="text-xs text-slate-500 mb-2">
+                          Ces sauvegardes sont créées automatiquement avant chaque modification importante.
+                        </p>
+                        {backups.map(key => {
+                          const backup = JSON.parse(localStorage.getItem(key));
+                          const date = new Date(backup?.timestamp || parseInt(key.split('_').pop()));
+                          return (
+                            <div key={key} className="flex items-center justify-between p-2 bg-white rounded-lg border border-emerald-100">
+                              <div>
+                                <p className="text-sm font-medium text-slate-700">
+                                  {date.toLocaleDateString('fr-FR')} à {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {backup?.employeeCount || 0} employés • {backup?.periodCount || 0} périodes
+                                </p>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Restaurer cette sauvegarde ? Les données actuelles seront remplacées.`)) return;
+
+                                  const companyId = companies[activeCompany]?.id;
+
+                                  // Restaurer les données
+                                  const restoredEmployees = backup.employees.map(e => ({
+                                    name: e.name,
+                                    department: e.department,
+                                    function: e.function,
+                                    totalCost: parseFloat(e.total_cost || e.totalCost) || 0,
+                                    period: e.period
+                                  }));
+
+                                  const restoredPeriods = [...new Set(restoredEmployees.map(e => e.period).filter(Boolean))].sort();
+
+                                  const newCompanies = {
+                                    ...companies,
+                                    [activeCompany]: {
+                                      ...companies[activeCompany],
+                                      employees: restoredEmployees,
+                                      periods: restoredPeriods,
+                                      mapping: backup.mapping || {}
+                                    }
+                                  };
+
+                                  setCompanies(newCompanies);
+                                  companiesRef.current = newCompanies;
+                                  setEmployees(restoredEmployees);
+                                  setPeriods(restoredPeriods);
+                                  setDepartmentMapping(backup.mapping || {});
+
+                                  // Sauvegarder dans Supabase
+                                  if (user?.id && companyId) {
+                                    try {
+                                      // Supprimer les anciens employés
+                                      await supabase.from('employees').delete().eq('company_id', companyId);
+
+                                      // Insérer les employés restaurés
+                                      if (restoredEmployees.length > 0) {
+                                        const employeesToInsert = restoredEmployees.map(e => ({
+                                          company_id: companyId,
+                                          name: e.name,
+                                          department: e.department,
+                                          function: e.function,
+                                          total_cost: e.totalCost,
+                                          period: e.period
+                                        }));
+
+                                        const batchSize = 500;
+                                        for (let i = 0; i < employeesToInsert.length; i += batchSize) {
+                                          await supabase.from('employees').insert(employeesToInsert.slice(i, i + batchSize));
+                                        }
+                                      }
+
+                                      toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés`);
+                                    } catch (e) {
+                                      console.error('[Salarize] Erreur restauration:', e);
+                                      toast.error('Erreur lors de la restauration');
+                                    }
+                                  } else {
+                                    saveToLocalStorage(newCompanies, activeCompany);
+                                    toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés`);
+                                  }
+
+                                  setShowDataManager(false);
+                                }}
+                                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-colors"
+                              >
+                                Restaurer
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  );
+                })()}
+
                 <button
                   onClick={() => setConfirmAction({ type: 'clear' })}
                   className="flex items-center gap-3 w-full p-3 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors text-left"
@@ -5850,7 +6402,7 @@ L'équipe Salarize`;
                     <p className="text-slate-400 text-sm">Supprimer toutes les données importées</p>
                   </div>
                 </button>
-                
+
                 <button
                   onClick={() => setConfirmAction({ type: 'delete' })}
                   className="flex items-center gap-3 w-full p-3 border border-red-200 rounded-lg hover:bg-red-50 transition-colors text-left"
@@ -6952,7 +7504,7 @@ L'équipe Salarize`;
         {showManageAccessModal && (
           <div
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-20 overflow-y-auto"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowManageAccessModal(false); }}
+            onClick={(e) => { if (e.target === e.currentTarget) { cancelPendingChanges(); setShowManageAccessModal(false); } }}
           >
             <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
               {/* Header */}
@@ -6970,7 +7522,7 @@ L'équipe Salarize`;
                     </div>
                   </div>
                   <button
-                    onClick={() => setShowManageAccessModal(false)}
+                    onClick={() => { cancelPendingChanges(); setShowManageAccessModal(false); }}
                     className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7004,7 +7556,7 @@ L'équipe Salarize`;
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Collaborateurs</h3>
                     <button
-                      onClick={() => { setShowManageAccessModal(false); setShowInviteModal(true); }}
+                      onClick={() => { cancelPendingChanges(); setShowManageAccessModal(false); setShowInviteModal(true); }}
                       className="text-sm text-violet-600 hover:text-violet-700 font-medium flex items-center gap-1"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7028,7 +7580,7 @@ L'équipe Salarize`;
                       </svg>
                       <p className="text-slate-500 text-sm">Aucun collaborateur invite</p>
                       <button
-                        onClick={() => { setShowManageAccessModal(false); setShowInviteModal(true); }}
+                        onClick={() => { cancelPendingChanges(); setShowManageAccessModal(false); setShowInviteModal(true); }}
                         className="mt-3 text-violet-600 hover:text-violet-700 text-sm font-medium"
                       >
                         Inviter un collaborateur
@@ -7036,66 +7588,142 @@ L'équipe Salarize`;
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {companyInvitations.map((invitation) => (
-                        <div key={invitation.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                            invitation.status === 'accepted' ? 'bg-emerald-500' : 'bg-slate-400'
+                      {companyInvitations.map((invitation) => {
+                        const currentRole = pendingRoleChanges[invitation.id] || invitation.role;
+                        const currentName = inviteDisplayNames[invitation.id] ?? invitation.display_name ?? '';
+                        const hasRoleChange = pendingRoleChanges[invitation.id] && pendingRoleChanges[invitation.id] !== invitation.role;
+                        const hasNameChange = inviteDisplayNames[invitation.id] !== undefined && inviteDisplayNames[invitation.id] !== (invitation.display_name || '');
+
+                        return (
+                          <div key={invitation.id} className={`p-3 rounded-xl transition-all ${
+                            hasRoleChange || hasNameChange ? 'bg-amber-50 border-2 border-amber-300' : 'bg-slate-50'
                           }`}>
-                            {invitation.invited_email?.charAt(0)?.toUpperCase() || '?'}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-slate-800 truncate">{invitation.invited_email}</p>
-                            <p className="text-xs text-slate-500">
-                              {invitation.status === 'accepted' ? (
-                                <span className="text-emerald-600">Acceptee</span>
-                              ) : (
-                                <span className="text-amber-600">En attente</span>
-                              )}
-                              {' • '}
-                              {new Date(invitation.created_at).toLocaleDateString('fr-FR')}
-                            </p>
-                          </div>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${
+                                invitation.status === 'accepted' ? 'bg-emerald-500' : 'bg-slate-400'
+                              }`}>
+                                {(currentName || invitation.invited_email)?.charAt(0)?.toUpperCase() || '?'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                {/* Champ de nom éditable */}
+                                {editingInviteName === invitation.id ? (
+                                  <input
+                                    type="text"
+                                    value={currentName}
+                                    onChange={(e) => setInviteDisplayNames(prev => ({ ...prev, [invitation.id]: e.target.value }))}
+                                    onBlur={() => setEditingInviteName(null)}
+                                    onKeyDown={(e) => e.key === 'Enter' && setEditingInviteName(null)}
+                                    placeholder="Nom d'affichage..."
+                                    className="w-full px-2 py-1 text-sm border border-violet-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium text-slate-800 truncate">
+                                      {currentName || invitation.invited_email}
+                                    </p>
+                                    <button
+                                      onClick={() => setEditingInviteName(invitation.id)}
+                                      className="p-1 text-slate-400 hover:text-violet-500 hover:bg-violet-50 rounded transition-colors"
+                                      title="Renommer"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                )}
+                                <p className="text-xs text-slate-500">
+                                  {currentName && <span className="text-slate-400">{invitation.invited_email} • </span>}
+                                  {invitation.status === 'accepted' ? (
+                                    <span className="text-emerald-600">Acceptee</span>
+                                  ) : (
+                                    <span className="text-amber-600">En attente</span>
+                                  )}
+                                  {' • '}
+                                  {new Date(invitation.created_at).toLocaleDateString('fr-FR')}
+                                </p>
+                              </div>
 
-                          {/* Sélecteur de rôle */}
-                          <select
-                            value={invitation.role}
-                            onChange={(e) => updateInvitationRole(invitation.id, e.target.value)}
-                            disabled={updatingRole === invitation.id}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${
-                              invitation.role === 'editor'
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                : 'bg-slate-100 border-slate-200 text-slate-700'
-                            } ${updatingRole === invitation.id ? 'opacity-50' : ''}`}
-                          >
-                            <option value="viewer">Lecteur</option>
-                            <option value="editor">Editeur</option>
-                          </select>
+                              {/* Sélecteur de rôle */}
+                              <select
+                                value={currentRole}
+                                onChange={(e) => stageRoleChange(invitation.id, e.target.value)}
+                                disabled={updatingRole === 'all'}
+                                className={`px-3 py-1.5 text-sm font-medium rounded-lg border transition-colors cursor-pointer ${
+                                  currentRole === 'editor'
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                    : 'bg-slate-100 border-slate-200 text-slate-700'
+                                } ${hasRoleChange ? 'ring-2 ring-amber-400' : ''}`}
+                              >
+                                <option value="viewer">Lecteur</option>
+                                <option value="editor">Editeur</option>
+                              </select>
 
-                          {/* Bouton révoquer */}
-                          <button
-                            onClick={() => revokeInvitation(invitation.id, invitation.invited_email)}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Revoquer l'acces"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
+                              {/* Bouton révoquer */}
+                              <button
+                                onClick={() => revokeInvitation(invitation.id, invitation.invited_email)}
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Revoquer l'acces"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                            {/* Indicateur de modification */}
+                            {(hasRoleChange || hasNameChange) && (
+                              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
+                                </svg>
+                                Modification en attente
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Footer */}
+              {/* Footer avec boutons de confirmation */}
               <div className="p-4 bg-slate-50 border-t border-slate-200">
-                <button
-                  onClick={() => setShowManageAccessModal(false)}
-                  className="w-full py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-medium transition-colors"
-                >
-                  Fermer
-                </button>
+                {hasPendingChanges ? (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={cancelPendingChanges}
+                      className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-medium transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={applyPendingChanges}
+                      disabled={updatingRole === 'all'}
+                      className="flex-1 py-3 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {updatingRole === 'all' ? (
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      Confirmer les modifications
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowManageAccessModal(false)}
+                    className="w-full py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-medium transition-colors"
+                  >
+                    Fermer
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -235,9 +235,69 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
             </>
           )}
 
-          {/* Aucune société */}
+          {/* Aucune société - État vide amélioré */}
           {Object.keys(companies).length === 0 && (
-            <p className="text-slate-600 text-sm">Aucune societe</p>
+            <div className="text-center py-6">
+              {/* Illustration */}
+              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-2xl flex items-center justify-center">
+                <svg className="w-10 h-10 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+
+              {/* Message principal */}
+              <h3 className="text-white font-semibold mb-2">Bienvenue sur Salarize !</h3>
+              <p className="text-slate-400 text-sm mb-6 px-2">
+                Commencez par creer votre premiere societe ou importer vos donnees salariales.
+              </p>
+
+              {/* Suggestions d'actions */}
+              <div className="space-y-2 px-2">
+                {!isViewerOnly && (
+                  <>
+                    <button
+                      onClick={onImportClick}
+                      className="w-full flex items-center gap-3 p-3 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 hover:from-violet-500/30 hover:to-fuchsia-500/30 rounded-xl transition-colors text-left group"
+                    >
+                      <div className="w-9 h-9 bg-fuchsia-500/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <svg className="w-4 h-4 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-white text-sm font-medium">Importer un fichier Excel</p>
+                        <p className="text-slate-500 text-xs">Format .xlsx de votre secretariat</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={onAddCompany}
+                      className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-xl transition-colors text-left group"
+                    >
+                      <div className="w-9 h-9 bg-violet-500/30 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-white text-sm font-medium">Creer une societe vide</p>
+                        <p className="text-slate-500 text-xs">Ajouter les donnees plus tard</p>
+                      </div>
+                    </button>
+                  </>
+                )}
+
+                {/* Aide */}
+                <div className="mt-4 p-3 bg-slate-800/30 rounded-xl border border-slate-700/50">
+                  <p className="text-slate-500 text-xs flex items-start gap-2">
+                    <svg className="w-4 h-4 text-slate-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Salarize analyse vos fichiers Excel de paie pour vous donner une vue claire de vos couts salariaux.</span>
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
