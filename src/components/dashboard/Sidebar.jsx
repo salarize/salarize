@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, isViewerOnly, companyOrder, onReorderCompanies }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, isViewerOnly, companyOrder, onReorderCompanies, onTimesheetClick }) {
   const [showActions, setShowActions] = useState(false);
   const [draggedCompany, setDraggedCompany] = useState(null);
   const [dragOverCompany, setDragOverCompany] = useState(null);
@@ -369,6 +369,27 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
               ))}
             </>
           )}
+
+          {/* Bouton Timesheet - Bientot disponible
+          {onTimesheetClick && (
+            <div className="mt-6 pt-4 border-t border-slate-700/50">
+              <button
+                onClick={onTimesheetClick}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 border border-violet-500/30 transition-all group"
+              >
+                <div className="w-8 h-8 bg-violet-500/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <p className="text-white text-sm font-medium">Timesheet</p>
+                  <p className="text-slate-500 text-[10px]">Suivi des heures</p>
+                </div>
+              </button>
+            </div>
+          )}
+          */}
 
           {/* Aucune société - État vide amélioré */}
           {Object.keys(companies).length === 0 && (

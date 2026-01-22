@@ -94,6 +94,9 @@ import {
   CompanySettingsModal
 } from './components/dashboard';
 
+// Components - Timesheet
+import TimesheetPage from './components/timesheet/TimesheetPage';
+
 // Styles
 import './styles/animations.css';
 
@@ -161,6 +164,7 @@ function AppContent() {
   const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
   const companiesRef = useRef({}); // Ref pour tracker companies en temps réel (pour imports multiples)
   const [companyOrder, setCompanyOrder] = useState([]); // Ordre des sociétés dans la sidebar (drag & drop)
+  const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
   const isRecoveryModeRef = useRef(
     typeof window !== 'undefined' && 
@@ -4775,6 +4779,7 @@ L'équipe Salarize`;
             isViewerOnly={isViewerOnly}
             companyOrder={companyOrder}
             onReorderCompanies={handleReorderCompanies}
+            onTimesheetClick={() => setShowTimesheet(true)}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -4861,6 +4866,16 @@ L'équipe Salarize`;
     );
   }
 
+  // Timesheet page
+  if (showTimesheet) {
+    return (
+      <TimesheetPage
+        user={user}
+        onBack={() => setShowTimesheet(false)}
+      />
+    );
+  }
+
   // Dashboard
   return (
     <PageTransition key="dashboard">
@@ -4880,6 +4895,7 @@ L'équipe Salarize`;
           isViewerOnly={isViewerOnly}
           companyOrder={companyOrder}
           onReorderCompanies={handleReorderCompanies}
+          onTimesheetClick={() => { setShowTimesheet(true); setSidebarOpen(false); }}
         />
         <DashboardHeader 
           user={user} 

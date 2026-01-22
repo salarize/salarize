@@ -11,7 +11,9 @@
       "Bash(git push)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(npx eslint:*)",
+      "Bash(node -e:*)"
     ]
   }
 }
