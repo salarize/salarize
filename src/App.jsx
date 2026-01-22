@@ -296,14 +296,17 @@ function AppContent() {
       const companyId = companies[activeCompany].id;
 
       // Vérifier si une invitation existe déjà pour cet email et cette société
-      const { data: existingInvite } = await supabase
+      const { data: existingInvites, error: checkError } = await supabase
         .from('invitations')
         .select('id, status')
         .eq('company_id', companyId)
-        .eq('invited_email', inviteEmail.toLowerCase().trim())
-        .single();
+        .eq('invited_email', inviteEmail.toLowerCase().trim());
 
-      if (existingInvite) {
+      if (checkError) {
+        console.error('[Salarize] Error checking existing invitations:', checkError);
+      }
+
+      if (existingInvites && existingInvites.length > 0) {
         toast.error('Une invitation a déjà été envoyée à cet email pour cette société');
         setSendingInvite(false);
         return;
@@ -329,9 +332,29 @@ function AppContent() {
 
       if (insertError) {
         console.error('[Salarize] Error inserting invitation:', insertError);
-        toast.error('Erreur lors de la création de l\'invitation');
-        setSendingInvite(false);
-        return;
+        // Essayer sans invite_token si la colonne n'existe pas
+        if (insertError.message?.includes('invite_token')) {
+          console.log('[Salarize] Retrying without invite_token column...');
+          const { error: retryError } = await supabase
+            .from('invitations')
+            .insert({
+              company_id: companyId,
+              invited_email: inviteEmail.toLowerCase().trim(),
+              role: inviteRole,
+              status: 'pending',
+              invited_by: user?.id
+            });
+          if (retryError) {
+            console.error('[Salarize] Retry also failed:', retryError);
+            toast.error('Erreur lors de la création de l\'invitation');
+            setSendingInvite(false);
+            return;
+          }
+        } else {
+          toast.error('Erreur lors de la création de l\'invitation');
+          setSendingInvite(false);
+          return;
+        }
       }
 
       // Envoyer l'email via EmailJS
