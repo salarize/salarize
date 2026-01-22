@@ -1742,19 +1742,17 @@ function AppContent() {
   };
   
   const handleAuthSuccess = (userData) => {
+    console.log('[Salarize] Auth success - user_id:', userData?.id, 'provider:', userData?.provider);
     setUser(userData);
     sessionStorage.setItem('salarize_user', JSON.stringify(userData));
     setShowAuthModal(false);
 
-    // Charger les données immédiatement après connexion via AuthModal
-    // (le onAuthStateChange peut ne pas se déclencher si déjà connecté)
-    if (userData?.id && !dataLoadedRef.current) {
+    // Toujours recharger les données après connexion via AuthModal
+    // pour s'assurer que les données correspondent au bon user
+    if (userData?.id) {
       dataLoadedRef.current = true;
       setIsLoadingData(true);
       loadFromSupabase(userData.id);
-    } else if (userData?.id && dataLoadedRef.current) {
-      // Données déjà chargées, aller directement au dashboard
-      setCurrentPage('dashboard');
     }
   };
 

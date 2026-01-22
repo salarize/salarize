@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 
 function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }) {
@@ -18,6 +18,25 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
   const avatarInputRef = useRef(null);
 
   const isGoogleUser = user?.provider === 'google' || user?.picture?.includes('googleusercontent');
+
+  // Verifier si l'utilisateur a deja un mot de passe defini
+  useEffect(() => {
+    const checkHasPassword = async () => {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          // Verifier si l'utilisateur a une identite email (mot de passe defini)
+          const hasEmailIdentity = currentUser.identities?.some(i => i.provider === 'email');
+          // Ou verifier dans app_metadata si un mot de passe a ete defini
+          const hasPasswordSet = currentUser.app_metadata?.providers?.includes('email') || hasEmailIdentity;
+          setHasPassword(hasPasswordSet);
+        }
+      } catch (err) {
+        console.error('Error checking password status:', err);
+      }
+    };
+    checkHasPassword();
+  }, []);
 
   const memberSince = useMemo(() => {
     const months = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'];
@@ -177,6 +196,9 @@ function ProfilePage({ user, onLogout, companies, setCurrentPage, onUpdateUser }
       });
 
       if (error) throw error;
+
+      // Rafraichir la session pour mettre a jour les providers
+      await supabase.auth.refreshSession();
 
       setHasPassword(true);
       setMessage({ type: 'success', text: 'Mot de passe defini avec succes ! Vous pouvez maintenant vous connecter avec votre email et ce mot de passe.' });

@@ -63,7 +63,18 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
         password
       });
 
-      if (error) throw error;
+      if (error) {
+        // Si login echoue, verifier si un compte Google existe avec cet email
+        if (error.message === 'Invalid login credentials') {
+          // Essayer de voir si l'utilisateur existe avec Google
+          // On ne peut pas verifier directement, donc on suggere Google
+          setError('Email ou mot de passe incorrect. Si vous avez un compte Google avec cet email, connectez-vous avec Google.');
+        } else {
+          throw error;
+        }
+        setLoading(false);
+        return;
+      }
 
       if (data.user) {
         // Utiliser le provider réel du compte (peut être google même si login par email)
@@ -81,9 +92,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
         onClose();
       }
     } catch (err) {
-      setError(err.message === 'Invalid login credentials'
-        ? 'Email ou mot de passe incorrect'
-        : err.message);
+      setError(err.message);
     }
     setLoading(false);
   };
