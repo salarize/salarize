@@ -130,32 +130,31 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
           </div>
         </div>
 
-        {/* Quick Actions - Icônes élégantes */}
+        {/* Quick Actions */}
         {!isViewerOnly && (
           <div className="px-4 py-3 border-b border-slate-800/50">
             <div className="flex items-center gap-2">
-              {/* Import */}
+              {/* Import - Action principale */}
               <button
                 onClick={onImportClick}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-xl transition-all group"
-                title="Importer des données"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-xl transition-all group"
+                title="Importer des données Excel"
               >
                 <svg className="w-4 h-4 text-violet-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <span className="text-xs font-medium text-slate-300">Import</span>
+                <span className="text-xs font-medium text-slate-300">Importer Excel</span>
               </button>
 
-              {/* Nouvelle société */}
+              {/* Nouvelle société - Bouton discret (juste icône) */}
               <button
                 onClick={onAddCompany}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 rounded-xl transition-all group"
-                title="Nouvelle société"
+                className="w-10 h-10 flex items-center justify-center bg-slate-800/30 hover:bg-slate-800 border border-slate-700/30 hover:border-slate-600 rounded-xl transition-all group"
+                title="Créer une société vide"
               >
-                <svg className="w-4 h-4 text-slate-400 group-hover:text-violet-400 group-hover:scale-110 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-slate-500 group-hover:text-violet-400 group-hover:scale-110 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-300">Nouveau</span>
               </button>
             </div>
           </div>
@@ -388,16 +387,16 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
         {activeCompany && hasCompanies && (
           <div className="p-4 border-t border-slate-800/50 bg-slate-950/50">
             <div className="flex items-center gap-2">
-              {/* Départements */}
+              {/* Équipes/Départements */}
               <button
                 onClick={onManageDepts}
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-800/70 hover:bg-slate-800 rounded-xl transition-all group"
-                title="Gérer les départements"
+                title="Gérer les équipes et départements"
               >
                 <svg className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-300">Depts</span>
+                <span className="text-xs font-medium text-slate-400 group-hover:text-slate-300">Équipes</span>
               </button>
 
               {/* Paramètres société */}
@@ -411,7 +410,7 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="text-xs font-medium text-slate-400 group-hover:text-slate-300">Config</span>
+                  <span className="text-xs font-medium text-slate-400 group-hover:text-slate-300">Paramètres</span>
                 </button>
               )}
             </div>
