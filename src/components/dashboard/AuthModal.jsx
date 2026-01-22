@@ -66,12 +66,22 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
       if (error) throw error;
 
       if (data.user) {
+        console.log('[Salarize] Email login - user:', data.user);
+        console.log('[Salarize] Email login - user_metadata:', data.user.user_metadata);
+        console.log('[Salarize] Email login - app_metadata:', data.user.app_metadata);
+        console.log('[Salarize] Email login - identities:', data.user.identities);
+
+        // Utiliser le provider réel du compte (peut être google même si login par email)
+        const realProvider = data.user.app_metadata?.provider ||
+                            (data.user.identities?.find(i => i.provider === 'google') ? 'google' : 'email');
+
         onSuccess({
           id: data.user.id,
           email: data.user.email,
-          name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || email.split('@')[0],
-          picture: data.user.user_metadata?.avatar_url || null,
-          provider: 'email'
+          name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || data.user.user_metadata?.full_name || email.split('@')[0],
+          picture: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null,
+          provider: realProvider,
+          created_at: data.user.created_at
         });
         onClose();
       }
