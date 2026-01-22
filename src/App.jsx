@@ -6649,7 +6649,7 @@ L'équipe Salarize`;
                       }, 0);
                       
                       return (
-                        <details key={year} className="bg-slate-50 rounded-lg" open>
+                        <details key={year} className="bg-slate-50 rounded-lg">
                           <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100 rounded-lg">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-slate-800">{year}</span>
@@ -6900,7 +6900,6 @@ L'équipe Salarize`;
                 </div>
                 <div>
                   <h3 className="font-semibold">vs Mois Précédent</h3>
-                  <p className="text-slate-400 text-xs">{comparisonData.current ? formatPeriod(comparisonData.current.period) : 'N/A'}</p>
                 </div>
               </div>
               
@@ -6946,7 +6945,6 @@ L'équipe Salarize`;
                 </div>
                 <div>
                   <h3 className="font-semibold">vs Année Précédente</h3>
-                  <p className="text-violet-200 text-xs">{comparisonData.current ? formatPeriod(comparisonData.current.period) : 'N/A'}</p>
                 </div>
               </div>
               

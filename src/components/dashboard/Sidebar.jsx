@@ -241,16 +241,18 @@ function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onA
                       )}
 
                       {/* Name */}
-                      <span className={`truncate font-medium ${
+                      <span className={`truncate font-medium flex-1 ${
                         activeCompany === name ? 'text-white' : 'text-slate-300'
                       }`}>{name}</span>
 
-                      {/* Owner badge */}
-                      {activeCompany === name && (
-                        <span className="ml-auto px-2 py-0.5 bg-violet-500/30 text-violet-300 text-[10px] font-semibold rounded-full">
-                          OWNER
-                        </span>
-                      )}
+                      {/* Owner badge - always visible */}
+                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                        activeCompany === name
+                          ? 'bg-violet-500/30 text-violet-300'
+                          : 'bg-slate-700/50 text-slate-500'
+                      }`}>
+                        OWNER
+                      </span>
                     </button>
                   </div>
                 ))}
