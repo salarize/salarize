@@ -866,49 +866,63 @@ function AppContent() {
 
       if (pendingInviteToken) {
         console.log('[Salarize] Found pending invite token:', pendingInviteToken);
-        localStorage.removeItem('pending_invite_token'); // Nettoyer
 
-        // Chercher l'invitation par token
+        // Chercher l'invitation par token (pending ou déjà accepted)
         const { data: tokenInvite, error: tokenError } = await supabase
           .from('invitations')
           .select('*')
           .eq('token', pendingInviteToken)
-          .eq('status', 'pending')
           .single();
 
         if (tokenError) {
           console.log('[Salarize] No invitation found for token:', tokenError.message);
+          localStorage.removeItem('pending_invite_token'); // Nettoyer seulement si pas trouvé
         } else if (tokenInvite) {
-          console.log('[Salarize] Found invitation via token for company:', tokenInvite.company_id);
+          console.log('[Salarize] Found invitation via token:', tokenInvite);
           tokenInviteCompanyId = tokenInvite.company_id;
           tokenInviteRole = tokenInvite.role;
 
-          // Accepter l'invitation et mettre à jour l'email (si différent)
-          const { error: updateError } = await supabase
-            .from('invitations')
-            .update({
-              status: 'accepted',
-              accepted_at: new Date().toISOString(),
-              invited_email: userEmail // Mettre à jour avec l'email réel de connexion
-            })
-            .eq('id', tokenInvite.id);
+          // Accepter l'invitation seulement si elle est encore pending
+          if (tokenInvite.status === 'pending') {
+            console.log('[Salarize] Attempting to accept invitation...');
+            const { data: updateData, error: updateError } = await supabase
+              .from('invitations')
+              .update({
+                status: 'accepted',
+                accepted_at: new Date().toISOString(),
+                invited_email: userEmail
+              })
+              .eq('id', tokenInvite.id)
+              .select();
 
-          if (updateError) {
-            console.error('[Salarize] Error accepting token invitation:', updateError);
-          } else {
-            toast.success('Invitation acceptée ! Vous avez maintenant accès à cette société.');
+            console.log('[Salarize] Update result:', { updateData, updateError });
 
-            // Charger directement la société partagée via le token
-            const { data: tokenCompany, error: companyError } = await supabase
-              .from('companies')
-              .select('*')
-              .eq('id', tokenInviteCompanyId)
-              .single();
-
-            if (!companyError && tokenCompany) {
-              console.log('[Salarize] Loaded company from token invite:', tokenCompany.name);
-              sharedCompaniesData.push(tokenCompany);
+            if (updateError) {
+              console.error('[Salarize] Error accepting invitation:', updateError);
+              // Même si l'update échoue, on charge quand même la société
+              // L'utilisateur pourra voir les données si les RLS le permettent
+            } else {
+              toast.success('Invitation acceptée ! Vous avez maintenant accès à cette société.');
             }
+          } else {
+            console.log('[Salarize] Invitation already accepted, status:', tokenInvite.status);
+          }
+
+          // Nettoyer le token maintenant qu'on a traité l'invitation
+          localStorage.removeItem('pending_invite_token');
+
+          // Charger la société partagée via le token (même si update a échoué)
+          const { data: tokenCompany, error: companyError } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('id', tokenInviteCompanyId)
+            .single();
+
+          console.log('[Salarize] Company load result:', { tokenCompany, companyError });
+
+          if (!companyError && tokenCompany) {
+            console.log('[Salarize] Loaded company from token invite:', tokenCompany.name);
+            sharedCompaniesData.push(tokenCompany);
           }
         }
       }
