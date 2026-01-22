@@ -65,6 +65,7 @@ import { ToastProvider, useToast } from './context/ToastContext';
 
 // Components - UI
 import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton } from './components/ui';
+import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
 import { Footer, PageTransition, ErrorBoundary } from './components/layout';
@@ -1116,11 +1117,33 @@ function AppContent() {
         }
       }
 
-      // Load first company if exists
-      const companyNames = Object.keys(loadedCompanies);
-      if (companyNames.length > 0) {
-        console.log('[Salarize] Loading first company:', companyNames[0]);
-        loadCompany(companyNames[0], loadedCompanies);
+      // Load first company if exists (respecting order: own companies first, then shared)
+      const ownCompanies = Object.entries(loadedCompanies)
+        .filter(([_, c]) => !c.isShared)
+        .map(([name]) => name);
+      const sharedCompaniesNames = Object.entries(loadedCompanies)
+        .filter(([_, c]) => c.isShared)
+        .map(([name]) => name);
+
+      // Sort by saved order if available
+      const sortByOrder = (names, order) => {
+        if (!order || order.length === 0) return names;
+        return names.sort((a, b) => {
+          const indexA = order.indexOf(a);
+          const indexB = order.indexOf(b);
+          if (indexA === -1 && indexB === -1) return 0;
+          if (indexA === -1) return 1;
+          if (indexB === -1) return -1;
+          return indexA - indexB;
+        });
+      };
+
+      const orderedOwn = sortByOrder(ownCompanies, supabaseOrder || []);
+      const firstCompany = orderedOwn[0] || sharedCompaniesNames[0];
+
+      if (firstCompany) {
+        console.log('[Salarize] Loading first company:', firstCompany);
+        loadCompany(firstCompany, loadedCompanies);
       }
       
       // Toujours aller au dashboard après le chargement (avec ou sans données)
@@ -3636,8 +3659,8 @@ function AppContent() {
               <div class="dept-row">
                 <div class="dept-name">${dept}</div>
                 <div class="dept-bar-container">
-                  <div class="dept-bar" style="width: ${(data.total / maxDeptCost * 100)}%">
-                    ${(data.total / totalCost * 100).toFixed(1)}%
+                  <div class="dept-bar" style="width: ${maxDeptCost > 0 ? (data.total / maxDeptCost * 100) : 0}%">
+                    ${totalCost > 0 ? (data.total / totalCost * 100).toFixed(1) : '0.0'}%
                   </div>
                 </div>
                 <div class="dept-cost">€${data.total.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</div>
@@ -5689,87 +5712,77 @@ L'équipe Salarize`;
         </div>
       )}
 
-      {/* Department Manager Modal */}
+      {/* Department Manager Modal - Design Notion/Linear */}
       {showDeptManager && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 overflow-y-auto"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto"
           onClick={(e) => { if (e.target === e.currentTarget) { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}}
         >
-          <div className="min-h-full flex items-start justify-center p-4 pt-8 pb-8">
-            <div className="bg-slate-900 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-700/50">
-              {/* Header avec gradient violet/fuchsia */}
-              <div className="relative overflow-hidden">
-                {/* Background gradient */}
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600" />
-                {/* Pattern décoratif */}
-                <div className="absolute inset-0 opacity-10">
-                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full" />
-                  <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-white rounded-full" />
+          <div className="min-h-full flex items-start justify-center p-4 pt-12 pb-8">
+            <div className="bg-slate-900 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-800">
+              {/* Header - Clean & Minimal */}
+              <div className="px-6 py-5 border-b border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">Départements</h2>
+                      <p className="text-slate-500 text-sm">{activeCompany}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}
+                    className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
 
-                <div className="relative p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold tracking-tight text-white">Départements</h2>
-                      <p className="text-white/70 text-sm mt-1">{activeCompany}</p>
-                    </div>
-                    <button
-                      onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}
-                      className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
-                    >
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                {/* Stats - Compact pills */}
+                <div className="flex gap-2 mt-4">
+                  <div className="px-3 py-1.5 bg-slate-800 rounded-lg">
+                    <span className="text-sm font-medium text-white">{deptManagerStats.total}</span>
+                    <span className="text-sm text-slate-500 ml-1.5">employés</span>
                   </div>
-
-                  {/* Stats row - Design moderne */}
-                  <div className="flex gap-3 mt-5">
-                    <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3 flex-1">
-                      <p className="text-3xl font-bold text-white">{deptManagerStats.total}</p>
-                      <p className="text-xs text-white/70 font-medium">Employés</p>
-                    </div>
-                    <div className="bg-white/15 backdrop-blur-sm rounded-2xl px-5 py-3 flex-1">
-                      <p className="text-3xl font-bold text-white">{deptManagerStats.deptCount}</p>
-                      <p className="text-xs text-white/70 font-medium">Départements</p>
-                    </div>
-                    {deptManagerStats.unassigned > 0 && (
-                      <div className="bg-amber-400/20 border border-amber-400/30 backdrop-blur-sm rounded-2xl px-5 py-3 flex-1">
-                        <p className="text-3xl font-bold text-amber-300">{deptManagerStats.unassigned}</p>
-                        <p className="text-xs text-amber-300/80 font-medium">Non assignés</p>
-                      </div>
-                    )}
+                  <div className="px-3 py-1.5 bg-slate-800 rounded-lg">
+                    <span className="text-sm font-medium text-white">{deptManagerStats.deptCount}</span>
+                    <span className="text-sm text-slate-500 ml-1.5">départements</span>
                   </div>
+                  {deptManagerStats.unassigned > 0 && (
+                    <div className="px-3 py-1.5 bg-slate-700 rounded-lg">
+                      <span className="text-sm font-medium text-slate-300">{deptManagerStats.unassigned}</span>
+                      <span className="text-sm text-slate-400 ml-1.5">non assignés</span>
+                    </div>
+                  )}
                 </div>
               </div>
               
               {/* Actions & Search */}
-              <div className="p-4 bg-slate-800/50 border-b border-slate-700/50">
+              <div className="px-6 py-4 border-b border-slate-800">
                 {/* Rename department UI */}
                 {showRenameDept && (
-                  <div className="mb-3 p-4 bg-slate-800 border border-slate-600 rounded-2xl">
-                    <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                      <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      Renommer un département
-                    </p>
+                  <div className="mb-4 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                    <p className="text-sm font-medium text-white mb-3">Renommer un département</p>
                     <div className="flex gap-2 mb-3 items-center">
-                      <select
+                      <CustomSelect
                         value={renameDeptOld}
-                        onChange={e => setRenameDeptOld(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
-                      >
-                        <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>Choisir...</option>
-                        {allDepartments.map(dept => (
-                          <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
-                        ))}
-                      </select>
-                      <span className="flex items-center text-slate-500">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
-                      </span>
+                        onChange={val => setRenameDeptOld(val)}
+                        options={[
+                          { value: '', label: 'Sélectionner...' },
+                          ...allDepartments.map(dept => ({ value: dept, label: dept }))
+                        ]}
+                        placeholder="Sélectionner..."
+                        className="flex-1"
+                      />
+                      <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
                       <input
                         type="text"
                         id="rename-dept-new"
@@ -5777,13 +5790,13 @@ L'équipe Salarize`;
                         placeholder="Nouveau nom..."
                         value={renameDeptNew}
                         onChange={e => setRenameDeptNew(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:border-violet-500 outline-none"
+                        className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none transition-all"
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowRenameDept(false); setRenameDeptOld(''); setRenameDeptNew(''); }}
-                        className="flex-1 py-2.5 text-sm text-slate-300 hover:bg-slate-700 rounded-xl transition-colors"
+                        className="flex-1 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                       >
                         Annuler
                       </button>
@@ -5803,7 +5816,6 @@ L'équipe Salarize`;
                             department: e.department === renameDeptOld ? renameDeptNew : e.department
                           }));
 
-                          // Mettre à jour createdDepartments si le département renommé y était
                           const updatedCreatedDepts = createdDepartments.map(d => d === renameDeptOld ? renameDeptNew : d);
                           setCreatedDepartments(updatedCreatedDepts);
 
@@ -5822,7 +5834,7 @@ L'équipe Salarize`;
                           setRenameDeptNew('');
                         }}
                         disabled={!renameDeptOld || !renameDeptNew}
-                        className="flex-1 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                        className="flex-1 py-2 bg-white text-slate-900 text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
                       >
                         Renommer
                       </button>
@@ -5832,45 +5844,40 @@ L'équipe Salarize`;
 
                 {/* Merge department UI */}
                 {showMergeDept && (
-                  <div className="mb-3 p-4 bg-slate-800 border border-purple-500/30 rounded-2xl">
-                    <p className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
-                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                      </svg>
-                      Fusionner des départements
-                    </p>
+                  <div className="mb-4 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                    <p className="text-sm font-medium text-white mb-1">Fusionner des départements</p>
                     <p className="text-xs text-slate-400 mb-3">Tous les employés du premier département seront déplacés vers le second.</p>
                     <div className="flex gap-2 mb-3 items-center">
-                      <select
+                      <CustomSelect
                         value={mergeDeptFrom}
-                        onChange={e => setMergeDeptFrom(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
-                      >
-                        <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>Fusionner...</option>
-                        {allDepartments.map(dept => (
-                          <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
-                        ))}
-                      </select>
+                        onChange={val => setMergeDeptFrom(val)}
+                        options={[
+                          { value: '', label: 'Fusionner...' },
+                          ...allDepartments.map(dept => ({ value: dept, label: dept }))
+                        ]}
+                        placeholder="Fusionner..."
+                        className="flex-1"
+                      />
                       <span className="flex items-center text-slate-500">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
                       </span>
-                      <select
+                      <CustomSelect
                         value={mergeDeptTo}
-                        onChange={e => setMergeDeptTo(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
-                      >
-                        <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>...vers</option>
-                        {allDepartments.filter(d => d !== mergeDeptFrom).map(dept => (
-                          <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
-                        ))}
-                      </select>
+                        onChange={val => setMergeDeptTo(val)}
+                        options={[
+                          { value: '', label: '...vers' },
+                          ...allDepartments.filter(d => d !== mergeDeptFrom).map(dept => ({ value: dept, label: dept }))
+                        ]}
+                        placeholder="...vers"
+                        className="flex-1"
+                      />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowMergeDept(false); setMergeDeptFrom(''); setMergeDeptTo(''); }}
-                        className="flex-1 py-2.5 text-sm text-slate-300 hover:bg-slate-700 rounded-xl transition-colors"
+                        className="flex-1 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                       >
                         Annuler
                       </button>
@@ -5911,7 +5918,7 @@ L'équipe Salarize`;
                           setMergeDeptTo('');
                         }}
                         disabled={!mergeDeptFrom || !mergeDeptTo}
-                        className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex-1 py-2 bg-white text-slate-900 text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
                       >
                         Fusionner
                       </button>
@@ -5923,7 +5930,7 @@ L'équipe Salarize`;
                   <div className="flex gap-2 mb-4">
                     <button
                       onClick={() => setShowCreateDept(true)}
-                      className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-2.5 bg-white hover:bg-slate-100 text-slate-900 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -5933,7 +5940,7 @@ L'équipe Salarize`;
 
                     <button
                       onClick={() => setShowRenameDept(true)}
-                      className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm font-semibold text-white transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -5943,7 +5950,7 @@ L'équipe Salarize`;
 
                     <button
                       onClick={() => setShowMergeDept(true)}
-                      className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded-xl text-sm font-semibold text-white transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -5955,8 +5962,8 @@ L'équipe Salarize`;
 
                 {/* Message pour les viewers */}
                 {isViewerOnly && (
-                  <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                    <p className="text-sm text-amber-400 flex items-center gap-2">
+                  <div className="mb-4 p-3 bg-slate-800 border border-slate-700 rounded-xl">
+                    <p className="text-sm text-slate-400 flex items-center gap-2">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
@@ -5967,13 +5974,8 @@ L'équipe Salarize`;
 
                 {/* Create department UI */}
                 {showCreateDept && (
-                  <div className="mb-3 p-4 bg-slate-800 border border-emerald-500/30 rounded-2xl">
-                    <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      Créer un nouveau département
-                    </p>
+                  <div className="mb-4 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                    <p className="text-sm font-medium text-white mb-3">Créer un nouveau département</p>
                     <div className="flex gap-2 mb-3">
                       <input
                         type="text"
@@ -5982,14 +5984,14 @@ L'équipe Salarize`;
                         placeholder="Nom du département..."
                         value={newDeptName}
                         onChange={e => setNewDeptName(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white placeholder-slate-400 focus:border-emerald-500 outline-none"
+                        className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-slate-600 focus:ring-1 focus:ring-slate-600 outline-none transition-all"
                         autoFocus
                       />
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => { setShowCreateDept(false); setNewDeptName(''); }}
-                        className="flex-1 py-2.5 text-sm text-slate-300 hover:bg-slate-700 rounded-xl transition-colors"
+                        className="flex-1 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                       >
                         Annuler
                       </button>
@@ -6017,33 +6019,33 @@ L'équipe Salarize`;
                           setNewDeptName('');
                         }}
                         disabled={!newDeptName.trim()}
-                        className="flex-1 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                        className="flex-1 py-2 bg-white text-slate-900 text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
                       >
                         Créer
                       </button>
                     </div>
-                    <p className="text-xs text-slate-400 mt-2">Le département sera immédiatement disponible dans les listes.</p>
+                    <p className="text-xs text-slate-500 mt-2">Le département sera immédiatement disponible dans les listes.</p>
                   </div>
                 )}
                 
                 {/* Bulk assign bar */}
                 {selectedEmployees.size > 0 && (
-                  <div className="mb-4 p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl flex items-center gap-3">
+                  <div className="mb-4 p-3 bg-slate-800 border border-slate-700 rounded-xl flex items-center gap-3">
                     <div className="flex-1">
-                      <span className="text-sm font-medium text-violet-300">
+                      <span className="text-sm font-medium text-white">
                         {selectedEmployees.size} employé{selectedEmployees.size > 1 ? 's' : ''} sélectionné{selectedEmployees.size > 1 ? 's' : ''}
                       </span>
                     </div>
-                    <select
+                    <CustomSelect
                       value={bulkAssignDept}
-                      onChange={e => setBulkAssignDept(e.target.value)}
-                      className="w-44 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
-                    >
-                      <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>Assigner à...</option>
-                      {allDepartments.map(dept => (
-                        <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
-                      ))}
-                    </select>
+                      onChange={val => setBulkAssignDept(val)}
+                      options={[
+                        { value: '', label: 'Assigner à...' },
+                        ...allDepartments.map(dept => ({ value: dept, label: dept }))
+                      ]}
+                      placeholder="Assigner à..."
+                      className="w-44"
+                    />
                     <button
                       onClick={() => {
                         if (!bulkAssignDept) return;
@@ -6077,13 +6079,13 @@ L'équipe Salarize`;
                         setBulkAssignDept('');
                       }}
                       disabled={!bulkAssignDept}
-                      className="px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                      className="px-4 py-2 bg-white text-slate-900 text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
                     >
                       Appliquer
                     </button>
                     <button
                       onClick={() => { setSelectedEmployees(new Set()); setBulkAssignDept(''); }}
-                      className="p-2 text-violet-400 hover:bg-slate-700 rounded-xl transition-colors"
+                      className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -6108,22 +6110,21 @@ L'équipe Salarize`;
                     />
                   </div>
 
-                  <select
+                  <CustomSelect
                     value={deptFilter === 'unassigned' ? 'unassigned' : deptFilter}
-                    onChange={e => setDeptFilter(e.target.value)}
-                    className="w-44 px-3 py-3 bg-slate-800 border border-slate-600 rounded-xl text-sm font-medium text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
-                  >
-                    <option value="all" style={{backgroundColor: '#1e293b', color: '#fff'}}>Tous les dép.</option>
-                    <option value="unassigned" style={{backgroundColor: '#1e293b', color: '#a78bfa'}}>Non assignés</option>
-                    {allDepartments.map(dept => (
-                      <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
-                    ))}
-                  </select>
+                    onChange={val => setDeptFilter(val)}
+                    options={[
+                      { value: 'all', label: 'Tous les dép.' },
+                      { value: 'unassigned', label: 'Non assignés' },
+                      ...allDepartments.map(dept => ({ value: dept, label: dept }))
+                    ]}
+                    className="w-44"
+                  />
                 </div>
               </div>
               
               {/* Employee list - Optimisé avec useMemo */}
-              <div className="divide-y divide-slate-700/50 max-h-96 overflow-y-auto bg-slate-800/30" style={{ willChange: 'scroll-position' }}>
+              <div className="bg-slate-800/30">
                 {filteredEmployeesForDept.length === 0 ? (
                   <div className="p-12 text-center">
                     <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -6136,8 +6137,8 @@ L'équipe Salarize`;
                   </div>
                 ) : (
                   <>
-                    {/* Select all header */}
-                    <div className="flex items-center gap-4 px-5 py-3 bg-slate-800/80 border-b border-slate-700 sticky top-0 backdrop-blur-sm">
+                    {/* Select all header - OUTSIDE scrollable area */}
+                    <div className="flex items-center gap-4 px-5 py-3 bg-slate-800 border-b border-slate-700">
                       <input
                         type="checkbox"
                         id="select-all-employees"
@@ -6160,7 +6161,7 @@ L'équipe Salarize`;
                             setSelectedEmployees(newSet);
                           }
                         }}
-                        className="w-4 h-4 rounded border-slate-500 bg-slate-700 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900"
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-white focus:ring-slate-500 focus:ring-offset-slate-900"
                       />
                       <span className="text-sm text-slate-400 flex-1">
                         {selectedEmployees.size > 0
@@ -6172,10 +6173,12 @@ L'équipe Salarize`;
                       </span>
                     </div>
 
+                    {/* Scrollable employee list */}
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-700/50">
                     {filteredEmployeesForDept.map((emp) => (
                       <div
                         key={emp.name}
-                        className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-700/50 transition-colors ${selectedEmployees.has(emp.name) ? 'bg-violet-500/10' : ''}`}
+                        className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors ${selectedEmployees.has(emp.name) ? 'bg-slate-800' : ''}`}
                         style={{ contain: 'layout style paint' }}
                       >
                         {/* Checkbox */}
@@ -6193,14 +6196,14 @@ L'équipe Salarize`;
                             }
                             setSelectedEmployees(newSet);
                           }}
-                          className="w-4 h-4 rounded border-slate-500 bg-slate-700 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900"
+                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-white focus:ring-slate-500 focus:ring-offset-slate-900"
                         />
 
                         {/* Avatar */}
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
                           emp.currentDept
-                            ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-300 border border-violet-500/20'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            ? 'bg-slate-800 text-slate-300'
+                            : 'bg-slate-700 text-slate-400 border border-slate-600'
                         }`}>
                           {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </div>
@@ -6209,12 +6212,12 @@ L'équipe Salarize`;
                           <p className="font-medium text-white truncate">{emp.name}</p>
                         </div>
 
-                        <select
+                        <CustomSelect
                           value={emp.currentDept || ''}
                           disabled={isViewerOnly}
-                          onChange={e => {
+                          onChange={val => {
                             if (isViewerOnly) return;
-                            const newDept = e.target.value || null;
+                            const newDept = val || null;
                             if (newDept === emp.currentDept) return;
 
                             const empCost = filtered
@@ -6228,27 +6231,17 @@ L'équipe Salarize`;
                               empCost: empCost
                             });
                           }}
-                          className={`w-44 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer appearance-none bg-no-repeat bg-right border ${
-                            isViewerOnly ? 'cursor-not-allowed opacity-60' : 'hover:border-violet-500/50'
-                          } ${
-                            emp.currentDept
-                              ? 'bg-slate-700 border-slate-600 text-white'
-                              : 'bg-violet-500/10 border-violet-500/30 text-violet-300'
-                          }`}
-                          style={{
-                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238b5cf6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
-                            backgroundSize: '1.25rem',
-                            backgroundPosition: 'right 0.5rem center',
-                            paddingRight: '2rem'
-                          }}
-                        >
-                          <option value="" style={{backgroundColor: '#1e293b', color: '#a78bfa'}}>Non assigné</option>
-                          {allDepartments.map(dept => (
-                            <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
-                          ))}
-                        </select>
+                          options={[
+                            { value: '', label: 'Non assigné' },
+                            ...allDepartments.map(dept => ({ value: dept, label: dept }))
+                          ]}
+                          variant={emp.currentDept ? 'default' : 'warning'}
+                          dropdownPosition="auto"
+                          className="w-44"
+                        />
                       </div>
                     ))}
+                    </div>
                   </>
                 )}
               </div>
@@ -6283,10 +6276,10 @@ L'équipe Salarize`;
               )}
 
               {/* Footer */}
-              <div className="p-4 bg-slate-800/80 border-t border-slate-700/50">
+              <div className="px-6 py-4 border-t border-slate-800">
                 <button
                   onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); setSelectedEmployees(new Set()); setBulkAssignDept(''); setDeptPage(0); }}
-                  className="w-full py-3.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-violet-500/25"
+                  className="w-full py-2.5 bg-white text-slate-900 rounded-lg font-medium hover:bg-slate-100 transition-colors"
                 >
                   Terminé
                 </button>
@@ -6303,20 +6296,20 @@ L'équipe Salarize`;
           onClick={() => setPendingDeptChange(null)}
         >
           <div
-            className="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden"
+            className="bg-slate-900 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-800"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-violet-600 to-purple-600 p-5 text-white">
+            <div className="px-5 py-4 border-b border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Confirmer le transfert</h3>
-                  <p className="text-white/70 text-sm">Changement de département</p>
+                  <h3 className="font-semibold text-white">Confirmer le transfert</h3>
+                  <p className="text-slate-500 text-sm">Changement de département</p>
                 </div>
               </div>
             </div>
@@ -6324,55 +6317,55 @@ L'équipe Salarize`;
             {/* Content */}
             <div className="p-5">
               <div className="text-center mb-4">
-                <p className="text-slate-800 font-semibold text-lg">{pendingDeptChange.empName}</p>
+                <p className="text-white font-semibold text-lg">{pendingDeptChange.empName}</p>
               </div>
 
               <div className="flex items-center justify-center gap-3 mb-4">
-                <div className={`px-4 py-2 rounded-xl text-sm font-medium ${
+                <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
                   pendingDeptChange.oldDept
-                    ? 'bg-slate-100 text-slate-700'
-                    : 'bg-amber-100 text-amber-700'
+                    ? 'bg-slate-800 text-slate-300'
+                    : 'bg-slate-700 text-slate-400 border border-slate-600'
                 }`}>
                   {pendingDeptChange.oldDept || 'Non assigné'}
                 </div>
-                <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
-                <div className={`px-4 py-2 rounded-xl text-sm font-medium ${
+                <div className={`px-4 py-2 rounded-lg text-sm font-medium ${
                   pendingDeptChange.newDept
-                    ? 'bg-violet-100 text-violet-700'
-                    : 'bg-amber-100 text-amber-700'
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-slate-700 text-slate-400 border border-slate-600'
                 }`}>
                   {pendingDeptChange.newDept || 'Non assigné'}
                 </div>
               </div>
 
               {/* Info sur le coût */}
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div>
-                    <p className="text-blue-800 text-sm font-medium">Impact sur les statistiques</p>
-                    <p className="text-blue-600 text-xs mt-1">
-                      Le coût de <strong>€{pendingDeptChange.empCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</strong> sera transféré
+                    <p className="text-slate-300 text-sm font-medium">Impact sur les statistiques</p>
+                    <p className="text-slate-500 text-xs mt-1">
+                      Le coût de <strong className="text-slate-300">€{pendingDeptChange.empCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</strong> sera transféré
                       {pendingDeptChange.oldDept && ` de "${pendingDeptChange.oldDept}"`} vers "{pendingDeptChange.newDept || 'Non assigné'}".
                     </p>
                   </div>
                 </div>
               </div>
 
-              <p className="text-slate-500 text-xs text-center">
+              <p className="text-slate-600 text-xs text-center">
                 Cette action modifiera les statistiques du dashboard.
               </p>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 p-5 bg-slate-50 border-t border-slate-100">
+            <div className="flex gap-3 px-5 py-4 border-t border-slate-800">
               <button
                 onClick={() => setPendingDeptChange(null)}
-                className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
+                className="flex-1 py-2.5 bg-slate-800 text-slate-300 rounded-lg font-medium hover:bg-slate-700 transition-colors"
               >
                 Annuler
               </button>
@@ -6421,7 +6414,7 @@ L'équipe Salarize`;
                     console.log(`[Salarize] === DEPARTMENT CHANGE SAVED ===`);
                   });
                 }}
-                className="flex-1 py-3 bg-violet-600 text-white rounded-xl font-medium hover:bg-violet-700 transition-colors"
+                className="flex-1 py-2.5 bg-white text-slate-900 rounded-lg font-medium hover:bg-slate-100 transition-colors"
               >
                 Confirmer
               </button>
@@ -7283,17 +7276,22 @@ L'équipe Salarize`;
           </div>
           
           <div className="space-y-2">
-            {sortedDepts.map(([dept, data]) => {
+            {sortedDepts
+              .filter(([dept]) => {
+                const comparison = deptStatsWithComparison[dept];
+                return comparison && comparison.currentCount > 0;
+              })
+              .map(([dept, data]) => {
               const comparison = deptStatsWithComparison[dept] || {};
-              const pct = ((data.total / totalCost) * 100).toFixed(1);
-              const barWidth = Math.max(5, (data.total / maxCost) * 100);
-              
+              const pct = totalCost > 0 ? ((comparison.current / totalCost) * 100).toFixed(1) : '0.0';
+              const barWidth = maxCost > 0 ? Math.max(5, (comparison.current / maxCost) * 100) : 5;
+
               return (
                 <div key={dept} className="flex items-center gap-3 py-2">
                   {/* Nom du département */}
                   <div className="w-32 sm:w-40 flex-shrink-0">
                     <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
-                    <span className="text-xs text-slate-400">{data.count} emp.</span>
+                    <span className="text-xs text-slate-400">{comparison.currentCount || 0} emp.</span>
                   </div>
                   
                   {/* Barre de progression */}
@@ -7331,34 +7329,40 @@ L'équipe Salarize`;
           </div>
           
           {/* Résumé des tendances */}
-          {Object.keys(deptStatsWithComparison).length > 0 && (() => {
+          {Object.keys(deptStatsWithComparison).length > 0 && comparisonData && (() => {
             const sorted = Object.entries(deptStatsWithComparison)
               .filter(([_dept, d]) => d.variationVsPrevMonth !== null && d.variationVsPrevMonth !== 0)
               .sort((a, b) => (b[1].variationVsPrevMonth || 0) - (a[1].variationVsPrevMonth || 0));
             const highest = sorted[0];
             const lowest = sorted[sorted.length - 1];
             const hasData = (highest && highest[1].variationVsPrevMonth > 0) || (lowest && lowest[1].variationVsPrevMonth < 0);
-            
+            const periodLabel = comparisonData.current?.period && comparisonData.prevMonth?.period
+              ? `${formatPeriod(comparisonData.prevMonth.period)} → ${formatPeriod(comparisonData.current.period)}`
+              : 'vs mois précédent';
+
             return hasData ? (
-              <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
-                {highest && highest[1].variationVsPrevMonth > 0 && (
-                  <div className="flex items-center gap-3 p-3 bg-red-50 rounded-xl">
-                    <span className="text-lg">📈</span>
-                    <div>
-                      <p className="text-xs text-red-600 font-medium">Plus forte hausse</p>
-                      <p className="font-bold text-red-700 text-sm">{highest[0]} +{highest[1].variationVsPrevMonth.toFixed(0)}%</p>
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <p className="text-xs text-slate-400 mb-3">Variation : {periodLabel}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {highest && highest[1].variationVsPrevMonth > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-red-50 rounded-xl">
+                      <span className="text-lg">📈</span>
+                      <div>
+                        <p className="text-xs text-red-600 font-medium">Plus forte hausse</p>
+                        <p className="font-bold text-red-700 text-sm">{highest[0]} +{highest[1].variationVsPrevMonth.toFixed(0)}%</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {lowest && lowest[1].variationVsPrevMonth < 0 && (
-                  <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl">
-                    <span className="text-lg">📉</span>
-                    <div>
-                      <p className="text-xs text-emerald-600 font-medium">Plus forte baisse</p>
-                      <p className="font-bold text-emerald-700 text-sm">{lowest[0]} {lowest[1].variationVsPrevMonth.toFixed(0)}%</p>
+                  )}
+                  {lowest && lowest[1].variationVsPrevMonth < 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl">
+                      <span className="text-lg">📉</span>
+                      <div>
+                        <p className="text-xs text-emerald-600 font-medium">Plus forte baisse</p>
+                        <p className="font-bold text-emerald-700 text-sm">{lowest[0]} {lowest[1].variationVsPrevMonth.toFixed(0)}%</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             ) : null;
           })()}

@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * CustomSelect - A modern dropdown component with clean styling
  * Replaces native <select> to avoid ugly OS default styles
+ * Uses React Portal to render dropdown outside overflow containers
  */
 function CustomSelect({
   value,
@@ -12,12 +14,14 @@ function CustomSelect({
   disabled = false,
   variant = "default", // "default" | "warning" | "compact"
   className = "",
-  dropdownPosition = "bottom" // "bottom" | "top"
+  dropdownPosition = "auto" // "auto" | "bottom" | "top"
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [dropdownStyle, setDropdownStyle] = useState({});
   const containerRef = useRef(null);
   const listRef = useRef(null);
+  const buttonRef = useRef(null);
 
   // Find selected option label
   const selectedOption = options.find(opt => opt.value === value);
@@ -27,7 +31,11 @@ function CustomSelect({
   // Close on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      // Check if click is outside both the container AND the dropdown (portal)
+      const isOutsideContainer = containerRef.current && !containerRef.current.contains(e.target);
+      const isOutsideDropdown = listRef.current && !listRef.current.contains(e.target);
+
+      if (isOutsideContainer && isOutsideDropdown) {
         setIsOpen(false);
       }
     };
@@ -78,6 +86,31 @@ function CustomSelect({
     }
   }, [highlightedIndex, isOpen]);
 
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = Math.min(options.length * 40 + 8, 240); // Estimate dropdown height
+
+      // Determine position: auto, top, or bottom
+      let showOnTop = dropdownPosition === "top";
+      if (dropdownPosition === "auto") {
+        showOnTop = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
+      }
+
+      setDropdownStyle({
+        position: 'fixed',
+        left: rect.left,
+        width: rect.width,
+        top: showOnTop ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+        maxHeight: showOnTop ? Math.min(spaceAbove - 8, 240) : Math.min(spaceBelow - 8, 240),
+      });
+    }
+  }, [isOpen, options.length, dropdownPosition]);
+
   const handleSelect = (val) => {
     onChange(val);
     setIsOpen(false);
@@ -103,7 +136,7 @@ function CustomSelect({
     }
 
     if (variant === "warning" || (isPlaceholder && variant !== "compact")) {
-      return `${base} cursor-pointer bg-slate-800 border-slate-600 text-amber-400 hover:border-amber-500/50 hover:bg-slate-750`;
+      return `${base} cursor-pointer bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500 hover:bg-slate-750`;
     }
 
     return `${base} cursor-pointer bg-slate-800 border-slate-600 text-white hover:border-slate-500 hover:bg-slate-750`;
@@ -113,6 +146,7 @@ function CustomSelect({
     <div ref={containerRef} className={`relative ${className}`}>
       {/* Trigger button */}
       <button
+        ref={buttonRef}
         type="button"
         onClick={toggleOpen}
         disabled={disabled}
@@ -133,12 +167,11 @@ function CustomSelect({
         </svg>
       </button>
 
-      {/* Dropdown menu */}
-      {isOpen && (
+      {/* Dropdown menu - rendered via Portal to escape overflow containers */}
+      {isOpen && createPortal(
         <div
-          className={`absolute z-50 w-full mt-1 py-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl shadow-black/30 max-h-60 overflow-y-auto ${
-            dropdownPosition === "top" ? "bottom-full mb-1" : "top-full"
-          }`}
+          style={dropdownStyle}
+          className="z-[9999] py-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl shadow-black/30 overflow-y-auto"
           role="listbox"
           ref={listRef}
         >
@@ -170,7 +203,8 @@ function CustomSelect({
               </div>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
