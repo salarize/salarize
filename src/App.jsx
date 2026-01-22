@@ -321,6 +321,7 @@ function AppContent() {
         .from('invitations')
         .insert({
           company_id: companyId,
+          company_name: activeCompany,
           invited_email: inviteEmail.toLowerCase().trim(),
           role: inviteRole,
           status: 'pending',
@@ -348,6 +349,7 @@ function AppContent() {
             .from('invitations')
             .insert({
               company_id: companyId,
+              company_name: activeCompany,
               invited_email: inviteEmail.toLowerCase().trim(),
               role: inviteRole,
               status: 'pending',
