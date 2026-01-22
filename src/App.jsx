@@ -911,15 +911,26 @@ function AppContent() {
       setCompanies(loadedCompanies);
       companiesRef.current = loadedCompanies; // Synchroniser la ref
 
-      // Charger l'ordre des sociétés depuis localStorage
-      const savedOrder = localStorage.getItem(`salarize_company_order_${userId}`);
-      if (savedOrder) {
-        try {
-          const parsedOrder = JSON.parse(savedOrder);
-          setCompanyOrder(parsedOrder);
-          console.log('[Salarize] Loaded company order:', parsedOrder);
-        } catch (e) {
-          console.warn('[Salarize] Failed to parse saved company order');
+      // Charger l'ordre des sociétés (priorité: Supabase > localStorage)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const supabaseOrder = authUser?.user_metadata?.company_order;
+
+      if (supabaseOrder && Array.isArray(supabaseOrder)) {
+        setCompanyOrder(supabaseOrder);
+        console.log('[Salarize] Loaded company order from Supabase:', supabaseOrder);
+        // Sync to localStorage
+        localStorage.setItem(`salarize_company_order_${userId}`, JSON.stringify(supabaseOrder));
+      } else {
+        // Fallback to localStorage
+        const savedOrder = localStorage.getItem(`salarize_company_order_${userId}`);
+        if (savedOrder) {
+          try {
+            const parsedOrder = JSON.parse(savedOrder);
+            setCompanyOrder(parsedOrder);
+            console.log('[Salarize] Loaded company order from localStorage:', parsedOrder);
+          } catch (e) {
+            console.warn('[Salarize] Failed to parse saved company order');
+          }
         }
       }
 
@@ -1779,11 +1790,21 @@ function AppContent() {
   };
 
   // Handler pour réorganiser les sociétés dans la sidebar (drag & drop)
-  const handleReorderCompanies = (newOrder) => {
+  const handleReorderCompanies = async (newOrder) => {
     setCompanyOrder(newOrder);
-    // Sauvegarder dans localStorage
+
+    // Sauvegarder dans localStorage (backup local)
     if (user?.id) {
       localStorage.setItem(`salarize_company_order_${user.id}`, JSON.stringify(newOrder));
+    }
+
+    // Sauvegarder dans Supabase (user_metadata)
+    try {
+      await supabase.auth.updateUser({
+        data: { company_order: newOrder }
+      });
+    } catch (err) {
+      console.error('[Salarize] Error saving company order:', err);
     }
   };
 
@@ -4788,7 +4809,7 @@ L'équipe Salarize`;
               onCancel={handleModalCancel}
             />
           )}
-          <div className="lg:ml-64 flex-1 flex items-center justify-center bg-slate-100 p-4">
+          <div className="lg:ml-72 flex-1 flex items-center justify-center bg-slate-100 p-4">
             <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center shadow-xl">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <p className="font-semibold text-amber-800">🏷️ {pendingAssignments.length} employé(s) sans département</p>
@@ -6222,7 +6243,7 @@ L'équipe Salarize`;
         </div>
       )}
 
-      <main className="lg:ml-64 pt-4 lg:pt-6 flex-1 p-4 lg:p-6">
+      <main className="lg:ml-72 pt-4 lg:pt-6 flex-1 p-4 lg:p-6">
         {/* Loading overlay quand on recharge les données */}
         {isLoadingData && employees.length > 0 && (
           <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-40 flex items-center justify-center">
