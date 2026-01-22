@@ -332,8 +332,17 @@ function AppContent() {
 
       if (insertError) {
         console.error('[Salarize] Error inserting invitation:', insertError);
+        console.error('[Salarize] Error details:', JSON.stringify(insertError, null, 2));
+
+        // Si c'est une erreur RLS ou de permission
+        if (insertError.code === '42501' || insertError.message?.includes('policy') || insertError.message?.includes('permission')) {
+          toast.error('Permission refusée. Vérifiez les policies RLS dans Supabase.');
+          setSendingInvite(false);
+          return;
+        }
+
         // Essayer sans invite_token si la colonne n'existe pas
-        if (insertError.message?.includes('invite_token')) {
+        if (insertError.message?.includes('invite_token') || insertError.code === '42703') {
           console.log('[Salarize] Retrying without invite_token column...');
           const { error: retryError } = await supabase
             .from('invitations')
@@ -346,12 +355,12 @@ function AppContent() {
             });
           if (retryError) {
             console.error('[Salarize] Retry also failed:', retryError);
-            toast.error('Erreur lors de la création de l\'invitation');
+            toast.error(`Erreur: ${retryError.message || 'Impossible de créer l\'invitation'}`);
             setSendingInvite(false);
             return;
           }
         } else {
-          toast.error('Erreur lors de la création de l\'invitation');
+          toast.error(`Erreur: ${insertError.message || 'Impossible de créer l\'invitation'}`);
           setSendingInvite(false);
           return;
         }
