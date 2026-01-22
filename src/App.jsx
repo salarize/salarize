@@ -65,7 +65,6 @@ import { ToastProvider, useToast } from './context/ToastContext';
 
 // Components - UI
 import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton } from './components/ui';
-import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
 import { Footer, PageTransition, ErrorBoundary } from './components/layout';
@@ -5566,16 +5565,16 @@ L'équipe Salarize`;
                       Renommer un département
                     </p>
                     <div className="flex gap-2 mb-3 items-center">
-                      <CustomSelect
+                      <select
                         value={renameDeptOld}
-                        onChange={setRenameDeptOld}
-                        placeholder="Choisir..."
-                        className="flex-1"
-                        options={[
-                          { value: '', label: 'Choisir...' },
-                          ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                        ]}
-                      />
+                        onChange={e => setRenameDeptOld(e.target.value)}
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-violet-500 outline-none"
+                      >
+                        <option value="" style={{backgroundColor: '#334155'}}>Choisir...</option>
+                        {allDepartments.map(dept => (
+                          <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                        ))}
+                      </select>
                       <span className="flex items-center text-slate-500">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -5588,7 +5587,7 @@ L'équipe Salarize`;
                         placeholder="Nouveau nom..."
                         value={renameDeptNew}
                         onChange={e => setRenameDeptNew(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:border-violet-500 outline-none"
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-400 focus:border-violet-500 outline-none"
                       />
                     </div>
                     <div className="flex gap-2">
@@ -5652,31 +5651,31 @@ L'équipe Salarize`;
                     </p>
                     <p className="text-xs text-slate-400 mb-3">Tous les employés du premier département seront déplacés vers le second.</p>
                     <div className="flex gap-2 mb-3 items-center">
-                      <CustomSelect
+                      <select
                         value={mergeDeptFrom}
-                        onChange={setMergeDeptFrom}
-                        placeholder="Fusionner..."
-                        className="flex-1"
-                        options={[
-                          { value: '', label: 'Fusionner...' },
-                          ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                        ]}
-                      />
+                        onChange={e => setMergeDeptFrom(e.target.value)}
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
+                      >
+                        <option value="" style={{backgroundColor: '#334155'}}>Fusionner...</option>
+                        {allDepartments.map(dept => (
+                          <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                        ))}
+                      </select>
                       <span className="flex items-center text-slate-500">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
                       </span>
-                      <CustomSelect
+                      <select
                         value={mergeDeptTo}
-                        onChange={setMergeDeptTo}
-                        placeholder="...vers"
-                        className="flex-1"
-                        options={[
-                          { value: '', label: '...vers' },
-                          ...allDepartments.filter(d => d !== mergeDeptFrom).map(dept => ({ value: dept, label: dept }))
-                        ]}
-                      />
+                        onChange={e => setMergeDeptTo(e.target.value)}
+                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
+                      >
+                        <option value="" style={{backgroundColor: '#334155'}}>...vers</option>
+                        {allDepartments.filter(d => d !== mergeDeptFrom).map(dept => (
+                          <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -5845,16 +5844,16 @@ L'équipe Salarize`;
                         {selectedEmployees.size} employé{selectedEmployees.size > 1 ? 's' : ''} sélectionné{selectedEmployees.size > 1 ? 's' : ''}
                       </span>
                     </div>
-                    <CustomSelect
+                    <select
                       value={bulkAssignDept}
-                      onChange={setBulkAssignDept}
-                      placeholder="Assigner à..."
-                      className="w-44"
-                      options={[
-                        { value: '', label: 'Assigner à...' },
-                        ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                      ]}
-                    />
+                      onChange={e => setBulkAssignDept(e.target.value)}
+                      className="w-44 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-violet-500 outline-none"
+                    >
+                      <option value="" style={{backgroundColor: '#334155'}}>Assigner à...</option>
+                      {allDepartments.map(dept => (
+                        <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                      ))}
+                    </select>
                     <button
                       onClick={() => {
                         if (!bulkAssignDept) return;
@@ -5919,17 +5918,17 @@ L'équipe Salarize`;
                     />
                   </div>
 
-                  <CustomSelect
+                  <select
                     value={deptFilter === 'unassigned' ? 'unassigned' : deptFilter}
-                    onChange={setDeptFilter}
-                    placeholder="Tous les dép."
-                    className="w-44"
-                    options={[
-                      { value: 'all', label: 'Tous les dép.' },
-                      { value: 'unassigned', label: 'Non assignés' },
-                      ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                    ]}
-                  />
+                    onChange={e => setDeptFilter(e.target.value)}
+                    className="w-44 px-3 py-3 bg-slate-700 border border-slate-600 rounded-xl text-sm font-medium text-white focus:border-violet-500 outline-none"
+                  >
+                    <option value="all" style={{backgroundColor: '#334155'}}>Tous les dép.</option>
+                    <option value="unassigned" style={{backgroundColor: '#334155'}}>Non assignés</option>
+                    {allDepartments.map(dept => (
+                      <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               
@@ -6020,19 +6019,12 @@ L'équipe Salarize`;
                           <p className="font-medium text-white truncate">{emp.name}</p>
                         </div>
 
-                        <CustomSelect
+                        <select
                           value={emp.currentDept || ''}
                           disabled={isViewerOnly}
-                          placeholder="Non assigné"
-                          variant={emp.currentDept ? 'default' : 'warning'}
-                          className="w-44"
-                          options={[
-                            { value: '', label: 'Non assigné' },
-                            ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                          ]}
-                          onChange={(newValue) => {
+                          onChange={e => {
                             if (isViewerOnly) return;
-                            const newDept = newValue || null;
+                            const newDept = e.target.value || null;
                             if (newDept === emp.currentDept) return;
 
                             const empCost = filtered
@@ -6046,7 +6038,25 @@ L'équipe Salarize`;
                               empCost: empCost
                             });
                           }}
-                        />
+                          className={`w-44 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer appearance-none bg-no-repeat bg-right ${
+                            isViewerOnly ? 'cursor-not-allowed opacity-60' : ''
+                          } ${
+                            emp.currentDept
+                              ? 'bg-slate-700 border-slate-600 text-white'
+                              : 'bg-slate-700 border-amber-500/50 text-amber-400'
+                          } border`}
+                          style={{
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                            backgroundSize: '1.25rem',
+                            backgroundPosition: 'right 0.5rem center',
+                            paddingRight: '2rem'
+                          }}
+                        >
+                          <option value="" style={{backgroundColor: '#1e293b', color: '#fbbf24'}}>Non assigné</option>
+                          {allDepartments.map(dept => (
+                            <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
+                          ))}
+                        </select>
                       </div>
                     ))}
                   </>
