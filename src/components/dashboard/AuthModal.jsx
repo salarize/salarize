@@ -66,11 +66,6 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
       if (error) throw error;
 
       if (data.user) {
-        console.log('[Salarize] Email login - user:', data.user);
-        console.log('[Salarize] Email login - user_metadata:', data.user.user_metadata);
-        console.log('[Salarize] Email login - app_metadata:', data.user.app_metadata);
-        console.log('[Salarize] Email login - identities:', data.user.identities);
-
         // Utiliser le provider réel du compte (peut être google même si login par email)
         const realProvider = data.user.app_metadata?.provider ||
                             (data.user.identities?.find(i => i.provider === 'google') ? 'google' : 'email');
@@ -78,7 +73,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
         onSuccess({
           id: data.user.id,
           email: data.user.email,
-          name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || data.user.user_metadata?.full_name || email.split('@')[0],
+          name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || email.split('@')[0],
           picture: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || null,
           provider: realProvider,
           created_at: data.user.created_at
@@ -129,15 +124,24 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
       if (error) throw error;
 
       if (data.user) {
+        // Verifier si l'email existe deja (compte Google ou autre)
         if (data.user.identities?.length === 0) {
-          setError('Cet email est deja utilise');
+          setError('Cet email est deja utilise. Si vous avez un compte Google, connectez-vous avec Google puis ajoutez un mot de passe dans votre profil.');
+        } else if (data.user.identities?.some(i => i.provider === 'google')) {
+          // L'utilisateur a deja un compte Google avec cet email
+          setError('Un compte Google existe deja avec cet email. Connectez-vous avec Google puis ajoutez un mot de passe dans votre profil.');
         } else {
           setSuccess('Compte cree ! Verifiez votre email pour confirmer votre inscription.');
           resetForm();
         }
       }
     } catch (err) {
-      setError(err.message);
+      // Gerer l'erreur "User already registered"
+      if (err.message?.includes('already registered') || err.message?.includes('already exists')) {
+        setError('Cet email est deja utilise. Si vous avez un compte Google, connectez-vous avec Google.');
+      } else {
+        setError(err.message);
+      }
     }
     setLoading(false);
   };
