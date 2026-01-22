@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../config/supabase';
 
-function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
+function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login', inviteInfo = null }) {
   const [view, setView] = useState(defaultTab);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -318,7 +318,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-start justify-center pt-20 p-4 overflow-y-auto">
       <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 p-4 text-center relative">
+        <div className={`p-4 text-center relative ${inviteInfo ? 'bg-gradient-to-r from-emerald-600/20 to-teal-600/20' : 'bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20'}`}>
           <button
             onClick={onClose}
             className="absolute right-3 top-3 p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -329,22 +329,41 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
           </button>
 
           <div className="flex items-center justify-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-lg">S</span>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${inviteInfo ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-gradient-to-br from-violet-500 to-fuchsia-500'}`}>
+              {inviteInfo ? (
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+              ) : (
+                <span className="text-white font-bold text-lg">S</span>
+              )}
             </div>
             <div className="text-left">
               <h2 className="text-xl font-bold text-white">
-                {view === 'login' ? 'Connexion' : 'Creer un compte'}
+                {inviteInfo ? 'Invitation' : (view === 'login' ? 'Connexion' : 'Creer un compte')}
               </h2>
               <p className="text-slate-400 text-xs">
-                {view === 'login' ? 'Accedez a votre espace' : 'Rejoignez Salarize'}
+                {inviteInfo ? `Rejoignez ${inviteInfo.companyName}` : (view === 'login' ? 'Accedez a votre espace' : 'Rejoignez Salarize')}
               </p>
             </div>
           </div>
         </div>
 
+        {/* Invitation Banner */}
+        {inviteInfo && (
+          <div className="mx-4 mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+            <p className="text-emerald-300 text-sm text-center">
+              <span className="font-medium">Vous avez ete invite</span> a acceder aux donnees de <strong>{inviteInfo.companyName}</strong>
+              {inviteInfo.role === 'editor' ? ' en tant qu\'editeur' : ' en lecture seule'}.
+            </p>
+            <p className="text-emerald-400/70 text-xs text-center mt-1">
+              Connectez-vous ou creez un compte pour accepter l'invitation.
+            </p>
+          </div>
+        )}
+
         {/* Tabs */}
-        <div className="flex border-b border-slate-700">
+        <div className="flex border-b border-slate-700 mt-2">
           <button
             onClick={() => { setView('login'); resetForm(); }}
             className={`flex-1 py-3 text-sm font-medium transition-colors ${
@@ -353,7 +372,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            Connexion
+            J'ai deja un compte
           </button>
           <button
             onClick={() => { setView('signup'); resetForm(); }}
@@ -363,7 +382,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            Inscription
+            Creer un compte
           </button>
         </div>
 

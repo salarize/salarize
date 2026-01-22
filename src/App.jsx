@@ -184,6 +184,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile sidebar
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false); // For period multi-select
   const [showAuthModal, setShowAuthModal] = useState(false); // For auth modal
+  const [pendingInviteInfo, setPendingInviteInfo] = useState(null); // { token, companyName } pour afficher message d'invitation
   const [fileQueue, setFileQueue] = useState([]); // File d'attente pour import multi-fichiers
   const [currentFileIndex, setCurrentFileIndex] = useState(0); // Index du fichier en cours
   const [importReady, setImportReady] = useState(false); // Délai avant de pouvoir importer
@@ -598,8 +599,44 @@ function AppContent() {
   // Check auth state on load
   useEffect(() => {
     let mounted = true;
-    
+
     const initAuth = async () => {
+      // Détecter un lien d'invitation dans l'URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const inviteToken = urlParams.get('invite');
+
+      if (inviteToken) {
+        console.log('[Salarize] Invitation link detected:', inviteToken);
+        // Sauvegarder le token pour après la connexion
+        sessionStorage.setItem('pending_invite_token', inviteToken);
+
+        // Chercher les infos de l'invitation pour afficher un message personnalisé
+        const { data: inviteData } = await supabase
+          .from('invitations')
+          .select('*, companies(name)')
+          .eq('invite_token', inviteToken)
+          .eq('status', 'pending')
+          .single();
+
+        if (inviteData) {
+          setPendingInviteInfo({
+            token: inviteToken,
+            companyName: inviteData.companies?.name || 'une société',
+            role: inviteData.role
+          });
+        }
+
+        // Vérifier si l'utilisateur est déjà connecté
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          // Pas connecté → afficher le modal d'auth
+          setShowAuthModal(true);
+          setIsLoading(false);
+          return;
+        }
+        // Si connecté, le token sera traité par loadFromSupabase
+      }
+
       // Détecter le token dans le hash (flow OAuth ou reset password)
       if (window.location.hash && window.location.hash.includes('access_token')) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -4464,10 +4501,11 @@ L'équipe Salarize`;
           onViewDemo={() => setCurrentPage('demo')}
           setCurrentPage={setCurrentPage}
         />
-        <AuthModal 
+        <AuthModal
           isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
+          onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
           onSuccess={handleAuthSuccess}
+          inviteInfo={pendingInviteInfo}
         />
       </PageTransition>
     );
@@ -4490,10 +4528,11 @@ L'équipe Salarize`;
           onGoToDashboard={() => setCurrentPage('dashboard')}
           setCurrentPage={setCurrentPage}
         />
-        <AuthModal 
+        <AuthModal
           isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
+          onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
           onSuccess={handleAuthSuccess}
+          inviteInfo={pendingInviteInfo}
         />
       </PageTransition>
     );
@@ -4516,10 +4555,11 @@ L'équipe Salarize`;
           onGoToDashboard={() => setCurrentPage('dashboard')}
           setCurrentPage={setCurrentPage}
         />
-        <AuthModal 
+        <AuthModal
           isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
+          onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
           onSuccess={handleAuthSuccess}
+          inviteInfo={pendingInviteInfo}
         />
       </PageTransition>
     );
@@ -4542,10 +4582,11 @@ L'équipe Salarize`;
           onGoToDashboard={() => setCurrentPage('dashboard')}
           setCurrentPage={setCurrentPage}
         />
-        <AuthModal 
+        <AuthModal
           isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
+          onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
           onSuccess={handleAuthSuccess}
+          inviteInfo={pendingInviteInfo}
         />
       </PageTransition>
     );
