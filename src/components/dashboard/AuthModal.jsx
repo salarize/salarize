@@ -27,7 +27,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login', inviteInf
       const urlParams = new URLSearchParams(window.location.search);
       const inviteToken = urlParams.get('invite');
       if (inviteToken) {
-        sessionStorage.setItem('pending_invite_token', inviteToken);
+        localStorage.setItem('pending_invite_token', inviteToken);
       }
 
       const { error } = await supabase.auth.signInWithOAuth({
@@ -61,7 +61,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login', inviteInf
     const urlParams = new URLSearchParams(window.location.search);
     const inviteToken = urlParams.get('invite');
     if (inviteToken) {
-      sessionStorage.setItem('pending_invite_token', inviteToken);
+      localStorage.setItem('pending_invite_token', inviteToken);
     }
 
     try {
@@ -129,7 +129,7 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login', inviteInf
     const urlParams = new URLSearchParams(window.location.search);
     const inviteToken = urlParams.get('invite');
     if (inviteToken) {
-      sessionStorage.setItem('pending_invite_token', inviteToken);
+      localStorage.setItem('pending_invite_token', inviteToken);
     }
 
     try {

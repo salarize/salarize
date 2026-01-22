@@ -641,8 +641,8 @@ function AppContent() {
 
       if (inviteToken) {
         console.log('[Salarize] Invitation link detected:', inviteToken);
-        // Sauvegarder le token pour après la connexion
-        sessionStorage.setItem('pending_invite_token', inviteToken);
+        // Sauvegarder le token pour après la connexion (localStorage persiste après OAuth redirect)
+        localStorage.setItem('pending_invite_token', inviteToken);
 
         // Chercher les infos de l'invitation pour afficher un message personnalisé
         const { data: inviteData } = await supabase
@@ -860,13 +860,13 @@ function AppContent() {
       let sharedCompaniesData = [];
 
       // Vérifier si un token d'invitation est en attente (depuis le lien d'invitation)
-      const pendingInviteToken = sessionStorage.getItem('pending_invite_token');
+      const pendingInviteToken = localStorage.getItem('pending_invite_token');
       let tokenInviteCompanyId = null;
       let tokenInviteRole = null;
 
       if (pendingInviteToken) {
         console.log('[Salarize] Found pending invite token:', pendingInviteToken);
-        sessionStorage.removeItem('pending_invite_token'); // Nettoyer
+        localStorage.removeItem('pending_invite_token'); // Nettoyer
 
         // Chercher l'invitation par token
         const { data: tokenInvite, error: tokenError } = await supabase
