@@ -325,7 +325,7 @@ function AppContent() {
           invited_email: inviteEmail.toLowerCase().trim(),
           role: inviteRole,
           status: 'pending',
-          invite_token: inviteToken,
+          token: inviteToken,
           invited_by: user?.id
         })
         .select()
@@ -342,9 +342,9 @@ function AppContent() {
           return;
         }
 
-        // Essayer sans invite_token si la colonne n'existe pas
-        if (insertError.message?.includes('invite_token') || insertError.code === '42703') {
-          console.log('[Salarize] Retrying without invite_token column...');
+        // Essayer sans token si la colonne n'existe pas
+        if (insertError.message?.includes('token') || insertError.code === '42703') {
+          console.log('[Salarize] Retrying without token column...');
           const { error: retryError } = await supabase
             .from('invitations')
             .insert({
@@ -648,7 +648,7 @@ function AppContent() {
         const { data: inviteData } = await supabase
           .from('invitations')
           .select('*, companies(name)')
-          .eq('invite_token', inviteToken)
+          .eq('token', inviteToken)
           .eq('status', 'pending')
           .single();
 
@@ -872,7 +872,7 @@ function AppContent() {
         const { data: tokenInvite, error: tokenError } = await supabase
           .from('invitations')
           .select('*')
-          .eq('invite_token', pendingInviteToken)
+          .eq('token', pendingInviteToken)
           .eq('status', 'pending')
           .single();
 
@@ -1355,7 +1355,7 @@ function AppContent() {
    * │ - invited_email (TEXT) - Email de l'invité                             │
    * │ - role (TEXT) - 'viewer' ou 'editor'                                   │
    * │ - status (TEXT) - 'pending', 'accepted', 'rejected'                    │
-   * │ - invite_token (TEXT) - Token unique pour le lien d'invitation         │
+   * │ - token (TEXT) - Token unique pour le lien d'invitation                │
    * │ - display_name (TEXT) - Nom personnalisé (nullable)                    │
    * │ - invited_by (UUID, FK → auth.users)                                   │
    * │ - accepted_at (TIMESTAMP) - Date d'acceptation (nullable)              │
@@ -1363,7 +1363,7 @@ function AppContent() {
    * └─────────────────────────────────────────────────────────────────────────┘
    *
    * [DB-MIGRATION-REQUIRED] Si tu vois une erreur sur une colonne manquante:
-   * - invite_token: ALTER TABLE invitations ADD COLUMN invite_token TEXT;
+   * - token: ALTER TABLE invitations ADD COLUMN token TEXT;
    * - display_name: ALTER TABLE invitations ADD COLUMN display_name TEXT;
    * - accepted_at: ALTER TABLE invitations ADD COLUMN accepted_at TIMESTAMP;
    *
