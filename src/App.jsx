@@ -597,9 +597,14 @@ function AppContent() {
           } else if (data.session) {
             // Nettoyer l'URL
             window.history.replaceState(null, '', window.location.pathname);
-            
+
             // Mettre à jour l'user
             const user = data.session.user;
+            console.log('[Salarize] Google login - user:', user);
+            console.log('[Salarize] Google login - user_metadata:', user.user_metadata);
+            console.log('[Salarize] Google login - app_metadata:', user.app_metadata);
+            console.log('[Salarize] Google login - identities:', user.identities);
+
             setUser({
               id: user.id,
               name: user.user_metadata?.full_name || user.user_metadata?.name || user.email,
