@@ -284,13 +284,55 @@ function AppContent() {
       return;
     }
 
+    if (!activeCompany || !companies[activeCompany]?.id) {
+      toast.error('Aucune société sélectionnée');
+      return;
+    }
+
     setSendingInvite(true);
-    
+
     try {
+      const companyId = companies[activeCompany].id;
+
+      // Vérifier si une invitation existe déjà pour cet email et cette société
+      const { data: existingInvite } = await supabase
+        .from('invitations')
+        .select('id, status')
+        .eq('company_id', companyId)
+        .eq('invited_email', inviteEmail.toLowerCase().trim())
+        .single();
+
+      if (existingInvite) {
+        toast.error('Une invitation a déjà été envoyée à cet email pour cette société');
+        setSendingInvite(false);
+        return;
+      }
+
       // Générer un token unique pour l'invitation
       const inviteToken = crypto.randomUUID();
       const inviteLink = `${window.location.origin}?invite=${inviteToken}`;
-      
+
+      // Insérer l'invitation dans Supabase
+      const { data: newInvitation, error: insertError } = await supabase
+        .from('invitations')
+        .insert({
+          company_id: companyId,
+          invited_email: inviteEmail.toLowerCase().trim(),
+          role: inviteRole,
+          status: 'pending',
+          invite_token: inviteToken,
+          invited_by: user?.id
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('[Salarize] Error inserting invitation:', insertError);
+        toast.error('Erreur lors de la création de l\'invitation');
+        setSendingInvite(false);
+        return;
+      }
+
       // Envoyer l'email via EmailJS
       await emailjs.send(
         EMAILJS_SERVICE_ID,
@@ -304,18 +346,12 @@ function AppContent() {
         }
       );
 
-      // Ajouter à la liste des invitations en attente
-      setPendingInvites([...pendingInvites, { 
-        email: inviteEmail, 
-        role: inviteRole, 
-        company: activeCompany,
-        token: inviteToken,
-        createdAt: new Date().toISOString()
-      }]);
-      
+      // Recharger les invitations pour afficher la nouvelle
+      await loadCompanyInvitations();
+
       toast.success(`Invitation envoyée à ${inviteEmail}`);
       setInviteEmail('');
-      
+
     } catch (error) {
       console.error('Erreur envoi invitation:', error);
       toast.error('Erreur lors de l\'envoi de l\'invitation. Veuillez réessayer.');
@@ -751,6 +787,44 @@ function AppContent() {
 
       // Load shared companies via invitations
       let sharedCompaniesData = [];
+
+      // Vérifier si un token d'invitation est en attente (depuis le lien d'invitation)
+      const pendingInviteToken = sessionStorage.getItem('pending_invite_token');
+      if (pendingInviteToken) {
+        console.log('[Salarize] Found pending invite token:', pendingInviteToken);
+        sessionStorage.removeItem('pending_invite_token'); // Nettoyer
+
+        // Chercher l'invitation par token
+        const { data: tokenInvite, error: tokenError } = await supabase
+          .from('invitations')
+          .select('*')
+          .eq('invite_token', pendingInviteToken)
+          .eq('status', 'pending')
+          .single();
+
+        if (tokenError) {
+          console.log('[Salarize] No invitation found for token:', tokenError.message);
+        } else if (tokenInvite) {
+          console.log('[Salarize] Found invitation via token for company:', tokenInvite.company_id);
+
+          // Accepter l'invitation et mettre à jour l'email (si différent)
+          const { error: updateError } = await supabase
+            .from('invitations')
+            .update({
+              status: 'accepted',
+              accepted_at: new Date().toISOString(),
+              invited_email: userEmail // Mettre à jour avec l'email réel de connexion
+            })
+            .eq('id', tokenInvite.id);
+
+          if (updateError) {
+            console.error('[Salarize] Error accepting token invitation:', updateError);
+          } else {
+            toast.success('Invitation acceptée ! Vous avez maintenant accès à cette société.');
+          }
+        }
+      }
+
       if (userEmail) {
         // Find all invitations for this email (pending or accepted)
         const { data: invitations, error: invError } = await supabase
@@ -1184,16 +1258,20 @@ function AppContent() {
    * │ TABLE: invitations                                                      │
    * │ - id (UUID, PK)                                                        │
    * │ - company_id (UUID, FK → companies.id)                                 │
-   * │ - email (TEXT) - Email de l'invité                                     │
+   * │ - invited_email (TEXT) - Email de l'invité                             │
    * │ - role (TEXT) - 'viewer' ou 'editor'                                   │
    * │ - status (TEXT) - 'pending', 'accepted', 'rejected'                    │
-   * │ - display_name (TEXT) - Nom personnalisé (OPTIONNEL - doit être ajouté)│
+   * │ - invite_token (TEXT) - Token unique pour le lien d'invitation         │
+   * │ - display_name (TEXT) - Nom personnalisé (nullable)                    │
    * │ - invited_by (UUID, FK → auth.users)                                   │
+   * │ - accepted_at (TIMESTAMP) - Date d'acceptation (nullable)              │
    * │ - created_at (TIMESTAMP)                                               │
    * └─────────────────────────────────────────────────────────────────────────┘
    *
    * [DB-MIGRATION-REQUIRED] Si tu vois une erreur sur une colonne manquante:
-   * - display_name dans invitations: ALTER TABLE invitations ADD COLUMN display_name TEXT;
+   * - invite_token: ALTER TABLE invitations ADD COLUMN invite_token TEXT;
+   * - display_name: ALTER TABLE invitations ADD COLUMN display_name TEXT;
+   * - accepted_at: ALTER TABLE invitations ADD COLUMN accepted_at TIMESTAMP;
    *
    * @param {Object} newCompanies - Objet { companyName: { employees, mapping, periods, ... } }
    * @param {string} activeCompanyName - Nom de la société active

@@ -57,6 +57,13 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
     setLoading(true);
     setError('');
 
+    // Sauvegarder le token d'invitation s'il existe dans l'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+    if (inviteToken) {
+      sessionStorage.setItem('pending_invite_token', inviteToken);
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -117,6 +124,13 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login' }) {
 
     setLoading(true);
     setError('');
+
+    // Sauvegarder le token d'invitation s'il existe dans l'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+    if (inviteToken) {
+      sessionStorage.setItem('pending_invite_token', inviteToken);
+    }
 
     try {
       const { data, error } = await supabase.auth.signUp({
