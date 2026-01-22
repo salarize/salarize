@@ -827,6 +827,9 @@ function AppContent() {
 
       // Vérifier si un token d'invitation est en attente (depuis le lien d'invitation)
       const pendingInviteToken = sessionStorage.getItem('pending_invite_token');
+      let tokenInviteCompanyId = null;
+      let tokenInviteRole = null;
+
       if (pendingInviteToken) {
         console.log('[Salarize] Found pending invite token:', pendingInviteToken);
         sessionStorage.removeItem('pending_invite_token'); // Nettoyer
@@ -843,6 +846,8 @@ function AppContent() {
           console.log('[Salarize] No invitation found for token:', tokenError.message);
         } else if (tokenInvite) {
           console.log('[Salarize] Found invitation via token for company:', tokenInvite.company_id);
+          tokenInviteCompanyId = tokenInvite.company_id;
+          tokenInviteRole = tokenInvite.role;
 
           // Accepter l'invitation et mettre à jour l'email (si différent)
           const { error: updateError } = await supabase
@@ -858,6 +863,18 @@ function AppContent() {
             console.error('[Salarize] Error accepting token invitation:', updateError);
           } else {
             toast.success('Invitation acceptée ! Vous avez maintenant accès à cette société.');
+
+            // Charger directement la société partagée via le token
+            const { data: tokenCompany, error: companyError } = await supabase
+              .from('companies')
+              .select('*')
+              .eq('id', tokenInviteCompanyId)
+              .single();
+
+            if (!companyError && tokenCompany) {
+              console.log('[Salarize] Loaded company from token invite:', tokenCompany.name);
+              sharedCompaniesData.push(tokenCompany);
+            }
           }
         }
       }
@@ -913,6 +930,12 @@ function AppContent() {
 
       // Create a map of company_id -> role from invitations
       const invitationRoles = {};
+
+      // Si on a accepté une invitation via token, ajouter son role
+      if (tokenInviteCompanyId && tokenInviteRole) {
+        invitationRoles[tokenInviteCompanyId] = tokenInviteRole;
+      }
+
       if (userEmail) {
         const { data: invs } = await supabase
           .from('invitations')
