@@ -5568,11 +5568,11 @@ L'équipe Salarize`;
                       <select
                         value={renameDeptOld}
                         onChange={e => setRenameDeptOld(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-violet-500 outline-none"
+                        className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
                       >
-                        <option value="" style={{backgroundColor: '#334155'}}>Choisir...</option>
+                        <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>Choisir...</option>
                         {allDepartments.map(dept => (
-                          <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                          <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
                         ))}
                       </select>
                       <span className="flex items-center text-slate-500">
@@ -5654,11 +5654,11 @@ L'équipe Salarize`;
                       <select
                         value={mergeDeptFrom}
                         onChange={e => setMergeDeptFrom(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
+                        className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
                       >
-                        <option value="" style={{backgroundColor: '#334155'}}>Fusionner...</option>
+                        <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>Fusionner...</option>
                         {allDepartments.map(dept => (
-                          <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                          <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
                         ))}
                       </select>
                       <span className="flex items-center text-slate-500">
@@ -5669,11 +5669,11 @@ L'équipe Salarize`;
                       <select
                         value={mergeDeptTo}
                         onChange={e => setMergeDeptTo(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
+                        className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
                       >
-                        <option value="" style={{backgroundColor: '#334155'}}>...vers</option>
+                        <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>...vers</option>
                         {allDepartments.filter(d => d !== mergeDeptFrom).map(dept => (
-                          <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                          <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
                         ))}
                       </select>
                     </div>
@@ -5847,11 +5847,11 @@ L'équipe Salarize`;
                     <select
                       value={bulkAssignDept}
                       onChange={e => setBulkAssignDept(e.target.value)}
-                      className="w-44 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:border-violet-500 outline-none"
+                      className="w-44 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
                     >
-                      <option value="" style={{backgroundColor: '#334155'}}>Assigner à...</option>
+                      <option value="" style={{backgroundColor: '#1e293b', color: '#94a3b8'}}>Assigner à...</option>
                       {allDepartments.map(dept => (
-                        <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                        <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
                       ))}
                     </select>
                     <button
@@ -5921,12 +5921,12 @@ L'équipe Salarize`;
                   <select
                     value={deptFilter === 'unassigned' ? 'unassigned' : deptFilter}
                     onChange={e => setDeptFilter(e.target.value)}
-                    className="w-44 px-3 py-3 bg-slate-700 border border-slate-600 rounded-xl text-sm font-medium text-white focus:border-violet-500 outline-none"
+                    className="w-44 px-3 py-3 bg-slate-800 border border-slate-600 rounded-xl text-sm font-medium text-white hover:border-violet-500/50 focus:border-violet-500 outline-none transition-colors"
                   >
-                    <option value="all" style={{backgroundColor: '#334155'}}>Tous les dép.</option>
-                    <option value="unassigned" style={{backgroundColor: '#334155'}}>Non assignés</option>
+                    <option value="all" style={{backgroundColor: '#1e293b', color: '#fff'}}>Tous les dép.</option>
+                    <option value="unassigned" style={{backgroundColor: '#1e293b', color: '#a78bfa'}}>Non assignés</option>
                     {allDepartments.map(dept => (
-                      <option key={dept} value={dept} style={{backgroundColor: '#334155'}}>{dept}</option>
+                      <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
                     ))}
                   </select>
                 </div>
@@ -6038,21 +6038,21 @@ L'équipe Salarize`;
                               empCost: empCost
                             });
                           }}
-                          className={`w-44 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer appearance-none bg-no-repeat bg-right ${
-                            isViewerOnly ? 'cursor-not-allowed opacity-60' : ''
+                          className={`w-44 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer appearance-none bg-no-repeat bg-right border ${
+                            isViewerOnly ? 'cursor-not-allowed opacity-60' : 'hover:border-violet-500/50'
                           } ${
                             emp.currentDept
                               ? 'bg-slate-700 border-slate-600 text-white'
-                              : 'bg-slate-700 border-amber-500/50 text-amber-400'
-                          } border`}
+                              : 'bg-violet-500/10 border-violet-500/30 text-violet-300'
+                          }`}
                           style={{
-                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
+                            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238b5cf6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`,
                             backgroundSize: '1.25rem',
                             backgroundPosition: 'right 0.5rem center',
                             paddingRight: '2rem'
                           }}
                         >
-                          <option value="" style={{backgroundColor: '#1e293b', color: '#fbbf24'}}>Non assigné</option>
+                          <option value="" style={{backgroundColor: '#1e293b', color: '#a78bfa'}}>Non assigné</option>
                           {allDepartments.map(dept => (
                             <option key={dept} value={dept} style={{backgroundColor: '#1e293b', color: '#fff'}}>{dept}</option>
                           ))}
