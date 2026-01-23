@@ -4601,10 +4601,14 @@ L'équipe Salarize`;
   const uniqueEmployeesWithDept = useMemo(() => {
     const seen = new Map();
     employees.forEach(e => {
-      if (!seen.has(e.name)) {
-        seen.set(e.name, {
+      const name = e.name?.trim();
+      if (name && !seen.has(name)) {
+        // Priorité: department_mappings > department dans les données > null
+        const dept = departmentMapping[name] || (e.department && e.department.trim()) || null;
+        seen.set(name, {
           ...e,
-          currentDept: e.department || departmentMapping[e.name] || null
+          name,
+          currentDept: dept
         });
       }
     });
