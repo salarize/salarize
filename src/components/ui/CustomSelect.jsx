@@ -76,12 +76,23 @@ function CustomSelect({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, highlightedIndex, options]);
 
-  // Scroll highlighted item into view
+  // Scroll highlighted item into view (within dropdown only, not page)
   useEffect(() => {
     if (isOpen && listRef.current && highlightedIndex >= 0) {
-      const item = listRef.current.children[highlightedIndex];
+      const list = listRef.current;
+      const item = list.children[highlightedIndex];
       if (item) {
-        item.scrollIntoView({ block: 'nearest' });
+        // Manual scroll within container only
+        const itemTop = item.offsetTop;
+        const itemBottom = itemTop + item.offsetHeight;
+        const listScrollTop = list.scrollTop;
+        const listHeight = list.clientHeight;
+
+        if (itemTop < listScrollTop) {
+          list.scrollTop = itemTop;
+        } else if (itemBottom > listScrollTop + listHeight) {
+          list.scrollTop = itemBottom - listHeight;
+        }
       }
     }
   }, [highlightedIndex, isOpen]);
