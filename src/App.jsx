@@ -744,6 +744,10 @@ function AppContent() {
             // Nettoyer l'URL
             window.history.replaceState(null, '', window.location.pathname);
 
+            // Fermer le modal d'auth (important pour le flow invitation)
+            setShowAuthModal(false);
+            setPendingInviteInfo(null);
+
             // Mettre à jour l'user
             const user = data.session.user;
             setUser({
