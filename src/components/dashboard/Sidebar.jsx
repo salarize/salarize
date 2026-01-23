@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 
-function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, isViewerOnly, companyOrder, onReorderCompanies, onTimesheetClick }) {
+function Sidebar({ companies, activeCompany, onSelectCompany, onImportClick, onAddCompany, onManageData, onManageDepts, debugMsg, setCurrentPage, isOpen, onClose, isViewerOnly, companyOrder, onReorderCompanies, onTimesheetClick, departmentMapping }) {
   const [draggedCompany, setDraggedCompany] = useState(null);
   const [dragOverCompany, setDragOverCompany] = useState(null);
 
+  // Utiliser departmentMapping (prioritaire) OU companies[].mapping pour cohérence avec App.jsx
+  const mapping = departmentMapping || companies[activeCompany]?.mapping || {};
   const unassignedCount = activeCompany && companies[activeCompany]
     ? new Set(
         (companies[activeCompany].employees || [])
-          .filter(e => !e.department && !companies[activeCompany].mapping?.[e.name])
-          .map(e => e.name)
+          .filter(e => {
+            const name = e.name?.trim();
+            // Même logique que uniqueEmployeesWithDept dans App.jsx
+            const dept = mapping[name] || (e.department && e.department.trim()) || null;
+            return !dept;
+          })
+          .map(e => e.name?.trim())
       ).size
     : 0;
 

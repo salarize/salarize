@@ -5197,6 +5197,7 @@ L'équipe Salarize`;
             companyOrder={companyOrder}
             onReorderCompanies={handleReorderCompanies}
             onTimesheetClick={() => setShowTimesheet(true)}
+            departmentMapping={departmentMapping}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -5313,6 +5314,7 @@ L'équipe Salarize`;
           companyOrder={companyOrder}
           onReorderCompanies={handleReorderCompanies}
           onTimesheetClick={() => { setShowTimesheet(true); setSidebarOpen(false); }}
+          departmentMapping={departmentMapping}
         />
         <DashboardHeader 
           user={user} 
