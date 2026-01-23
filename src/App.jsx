@@ -6299,6 +6299,7 @@ L'équipe Salarize`;
                       { value: 'unassigned', label: 'Non assignés' },
                       ...allDepartments.map(dept => ({ value: dept, label: dept }))
                     ]}
+                    variant="violet"
                     className="w-44"
                   />
                 </div>
