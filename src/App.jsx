@@ -386,16 +386,9 @@ function AppContent() {
               <strong style="color: #1e293b;">${user?.name || user?.email || 'Un utilisateur'}</strong> vous invite à accéder aux données salariales de l'entreprise <strong style="color: #6366f1;">${activeCompany}</strong>.
             </p>
 
-            <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; margin: 25px 0;">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                  <span style="font-size: 24px;">🔐</span>
-                </div>
-                <div>
-                  <p style="margin: 0; color: #64748b; font-size: 13px;">Votre rôle</p>
-                  <p style="margin: 4px 0 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${inviteRole === 'viewer' ? '👁️ Lecteur (consultation)' : '✏️ Éditeur (modification)'}</p>
-                </div>
-              </div>
+            <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center;">
+              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px;">Votre rôle</p>
+              <p style="margin: 0; color: #1e293b; font-size: 18px; font-weight: 600;">${inviteRole === 'viewer' ? '👁️ Lecteur (consultation)' : '✏️ Éditeur (modification)'}</p>
             </div>
 
             <a href="${inviteLink}" style="display: block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; text-align: center; margin: 30px 0;">
