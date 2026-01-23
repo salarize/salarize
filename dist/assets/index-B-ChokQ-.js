@@ -649,11 +649,10 @@ ${g}`}class Ar extends Error{constructor({message:t,code:r,cause:n,name:a}){var 
     `,ee=window.open("","_blank");ee.document.write(te),ee.document.close(),e.success("Rapport PDF généré")},zL=async()=>{if(!ue||!a)return;if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ue)){e.error("Adresse email invalide");return}Ce(!0);try{const E=ar.reduce((Ee,ze)=>Ee+ze.totalCost,0),I=new Set(ar.map(Ee=>Ee.name)).size,H=v.length,B=I>0?E/I:0,Q=crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36),{data:{user:te}}=await Re.auth.getUser();if(te){const{data:Ee}=await Re.from("companies").select("id").eq("user_id",te.id).eq("name",a).single();Ee&&await Re.from("shares").insert({company_id:Ee.id,shared_by:te.id,shared_with_email:ue,token:Q,message:Ne,expires_at:new Date(Date.now()+30*24*60*60*1e3).toISOString()})}const ee=(L==null?void 0:L.name)||"Un utilisateur Salarize",se=`📊 Rapport salarial ${a}`,de={};ar.forEach(Ee=>{const ze=Ee.department||c[Ee.name]||"Non assigné";de[ze]=(de[ze]||0)+Ee.totalCost});const ae=Object.entries(de).sort((Ee,ze)=>ze[1]-Ee[1]).slice(0,5).map(([Ee,ze])=>`  • ${Ee}: €${ze.toLocaleString("fr-BE",{maximumFractionDigits:0})}`).join(`
 `),ve=Object.entries(de).sort((Ee,ze)=>ze[1]-Ee[1]).slice(0,5).map(([Ee,ze],Ke)=>`
           <tr>
-            <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
-              <span style="display: inline-block; width: 24px; height: 24px; background: ${Ke===0?"#fbbf24":Ke===1?"#94a3b8":Ke===2?"#d97706":"#e2e8f0"}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 600; color: ${Ke<3?"white":"#64748b"}; margin-right: 12px;">${Ke+1}</span>
-              <span style="color: #1e293b; font-weight: 500;">${Ee}</span>
+            <td style="padding: 14px 16px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-weight: 500;">
+              ${Ke===0?"🥇":Ke===1?"🥈":Ke===2?"🥉":`${Ke+1}.`} ${Ee}
             </td>
-            <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #1e293b;">€${ze.toLocaleString("fr-BE",{maximumFractionDigits:0})}</td>
+            <td style="padding: 14px 16px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #1e293b;">€${ze.toLocaleString("fr-BE",{maximumFractionDigits:0})}</td>
           </tr>
         `).join(""),ge=`
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 40px 20px;">
@@ -673,24 +672,28 @@ ${g}`}class Ar extends Error{constructor({message:t,code:r,cause:n,name:a}){var 
             </div>
             `:""}
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 30px 0;">
-              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">💰 Coût Total</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">€${E.toLocaleString("fr-BE",{maximumFractionDigits:0})}</p>
-              </div>
-              <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">👥 Employés</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">${I}</p>
-              </div>
-              <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">📅 Périodes</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">${H}</p>
-              </div>
-              <div style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">📈 Moy/Employé</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">€${B.toLocaleString("fr-BE",{maximumFractionDigits:0})}</p>
-              </div>
-            </div>
+            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
+              <tr>
+                <td width="33%" style="padding: 8px;">
+                  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 12px;">💰 Coût Total</p>
+                    <p style="margin: 0; color: white; font-size: 20px; font-weight: 700;">€${E.toLocaleString("fr-BE",{maximumFractionDigits:0})}</p>
+                  </div>
+                </td>
+                <td width="33%" style="padding: 8px;">
+                  <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 12px;">👥 Employés</p>
+                    <p style="margin: 0; color: white; font-size: 20px; font-weight: 700;">${I}</p>
+                  </div>
+                </td>
+                <td width="33%" style="padding: 8px;">
+                  <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 12px;">📅 Périodes</p>
+                    <p style="margin: 0; color: white; font-size: 20px; font-weight: 700;">${H}</p>
+                  </div>
+                </td>
+              </tr>
+            </table>
 
             <h3 style="color: #1e293b; font-size: 16px; margin: 30px 0 16px 0; font-weight: 600;">🏢 Top 5 Départements</h3>
             <table style="width: 100%; border-collapse: collapse; background: #f8fafc; border-radius: 12px; overflow: hidden;">

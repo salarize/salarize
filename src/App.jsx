@@ -3837,11 +3837,10 @@ function AppContent() {
         .slice(0, 5)
         .map(([dept, cost], i) => `
           <tr>
-            <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
-              <span style="display: inline-block; width: 24px; height: 24px; background: ${i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#d97706' : '#e2e8f0'}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 600; color: ${i < 3 ? 'white' : '#64748b'}; margin-right: 12px;">${i + 1}</span>
-              <span style="color: #1e293b; font-weight: 500;">${dept}</span>
+            <td style="padding: 14px 16px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-weight: 500;">
+              ${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} ${dept}
             </td>
-            <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #1e293b;">€${cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</td>
+            <td style="padding: 14px 16px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #1e293b;">€${cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</td>
           </tr>
         `).join('');
 
@@ -3863,24 +3862,28 @@ function AppContent() {
             </div>
             ` : ''}
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 30px 0;">
-              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">💰 Coût Total</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">€${totalCostValue.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
-              </div>
-              <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">👥 Employés</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">${uniqueEmps}</p>
-              </div>
-              <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">📅 Périodes</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">${periodsCount}</p>
-              </div>
-              <div style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">📈 Moy/Employé</p>
-                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">€${avgCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
-              </div>
-            </div>
+            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 30px 0;">
+              <tr>
+                <td width="33%" style="padding: 8px;">
+                  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 12px;">💰 Coût Total</p>
+                    <p style="margin: 0; color: white; font-size: 20px; font-weight: 700;">€${totalCostValue.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
+                  </div>
+                </td>
+                <td width="33%" style="padding: 8px;">
+                  <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 12px;">👥 Employés</p>
+                    <p style="margin: 0; color: white; font-size: 20px; font-weight: 700;">${uniqueEmps}</p>
+                  </div>
+                </td>
+                <td width="33%" style="padding: 8px;">
+                  <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                    <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 12px;">📅 Périodes</p>
+                    <p style="margin: 0; color: white; font-size: 20px; font-weight: 700;">${periodsCount}</p>
+                  </div>
+                </td>
+              </tr>
+            </table>
 
             <h3 style="color: #1e293b; font-size: 16px; margin: 30px 0 16px 0; font-weight: 600;">🏢 Top 5 Départements</h3>
             <table style="width: 100%; border-collapse: collapse; background: #f8fafc; border-radius: 12px; overflow: hidden;">
