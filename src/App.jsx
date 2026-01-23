@@ -316,7 +316,8 @@ function AppContent() {
 
       // Générer un token unique pour l'invitation
       const inviteToken = crypto.randomUUID();
-      const inviteLink = `${window.location.origin}?invite=${inviteToken}`;
+      const productionUrl = 'https://www.salarize.co';
+      const inviteLink = `${productionUrl}?invite=${inviteToken}`;
 
       // Insérer l'invitation dans Supabase
       const { data: newInvitation, error: insertError } = await supabase
