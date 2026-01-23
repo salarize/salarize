@@ -46,7 +46,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 // Config
 import { supabase, getValidSession } from './config/supabase';
-import { emailjs, EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID } from './config/emailjs';
+import { emailjs, EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_SHARE_TEMPLATE_ID } from './config/emailjs';
 
 // Constants
 import { DEMO_COMPANY, DEMO_EMPLOYEES, DEMO_MAPPING } from './constants/demo';
@@ -138,6 +138,7 @@ function AppContent() {
   const [debugMsg, setDebugMsg] = useState('');
   const [user, setUser] = useState(null);
   const [selectedYear, setSelectedYear] = useState('2025');
+  const [deptPeriodFilter, setDeptPeriodFilter] = useState('all'); // 'all' ou une période spécifique
   const [showDataManager, setShowDataManager] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'clear' | 'delete' | 'deletePeriod', period?: string }
   const [showLogoMenu, setShowLogoMenu] = useState(false);
@@ -369,6 +370,48 @@ function AppContent() {
         }
       }
 
+      // Créer un beau template HTML pour l'invitation
+      const inviteHtml = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 40px 20px;">
+          <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px 16px 0 0; padding: 40px 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">📊 Salarize</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Gestion intelligente des coûts salariaux</p>
+          </div>
+
+          <div style="background: white; padding: 40px 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <h2 style="color: #1e293b; margin: 0 0 20px 0; font-size: 22px;">Vous êtes invité(e) !</h2>
+
+            <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+              <strong style="color: #1e293b;">${user?.name || user?.email || 'Un utilisateur'}</strong> vous invite à accéder aux données salariales de l'entreprise <strong style="color: #6366f1;">${activeCompany}</strong>.
+            </p>
+
+            <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; margin: 25px 0;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                  <span style="font-size: 24px;">🔐</span>
+                </div>
+                <div>
+                  <p style="margin: 0; color: #64748b; font-size: 13px;">Votre rôle</p>
+                  <p style="margin: 4px 0 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${inviteRole === 'viewer' ? '👁️ Lecteur (consultation)' : '✏️ Éditeur (modification)'}</p>
+                </div>
+              </div>
+            </div>
+
+            <a href="${inviteLink}" style="display: block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 12px; font-weight: 600; font-size: 16px; text-align: center; margin: 30px 0;">
+              ✨ Accepter l'invitation
+            </a>
+
+            <p style="color: #94a3b8; font-size: 13px; text-align: center; margin: 20px 0 0 0;">
+              Ce lien expire dans 7 jours. Si vous n'avez pas demandé cet accès, ignorez cet email.
+            </p>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 30px 0 0 0;">
+            © ${new Date().getFullYear()} Salarize • Gestion des coûts salariaux
+          </p>
+        </div>
+      `;
+
       // Envoyer l'email via EmailJS
       await emailjs.send(
         EMAILJS_SERVICE_ID,
@@ -379,6 +422,7 @@ function AppContent() {
           company_name: activeCompany,
           role: inviteRole === 'viewer' ? 'Lecteur (consultation uniquement)' : 'Éditeur (consultation et modification)',
           invite_link: inviteLink,
+          html_content: inviteHtml,
         }
       );
 
@@ -1094,51 +1138,64 @@ function AppContent() {
       setCompanies(loadedCompanies);
       companiesRef.current = loadedCompanies; // Synchroniser la ref
 
-      // Charger l'ordre des sociétés (priorité: Supabase > localStorage)
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const supabaseOrder = authUser?.user_metadata?.company_order;
+      // Charger l'ordre des sociétés (priorité: localStorage > Supabase)
+      // localStorage est plus fiable car mis à jour immédiatement lors du drag & drop
+      let savedOrder = null;
 
-      if (supabaseOrder && Array.isArray(supabaseOrder)) {
-        setCompanyOrder(supabaseOrder);
-        console.log('[Salarize] Loaded company order from Supabase:', supabaseOrder);
-        // Sync to localStorage
-        localStorage.setItem(`salarize_company_order_${userId}`, JSON.stringify(supabaseOrder));
-      } else {
-        // Fallback to localStorage
-        const savedOrder = localStorage.getItem(`salarize_company_order_${userId}`);
-        if (savedOrder) {
-          try {
-            const parsedOrder = JSON.parse(savedOrder);
-            setCompanyOrder(parsedOrder);
-            console.log('[Salarize] Loaded company order from localStorage:', parsedOrder);
-          } catch (e) {
-            console.warn('[Salarize] Failed to parse saved company order');
-          }
+      // 1. Essayer localStorage d'abord (plus récent après un reorder)
+      const localStorageOrder = localStorage.getItem(`salarize_company_order_${userId}`);
+      if (localStorageOrder) {
+        try {
+          savedOrder = JSON.parse(localStorageOrder);
+          console.log('[Salarize] Loaded company order from localStorage:', savedOrder);
+        } catch (e) {
+          console.warn('[Salarize] Failed to parse localStorage company order');
         }
+      }
+
+      // 2. Fallback vers Supabase user_metadata si localStorage vide
+      if (!savedOrder) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const supabaseOrder = authUser?.user_metadata?.company_order;
+        if (supabaseOrder && Array.isArray(supabaseOrder)) {
+          savedOrder = supabaseOrder;
+          console.log('[Salarize] Loaded company order from Supabase:', savedOrder);
+          localStorage.setItem(`salarize_company_order_${userId}`, JSON.stringify(savedOrder));
+        }
+      }
+
+      if (savedOrder) {
+        setCompanyOrder(savedOrder);
       }
 
       // Load first company if exists (respecting order: own companies first, then shared)
       const ownCompanies = Object.entries(loadedCompanies)
         .filter(([_, c]) => !c.isShared)
-        .map(([name]) => name);
+        .map(([name]) => name)
+        .sort(); // Tri alphabétique par défaut
       const sharedCompaniesNames = Object.entries(loadedCompanies)
         .filter(([_, c]) => c.isShared)
-        .map(([name]) => name);
+        .map(([name]) => name)
+        .sort();
+
+      console.log('[Salarize] Own companies (alphabetical):', ownCompanies);
+      console.log('[Salarize] Saved order:', savedOrder);
 
       // Sort by saved order if available
       const sortByOrder = (names, order) => {
-        if (!order || order.length === 0) return names;
-        return names.sort((a, b) => {
+        if (!order || order.length === 0) return names; // Déjà trié alphabétiquement
+        return [...names].sort((a, b) => {
           const indexA = order.indexOf(a);
           const indexB = order.indexOf(b);
-          if (indexA === -1 && indexB === -1) return 0;
+          if (indexA === -1 && indexB === -1) return a.localeCompare(b); // Alphabétique si pas dans l'ordre
           if (indexA === -1) return 1;
           if (indexB === -1) return -1;
           return indexA - indexB;
         });
       };
 
-      const orderedOwn = sortByOrder(ownCompanies, supabaseOrder || []);
+      const orderedOwn = sortByOrder(ownCompanies, savedOrder || []);
+      console.log('[Salarize] Ordered companies:', orderedOwn);
       const firstCompany = orderedOwn[0] || sharedCompaniesNames[0];
 
       if (firstCompany) {
@@ -3774,6 +3831,72 @@ function AppContent() {
         .map(([dept, cost]) => `  • ${dept}: €${cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}`)
         .join('\n');
       
+      const topDeptsHtml = Object.entries(deptCosts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([dept, cost], i) => `
+          <tr>
+            <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+              <span style="display: inline-block; width: 24px; height: 24px; background: ${i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#d97706' : '#e2e8f0'}; border-radius: 50%; text-align: center; line-height: 24px; font-size: 12px; font-weight: 600; color: ${i < 3 ? 'white' : '#64748b'}; margin-right: 12px;">${i + 1}</span>
+              <span style="color: #1e293b; font-weight: 500;">${dept}</span>
+            </td>
+            <td style="padding: 12px 16px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 600; color: #1e293b;">€${cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</td>
+          </tr>
+        `).join('');
+
+      const shareHtml = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 40px 20px;">
+          <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px 16px 0 0; padding: 40px 30px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">📊 Rapport Salarial</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 18px; font-weight: 500;">${activeCompany}</p>
+          </div>
+
+          <div style="background: white; padding: 40px 30px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <p style="color: #475569; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+              <strong style="color: #1e293b;">${senderName}</strong> vous partage un rapport salarial via Salarize.
+            </p>
+
+            ${shareMessage ? `
+            <div style="background: #eff6ff; border-left: 4px solid #6366f1; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 0 0 30px 0;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">"${shareMessage}"</p>
+            </div>
+            ` : ''}
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 30px 0;">
+              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">💰 Coût Total</p>
+                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">€${totalCostValue.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">👥 Employés</p>
+                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">${uniqueEmps}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">📅 Périodes</p>
+                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">${periodsCount}</p>
+              </div>
+              <div style="background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); border-radius: 12px; padding: 20px; text-align: center;">
+                <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.8); font-size: 13px;">📈 Moy/Employé</p>
+                <p style="margin: 0; color: white; font-size: 24px; font-weight: 700;">€${avgCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
+              </div>
+            </div>
+
+            <h3 style="color: #1e293b; font-size: 16px; margin: 30px 0 16px 0; font-weight: 600;">🏢 Top 5 Départements</h3>
+            <table style="width: 100%; border-collapse: collapse; background: #f8fafc; border-radius: 12px; overflow: hidden;">
+              ${topDeptsHtml}
+            </table>
+
+            <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 30px 0 0 0;">
+              Rapport généré le ${new Date().toLocaleDateString('fr-BE')} à ${new Date().toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 30px 0 0 0;">
+            © ${new Date().getFullYear()} Salarize • Gestion des coûts salariaux
+          </p>
+        </div>
+      `;
+
       const emailBody = `Bonjour,
 
 ${senderName} vous partage un rapport salarial via Salarize.
@@ -3798,7 +3921,7 @@ L'équipe Salarize`;
       try {
         await emailjs.send(
           EMAILJS_SERVICE_ID,
-          'template_share', // Créer ce template dans EmailJS
+          EMAILJS_SHARE_TEMPLATE_ID,
           {
             to_email: shareEmail,
             from_name: senderName,
@@ -3809,6 +3932,7 @@ L'équipe Salarize`;
             avg_cost: `€${avgCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
             top_departments: topDepts,
             message: shareMessage || 'Aucun message',
+            html_content: shareHtml,
           }
         );
         toast.success(`Rapport envoyé à ${shareEmail}`);
@@ -4232,27 +4356,83 @@ L'équipe Salarize`;
   
   const deptStats = useMemo(() => {
     const stats = {};
+    const uniqueNamesMap = {};
+
     filtered.forEach(e => {
       const d = e.department || departmentMapping[e.name] || 'Non assigné';
-      if (!stats[d]) stats[d] = { total: 0, count: 0 };
+      if (!stats[d]) {
+        stats[d] = { total: 0, count: 0, uniqueCount: 0 };
+        uniqueNamesMap[d] = new Set();
+      }
       stats[d].total += e.totalCost;
       stats[d].count++;
+      uniqueNamesMap[d].add(e.name);
     });
-    // Filtrer les départements avec un coût total de 0
+
+    // Calculer le count unique et filtrer les départements vides
     Object.keys(stats).forEach(dept => {
-      if (stats[dept].total === 0) delete stats[dept];
+      if (stats[dept].total === 0) {
+        delete stats[dept];
+      } else {
+        stats[dept].uniqueCount = uniqueNamesMap[dept].size;
+      }
     });
     return stats;
   }, [filtered, departmentMapping]);
   
-  const sortedDepts = useMemo(() => 
+  const sortedDepts = useMemo(() =>
     Object.entries(deptStats).sort((a, b) => b[1].total - a[1].total),
     [deptStats]
   );
-  
-  const maxCost = useMemo(() => 
+
+  const maxCost = useMemo(() =>
     Math.max(...sortedDepts.map(([_name, d]) => d.total), 1),
     [sortedDepts]
+  );
+
+  // Stats département filtrées par mois (pour la répartition)
+  const filteredDeptStats = useMemo(() => {
+    if (deptPeriodFilter === 'all') return deptStats;
+    if (!filtered || filtered.length === 0) return {};
+
+    const stats = {};
+    const uniqueNamesMap = {};
+    const periodFiltered = filtered.filter(e => e.period === deptPeriodFilter);
+
+    periodFiltered.forEach(e => {
+      const d = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (!stats[d]) {
+        stats[d] = { total: 0, count: 0, uniqueCount: 0 };
+        uniqueNamesMap[d] = new Set();
+      }
+      stats[d].total += e.totalCost;
+      stats[d].count++;
+      uniqueNamesMap[d].add(e.name);
+    });
+
+    Object.keys(stats).forEach(dept => {
+      if (stats[dept].total === 0) {
+        delete stats[dept];
+      } else {
+        stats[dept].uniqueCount = uniqueNamesMap[dept].size;
+      }
+    });
+    return stats;
+  }, [deptStats, filtered, deptPeriodFilter, departmentMapping]);
+
+  const filteredSortedDepts = useMemo(() =>
+    Object.entries(filteredDeptStats).sort((a, b) => b[1].total - a[1].total),
+    [filteredDeptStats]
+  );
+
+  const filteredMaxCost = useMemo(() =>
+    Math.max(...filteredSortedDepts.map(([_name, d]) => d.total), 1),
+    [filteredSortedDepts]
+  );
+
+  const filteredTotalCost = useMemo(() =>
+    filteredSortedDepts.reduce((sum, [_, d]) => sum + d.total, 0),
+    [filteredSortedDepts]
   );
 
   const empAgg = useMemo(() => {
@@ -7099,12 +7279,12 @@ L'équipe Salarize`;
               {comparisonData.prevMonth ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-300">{formatPeriod(comparisonData.current.period)}</span>
-                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
                     <span className="text-slate-300">{formatPeriod(comparisonData.prevMonth.period)}</span>
                     <span className="font-bold">€{comparisonData.prevMonth?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-300">{formatPeriod(comparisonData.current.period)}</span>
+                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="border-t border-slate-700 pt-3">
                     <div className="flex justify-between items-center">
@@ -7144,12 +7324,12 @@ L'équipe Salarize`;
               {comparisonData.sameMonthLastYear ? (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-violet-200">{formatPeriod(comparisonData.current.period)}</span>
-                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
                     <span className="text-violet-200">{formatPeriod(comparisonData.sameMonthLastYear.period)}</span>
                     <span className="font-bold">€{comparisonData.sameMonthLastYear?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-violet-200">{formatPeriod(comparisonData.current.period)}</span>
+                    <span className="font-bold">€{comparisonData.current?.total?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}</span>
                   </div>
                   <div className="border-t border-violet-500/50 pt-3">
                     <div className="flex justify-between items-center">
@@ -7192,16 +7372,49 @@ L'équipe Salarize`;
               )}
             </div>
             
-            {/* Graphique Standard */}
+            {/* Graphique Style Power BI */}
             <div className="h-96">
-              {chartData.length > 0 ? (
+              {chartData.length > 0 ? (() => {
+                const avgTotal = chartData.reduce((sum, d) => sum + d.total, 0) / chartData.length;
+                const maxTotal = Math.max(...chartData.map(d => d.total));
+                const minTotal = Math.min(...chartData.map(d => d.total));
+
+                // Enrichir les données avec variation vs période précédente
+                const enrichedData = chartData.map((d, i) => {
+                  const prevTotal = i > 0 ? chartData[i - 1].total : null;
+                  const variation = prevTotal ? ((d.total - prevTotal) / prevTotal * 100) : null;
+                  return {
+                    ...d,
+                    variation,
+                    isAboveAvg: d.total > avgTotal,
+                    isMax: d.total === maxTotal,
+                    isMin: d.total === minTotal
+                  };
+                });
+
+                return (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="period" 
+                  <BarChart data={enrichedData} margin={{ top: 25, right: 30, left: 20, bottom: 10 }}>
+                    <defs>
+                      <linearGradient id="barGradientNormal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={`rgb(${getBrandColor()})`} stopOpacity={1}/>
+                        <stop offset="100%" stopColor={`rgb(${getBrandColor()})`} stopOpacity={0.7}/>
+                      </linearGradient>
+                      <linearGradient id="barGradientHigh" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
+                        <stop offset="100%" stopColor="#dc2626" stopOpacity={0.7}/>
+                      </linearGradient>
+                      <linearGradient id="barGradientLow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={1}/>
+                        <stop offset="100%" stopColor="#059669" stopOpacity={0.7}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis
+                      dataKey="period"
                       tick={{ fontSize: 11, fill: '#64748b' }}
-                      tickLine={{ stroke: '#e2e8f0' }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#e2e8f0' }}
                       tickFormatter={(value) => {
                         const month = parseInt(value.substring(5), 10);
                         const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
@@ -7209,30 +7422,73 @@ L'équipe Salarize`;
                         return `${monthNames[month - 1]} '${year}`;
                       }}
                     />
-                    <YAxis 
+                    <YAxis
                       tick={{ fontSize: 12, fill: '#64748b' }}
-                        tickLine={{ stroke: '#e2e8f0' }}
-                        tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip 
-                        formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût total']}
-                        labelFormatter={(label) => formatPeriod(label)}
-                        contentStyle={{ 
-                          backgroundColor: '#1e293b', 
-                          border: 'none', 
-                          borderRadius: '8px',
-                          color: '#fff'
-                        }}
-                        labelStyle={{ color: '#94a3b8' }}
-                      />
-                      <Bar 
-                        dataKey="total" 
-                        fill={`rgb(${getBrandColor()})`}
-                        radius={[6, 6, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-slate-900 p-3 rounded-lg shadow-xl border border-slate-700">
+                              <p className="text-slate-400 text-xs mb-1">{formatPeriod(label)}</p>
+                              <p className="text-white font-bold text-lg">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
+                              {data.variation !== null && (
+                                <p className={`text-sm mt-1 ${data.variation >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                  {data.variation >= 0 ? '↑' : '↓'} {Math.abs(data.variation).toFixed(1)}% vs mois préc.
+                                </p>
+                              )}
+                              <div className="mt-2 pt-2 border-t border-slate-700 text-xs">
+                                <p className="text-slate-400">
+                                  {data.isAboveAvg ? '⚠️ Au-dessus' : '✅ En-dessous'} de la moyenne
+                                </p>
+                                {data.isMax && <p className="text-red-400 mt-1">📈 Mois le plus coûteux</p>}
+                                {data.isMin && <p className="text-emerald-400 mt-1">📉 Mois le moins coûteux</p>}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <ReferenceLine
+                      y={avgTotal}
+                      stroke="#6366f1"
+                      strokeDasharray="5 5"
+                      strokeWidth={2}
+                      label={{
+                        value: `Moy: €${(avgTotal / 1000).toFixed(1)}k`,
+                        position: 'right',
+                        fill: '#6366f1',
+                        fontSize: 11,
+                        fontWeight: 600
+                      }}
+                    />
+                    <Bar
+                      dataKey="total"
+                      radius={[4, 4, 0, 0]}
+                      label={chartData.length <= 12 ? {
+                        position: 'top',
+                        fill: '#64748b',
+                        fontSize: 10,
+                        formatter: (value) => `€${(value / 1000).toFixed(0)}k`
+                      } : false}
+                    >
+                      {enrichedData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.isAboveAvg ? 'url(#barGradientHigh)' : 'url(#barGradientLow)'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                );
+              })() : (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400">
                     <svg className="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -7248,21 +7504,39 @@ L'équipe Salarize`;
         {/* Departments - Version Simple sans scroll */}
         {visibleKpis.deptBreakdown && (
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
-            <div className="flex items-center gap-2 sm:gap-4">
-              {/* Filtre de période */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Filtre par mois - Pills élégantes */}
               {periods.length > 1 && (
-                <select
-                  value={selectedYear}
-                  onChange={e => setSelectedYear(e.target.value)}
-                  className="px-2 sm:px-3 py-1 border border-slate-200 rounded-lg bg-white text-xs sm:text-sm"
-                >
-                  <option value="all">Toutes</option>
-                  {years.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setDeptPeriodFilter('all')}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                      deptPeriodFilter === 'all'
+                        ? 'bg-white text-slate-800 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    Cumul
+                  </button>
+                  <select
+                    value={deptPeriodFilter === 'all' ? '' : deptPeriodFilter}
+                    onChange={e => setDeptPeriodFilter(e.target.value || 'all')}
+                    className={`px-2 py-1 text-xs font-medium rounded-md border-0 transition-all cursor-pointer ${
+                      deptPeriodFilter !== 'all'
+                        ? 'bg-white text-slate-800 shadow-sm'
+                        : 'bg-transparent text-slate-500'
+                    }`}
+                  >
+                    <option value="">Mois...</option>
+                    {[...periods].sort().reverse().map(p => (
+                      <option key={p} value={p}>{formatPeriod(p)}</option>
+                    ))}
+                  </select>
+                </div>
               )}
-              <span className="text-xs text-slate-400">{sortedDepts.length} dép.</span>
+              <span className="text-xs text-slate-400 ml-2">{filteredSortedDepts.length} dép.</span>
             </div>
           </div>
           
@@ -7276,22 +7550,19 @@ L'équipe Salarize`;
           </div>
           
           <div className="space-y-2">
-            {sortedDepts
-              .filter(([dept]) => {
-                const comparison = deptStatsWithComparison[dept];
-                return comparison && comparison.currentCount > 0;
-              })
+            {filteredSortedDepts
+              .filter(([_, data]) => data.total > 0)
               .map(([dept, data]) => {
               const comparison = deptStatsWithComparison[dept] || {};
-              const pct = totalCost > 0 ? ((comparison.current / totalCost) * 100).toFixed(1) : '0.0';
-              const barWidth = maxCost > 0 ? Math.max(5, (comparison.current / maxCost) * 100) : 5;
+              const pct = filteredTotalCost > 0 ? ((data.total / filteredTotalCost) * 100).toFixed(1) : '0.0';
+              const barWidth = filteredMaxCost > 0 ? Math.max(5, (data.total / filteredMaxCost) * 100) : 5;
 
               return (
                 <div key={dept} className="flex items-center gap-3 py-2">
                   {/* Nom du département */}
                   <div className="w-32 sm:w-40 flex-shrink-0">
                     <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
-                    <span className="text-xs text-slate-400">{comparison.currentCount || 0} emp.</span>
+                    <span className="text-xs text-slate-400">{data.uniqueCount || data.count} emp.</span>
                   </div>
                   
                   {/* Barre de progression */}
