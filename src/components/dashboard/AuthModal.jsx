@@ -154,8 +154,8 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login', inviteInf
           // L'utilisateur a deja un compte Google avec cet email
           setError('Un compte Google existe deja avec cet email. Connectez-vous avec Google puis ajoutez un mot de passe dans votre profil.');
         } else {
-          setSuccess('Compte cree ! Verifiez votre email pour confirmer votre inscription.');
-          resetForm();
+          // Afficher la vue de confirmation
+          setView('signup-success');
         }
       }
     } catch (err) {
@@ -199,6 +199,51 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login', inviteInf
   };
 
   if (!isOpen) return null;
+
+  // Vue: Compte créé avec succès
+  if (view === 'signup-success') {
+    return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-start justify-center pt-12 sm:pt-20 p-4 overflow-y-auto">
+        <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 overflow-hidden">
+          <div className="p-6 sm:p-8 text-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-5 border border-emerald-500/30">
+              <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">Compte créé !</h2>
+            <div className="bg-slate-800/50 rounded-xl p-4 mb-5 border border-slate-700/50">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="text-white font-medium">Vérifiez votre email</span>
+              </div>
+              <p className="text-slate-400 text-sm">
+                Un lien de confirmation a été envoyé à<br/>
+                <strong className="text-violet-300">{email}</strong>
+              </p>
+            </div>
+            <p className="text-slate-500 text-xs mb-5">
+              📧 Vérifiez aussi vos spams si vous ne trouvez pas l'email
+            </p>
+            <button
+              onClick={() => { setView('login'); resetForm(); }}
+              className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-violet-500/20"
+            >
+              J'ai confirmé, me connecter
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full mt-3 py-2.5 text-slate-400 hover:text-white text-sm transition-colors"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Vue: Email envoye avec succes
   if (view === 'forgot-sent') {

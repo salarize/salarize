@@ -4653,10 +4653,16 @@ L'équipe Salarize`;
   }, [allFilteredEmployeesForDept, deptPage]);
 
   // Nombre total de pages
-  const deptTotalPages = useMemo(() => 
+  const deptTotalPages = useMemo(() =>
     Math.ceil(allFilteredEmployeesForDept.length / DEPT_PAGE_SIZE),
     [allFilteredEmployeesForDept.length]
   );
+
+  // Options mémoïsées pour le dropdown des départements (évite recréation à chaque render)
+  const deptSelectOptions = useMemo(() => [
+    { value: '', label: 'Non assigné' },
+    ...allDepartments.map(dept => ({ value: dept, label: dept }))
+  ], [allDepartments]);
 
   // Reset page quand les filtres changent
   useEffect(() => {
@@ -5202,6 +5208,7 @@ L'équipe Salarize`;
             onReorderCompanies={handleReorderCompanies}
             onTimesheetClick={() => setShowTimesheet(true)}
             departmentMapping={departmentMapping}
+            employees={employees}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -5319,6 +5326,7 @@ L'équipe Salarize`;
           onReorderCompanies={handleReorderCompanies}
           onTimesheetClick={() => { setShowTimesheet(true); setSidebarOpen(false); }}
           departmentMapping={departmentMapping}
+          employees={employees}
         />
         <DashboardHeader 
           user={user} 
@@ -5964,11 +5972,9 @@ L'équipe Salarize`;
                       <CustomSelect
                         value={renameDeptOld}
                         onChange={val => setRenameDeptOld(val)}
-                        options={[
-                          { value: '', label: 'Sélectionner...' },
-                          ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                        ]}
+                        options={deptSelectOptions}
                         placeholder="Sélectionner..."
+                        showIcons={true}
                         className="flex-1"
                       />
                       <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6042,11 +6048,9 @@ L'équipe Salarize`;
                       <CustomSelect
                         value={mergeDeptFrom}
                         onChange={val => setMergeDeptFrom(val)}
-                        options={[
-                          { value: '', label: 'Fusionner...' },
-                          ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                        ]}
+                        options={deptSelectOptions}
                         placeholder="Fusionner..."
+                        showIcons={true}
                         className="flex-1"
                       />
                       <span className="flex items-center text-slate-500">
@@ -6057,11 +6061,9 @@ L'équipe Salarize`;
                       <CustomSelect
                         value={mergeDeptTo}
                         onChange={val => setMergeDeptTo(val)}
-                        options={[
-                          { value: '', label: '...vers' },
-                          ...allDepartments.filter(d => d !== mergeDeptFrom).map(dept => ({ value: dept, label: dept }))
-                        ]}
+                        options={deptSelectOptions.filter(opt => opt.value !== mergeDeptFrom)}
                         placeholder="...vers"
+                        showIcons={true}
                         className="flex-1"
                       />
                     </div>
@@ -6230,12 +6232,10 @@ L'équipe Salarize`;
                     <CustomSelect
                       value={bulkAssignDept}
                       onChange={val => setBulkAssignDept(val)}
-                      options={[
-                        { value: '', label: 'Assigner à...' },
-                        ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                      ]}
+                      options={deptSelectOptions}
                       placeholder="Assigner à..."
-                      className="w-44"
+                      showIcons={true}
+                      className="w-40"
                     />
                     <button
                       onClick={() => {
@@ -6285,9 +6285,9 @@ L'équipe Salarize`;
                   </div>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <div className="relative flex-1">
-                    <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input
@@ -6297,7 +6297,7 @@ L'équipe Salarize`;
                       placeholder="Rechercher un employé..."
                       value={deptSearchTerm}
                       onChange={e => setDeptSearchTerm(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-700 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:border-violet-500 outline-none transition-all"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-sm text-white placeholder-slate-500 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 outline-none transition-all"
                     />
                   </div>
 
@@ -6310,6 +6310,7 @@ L'équipe Salarize`;
                       ...allDepartments.map(dept => ({ value: dept, label: dept }))
                     ]}
                     variant="violet"
+                    showIcons={true}
                     className="w-44"
                   />
                 </div>
@@ -6329,8 +6330,8 @@ L'équipe Salarize`;
                   </div>
                 ) : (
                   <>
-                    {/* Select all header - OUTSIDE scrollable area */}
-                    <div className="flex items-center gap-4 px-5 py-3 bg-slate-800 border-b border-slate-700">
+                    {/* Select all header */}
+                    <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-800/80 border-b border-slate-700/50">
                       <input
                         type="checkbox"
                         id="select-all-employees"
@@ -6345,7 +6346,6 @@ L'équipe Salarize`;
                         }}
                         onChange={e => {
                           if (e.target.checked) {
-                            // Sélectionner TOUS les employés filtrés (pas juste la page)
                             setSelectedEmployees(new Set([...selectedEmployees, ...allFilteredEmployeesForDept.map(emp => emp.name)]));
                           } else {
                             const newSet = new Set(selectedEmployees);
@@ -6353,24 +6353,28 @@ L'équipe Salarize`;
                             setSelectedEmployees(newSet);
                           }
                         }}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-white focus:ring-slate-500 focus:ring-offset-slate-900"
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
                       />
-                      <span className="text-sm text-slate-400 flex-1">
+                      <span className="text-xs font-medium text-slate-400 flex-1">
                         {selectedEmployees.size > 0
                           ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}`
                           : `Tout sélectionner (${allFilteredEmployeesForDept.length})`}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-500 tabular-nums">
                         {deptPage * DEPT_PAGE_SIZE + 1}-{Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length)} sur {allFilteredEmployeesForDept.length}
                       </span>
                     </div>
 
                     {/* Scrollable employee list */}
-                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-700/50">
-                    {filteredEmployeesForDept.map((emp) => (
+                    <div className="max-h-96 overflow-y-auto">
+                    {filteredEmployeesForDept.map((emp, idx) => (
                       <div
                         key={emp.name}
-                        className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors ${selectedEmployees.has(emp.name) ? 'bg-slate-800' : ''}`}
+                        className={`group flex items-center gap-3 px-4 py-3 transition-all duration-150 border-b border-slate-800/50 ${
+                          selectedEmployees.has(emp.name)
+                            ? 'bg-violet-500/10'
+                            : 'hover:bg-slate-800/50'
+                        }`}
                         style={{ contain: 'layout style paint' }}
                       >
                         {/* Checkbox */}
@@ -6388,22 +6392,24 @@ L'équipe Salarize`;
                             }
                             setSelectedEmployees(newSet);
                           }}
-                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-white focus:ring-slate-500 focus:ring-offset-slate-900"
+                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
                         />
 
-                        {/* Avatar */}
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
+                        {/* Avatar avec initiales */}
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                           emp.currentDept
-                            ? 'bg-slate-800 text-slate-300'
-                            : 'bg-slate-700 text-slate-400 border border-slate-600'
+                            ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 text-violet-300 border border-violet-500/20'
+                            : 'bg-slate-700/50 text-slate-400 border border-slate-600/50'
                         }`}>
-                          {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
 
+                        {/* Nom */}
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-white truncate">{emp.name}</p>
+                          <p className="font-medium text-white truncate text-sm">{emp.name}</p>
                         </div>
 
+                        {/* Dropdown département */}
                         <CustomSelect
                           value={emp.currentDept || ''}
                           disabled={isViewerOnly}
@@ -6423,13 +6429,11 @@ L'équipe Salarize`;
                               empCost: empCost
                             });
                           }}
-                          options={[
-                            { value: '', label: 'Non assigné' },
-                            ...allDepartments.map(dept => ({ value: dept, label: dept }))
-                          ]}
+                          options={deptSelectOptions}
                           variant={emp.currentDept ? 'default' : 'warning'}
                           dropdownPosition="auto"
-                          className="w-44"
+                          showIcons={true}
+                          className="w-36"
                         />
                       </div>
                     ))}
@@ -6468,10 +6472,10 @@ L'équipe Salarize`;
               )}
 
               {/* Footer */}
-              <div className="px-6 py-4 border-t border-slate-800">
+              <div className="px-5 py-4 bg-slate-800/30 border-t border-slate-700/50">
                 <button
                   onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); setSelectedEmployees(new Set()); setBulkAssignDept(''); setDeptPage(0); }}
-                  className="w-full py-2.5 bg-white text-slate-900 rounded-lg font-medium hover:bg-slate-100 transition-colors"
+                  className="w-full py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-xl font-semibold hover:from-violet-500 hover:to-fuchsia-500 transition-all shadow-lg shadow-violet-500/20"
                 >
                   Terminé
                 </button>
@@ -6901,44 +6905,60 @@ L'équipe Salarize`;
           </div>
         </div>
         
-        {/* KPI Cards - 3 colonnes */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+        {/* KPI Cards - Responsive grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between sm:justify-start sm:gap-3 mb-2 sm:mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium text-slate-500">Coût Total</span>
               </div>
-              <span className="text-sm font-medium text-slate-500">Coût Total</span>
+              <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs font-medium rounded-lg">
+                {selectedPeriods.length > 0
+                  ? `${selectedPeriods.length} période${selectedPeriods.length > 1 ? 's' : ''}`
+                  : selectedYear !== 'all'
+                    ? selectedYear
+                    : `${filteredPeriodsCount} mois`}
+              </span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-            <p className="text-xs text-slate-400 mt-1">~€{filteredPeriodsCount > 0 ? (totalCost / filteredPeriodsCount).toLocaleString('fr-BE', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : 0} / mois</p>
+            <div className="flex items-end justify-between sm:block">
+              <p className="text-xl sm:text-2xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
+              <p className="text-xs text-slate-400 sm:mt-1">~€{filteredPeriodsCount > 0 ? (totalCost / filteredPeriodsCount).toLocaleString('fr-BE', {minimumFractionDigits: 0, maximumFractionDigits: 0}) : 0} / mois</p>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-2 sm:mb-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
               <span className="text-sm font-medium text-slate-500">Employés</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">{avgEmployeesPerPeriod}</p>
-            <p className="text-xs text-slate-400 mt-1">moyenne / mois</p>
+            <div className="flex items-end justify-between sm:block">
+              <p className="text-xl sm:text-2xl font-bold text-slate-800">{avgEmployeesPerPeriod}</p>
+              <p className="text-xs text-slate-400 sm:mt-1">moyenne / mois</p>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-3 mb-2 sm:mb-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
                 <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
               <span className="text-sm font-medium text-slate-500">Départements</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
+            <div className="flex items-end justify-between sm:block">
+              <p className="text-xl sm:text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
+              <p className="text-xs text-slate-400 sm:mt-1 sm:invisible">actifs</p>
+            </div>
           </div>
         </div>
 
