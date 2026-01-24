@@ -372,7 +372,9 @@ function AppContent() {
       }
 
       // Créer un beau template HTML pour l'invitation
+      const invitePreheader = (user?.name || 'Quelqu\'un') + ' vous invite à consulter ' + activeCompany + ' sur Salarize';
       const inviteHtml = `
+        <span style="display:none;font-size:1px;color:#f8fafc;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${invitePreheader}</span>
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 40px 20px;">
           <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px 16px 0 0; padding: 40px 30px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">📊 Salarize</h1>
@@ -3841,7 +3843,9 @@ function AppContent() {
           </tr>
         `).join('');
 
+      const sharePreheader = senderName + ' vous partage le rapport ' + activeCompany + ' - €' + totalCostValue.toLocaleString('fr-BE', { maximumFractionDigits: 0 });
       const shareHtml = `
+        <span style="display:none;font-size:1px;color:#f8fafc;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">${sharePreheader}</span>
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc; padding: 40px 20px;">
           <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border-radius: 16px 16px 0 0; padding: 40px 30px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">📊 Rapport Salarial</h1>
