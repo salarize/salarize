@@ -1803,92 +1803,190 @@ function AppContent() {
     saveAll(newCompanies, active);
   }, 800);
 
-  // Export Excel amélioré avec comparaisons
-  const exportToExcel = () => {
-    if (!activeCompany || employees.length === 0) return;
-    
-    const company = companies[activeCompany];
-    const filteredData = selectedPeriods.length === 0 
-      ? employees 
-      : employees.filter(e => selectedPeriods.includes(e.period));
-    
-    // Feuille 1 : Résumé avec comparaisons
-    const summaryRows = [];
-    
-    // En-tête du rapport
-    summaryRows.push({ 'Rapport': `Analyse Salariale - ${activeCompany}` });
-    summaryRows.push({ 'Rapport': `Généré le ${new Date().toLocaleDateString('fr-BE')}` });
-    summaryRows.push({});
-    
-    // Stats globales
-    const totalCostExport = filteredData.reduce((sum, e) => sum + e.totalCost, 0);
-    summaryRows.push({ 'Indicateur': 'Coût Total', 'Valeur': `€${totalCostExport.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}` });
-    summaryRows.push({ 'Indicateur': 'Nombre d\'employés', 'Valeur': new Set(filteredData.map(e => e.name)).size });
-    summaryRows.push({ 'Indicateur': 'Périodes analysées', 'Valeur': periods.length });
-    
-    // Comparaisons si disponibles
-    if (comparisonData && comparisonData.current) {
-      summaryRows.push({});
-      summaryRows.push({ 'Indicateur': '=== COMPARAISONS ===' });
-      if (comparisonData.prevMonth && comparisonData.variationVsPrevMonth !== null) {
-        summaryRows.push({ 
-          'Indicateur': 'vs Mois précédent', 
-          'Valeur': `${comparisonData.variationVsPrevMonth >= 0 ? '+' : ''}${comparisonData.variationVsPrevMonth.toFixed(2)}%`,
-          'Détail': `€${comparisonData.diffVsPrevMonth?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}`
-        });
-      }
-      if (comparisonData.sameMonthLastYear && comparisonData.variationVsLastYear !== null) {
-        summaryRows.push({ 
-          'Indicateur': 'vs Année précédente', 
-          'Valeur': `${comparisonData.variationVsLastYear >= 0 ? '+' : ''}${comparisonData.variationVsLastYear.toFixed(2)}%`,
-          'Détail': `€${comparisonData.diffVsLastYear?.toLocaleString('fr-BE', { minimumFractionDigits: 2 }) || '0'}`
-        });
-      }
+  const getExportScope = (yearOverride = null) => {
+    let scopedPeriods = [...periods];
+    const targetYear = yearOverride || (selectedYear !== 'all' ? selectedYear : null);
+
+    if (targetYear) {
+      scopedPeriods = scopedPeriods.filter(p => p.startsWith(targetYear));
     }
-    summaryRows.push({});
-    
-    // Feuille 2 : Départements avec comparaisons
-    const deptRows = [
-      { 'Département': 'DÉPARTEMENT', 'Coût Actuel': 'COÛT ACTUEL', 'vs M-1 (%)': 'VS M-1 (%)', 'vs M-1 (€)': 'VS M-1 (€)', 'vs An-1 (%)': 'VS N-1 (%)', 'vs An-1 (€)': 'VS N-1 (€)', 'Employés': 'EMPLOYÉS' }
+
+    if (selectedPeriods.length > 0 && !yearOverride) {
+      scopedPeriods = scopedPeriods.filter(p => selectedPeriods.includes(p));
+    } else if (periodFilter !== 'all' && !yearOverride) {
+      scopedPeriods = scopedPeriods.filter(p => filteredPeriodsByRange.includes(p));
+    }
+
+    scopedPeriods = [...new Set(scopedPeriods)].sort();
+    const scopedEmployees = employees.filter(e => scopedPeriods.includes(e.period));
+
+    return { scopedEmployees, scopedPeriods, targetYear };
+  };
+
+  const buildMonthlySeries = (scopedEmployees, scopedPeriods, targetYear) => {
+    const periodAgg = {};
+    scopedEmployees.forEach(e => {
+      if (!periodAgg[e.period]) {
+        periodAgg[e.period] = { total: 0, names: new Set() };
+      }
+      periodAgg[e.period].total += e.totalCost || 0;
+      periodAgg[e.period].names.add(e.name);
+    });
+
+    let periodList = scopedPeriods;
+    if (targetYear) {
+      periodList = Array.from({ length: 12 }, (_, i) => `${targetYear}-${String(i + 1).padStart(2, '0')}`);
+    }
+
+    const series = periodList.map(period => {
+      const entry = periodAgg[period] || { total: 0, names: new Set() };
+      const employeesCount = entry.names.size;
+      const avgPerEmployee = employeesCount > 0 ? entry.total / employeesCount : 0;
+      return {
+        period,
+        total: entry.total,
+        employees: employeesCount,
+        avgPerEmployee
+      };
+    });
+
+    series.forEach((row, idx) => {
+      const prev = idx > 0 ? series[idx - 1].total : null;
+      row.variation = prev && prev !== 0 ? ((row.total - prev) / prev) * 100 : null;
+    });
+
+    return series;
+  };
+
+  const buildDeptSeries = (scopedEmployees) => {
+    const stats = {};
+    const total = scopedEmployees.reduce((sum, e) => sum + (e.totalCost || 0), 0);
+
+    scopedEmployees.forEach(e => {
+      const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (!stats[dept]) {
+        stats[dept] = { total: 0, names: new Set() };
+      }
+      stats[dept].total += e.totalCost || 0;
+      stats[dept].names.add(e.name);
+    });
+
+    return Object.entries(stats)
+      .map(([dept, data]) => ({
+        dept,
+        total: data.total,
+        employees: data.names.size,
+        share: total > 0 ? (data.total / total) * 100 : 0
+      }))
+      .sort((a, b) => b.total - a.total);
+  };
+
+  const buildReportLabel = (scopedPeriods, targetYear) => {
+    if (targetYear) return `Année ${targetYear}`;
+    if (scopedPeriods.length === 0) return 'Aucune période';
+    if (scopedPeriods.length === 1) return formatPeriod(scopedPeriods[0]);
+    return `${formatPeriod(scopedPeriods[0])} - ${formatPeriod(scopedPeriods[scopedPeriods.length - 1])}`;
+  };
+
+  const buildAnalyticsWorkbook = (scopedEmployees, scopedPeriods, targetYear) => {
+    const reportLabel = buildReportLabel(scopedPeriods, targetYear);
+    const totalCostExport = scopedEmployees.reduce((sum, e) => sum + (e.totalCost || 0), 0);
+    const uniqueEmployees = new Set(scopedEmployees.map(e => e.name)).size;
+    const deptSeries = buildDeptSeries(scopedEmployees);
+    const monthlySeries = buildMonthlySeries(scopedEmployees, scopedPeriods, targetYear);
+
+    const summaryData = [
+      ['Rapport', `Analyse Salariale - ${activeCompany}`],
+      ['Période', reportLabel],
+      ['Généré le', new Date().toLocaleDateString('fr-BE')],
+      [],
+      ['Indicateur', 'Valeur'],
+      ['Coût total', totalCostExport],
+      ['Employés uniques', uniqueEmployees],
+      ['Départements', deptSeries.length],
+      ['Périodes analysées', new Set(scopedEmployees.map(e => e.period)).size],
+      ['Coût moyen / employé', uniqueEmployees > 0 ? totalCostExport / uniqueEmployees : 0]
     ];
-    
-    Object.entries(deptStatsWithComparison)
-      .sort((a, b) => b[1].current - a[1].current)
-      .forEach(([dept, data]) => {
-        deptRows.push({
-          'Département': dept,
-          'Coût Actuel': `€${data.current.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
-          'vs M-1 (%)': data.variationVsPrevMonth !== null ? `${data.variationVsPrevMonth >= 0 ? '+' : ''}${data.variationVsPrevMonth.toFixed(1)}%` : '-',
-          'vs M-1 (€)': data.diffVsPrevMonth ? `€${data.diffVsPrevMonth.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : '-',
-          'vs An-1 (%)': data.variationVsLastYear !== null ? `${data.variationVsLastYear >= 0 ? '+' : ''}${data.variationVsLastYear.toFixed(1)}%` : '-',
-          'vs An-1 (€)': data.diffVsLastYear ? `€${data.diffVsLastYear.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}` : '-',
-          'Employés': data.currentCount
-        });
-      });
-    
-    // Feuille 3 : Détail employés
-    const detailData = filteredData.map(e => ({
+
+    const monthlyRows = monthlySeries.map(row => ({
+      'Mois': formatPeriod(row.period),
+      'Coût total (€)': Math.round(row.total * 100) / 100,
+      'Employés uniques': row.employees,
+      'Coût moyen / employé (€)': Math.round(row.avgPerEmployee * 100) / 100,
+      'Variation vs M-1 (%)': row.variation !== null ? Math.round(row.variation * 10) / 10 : null
+    }));
+
+    const deptRows = deptSeries.map(row => ({
+      'Département': row.dept,
+      'Coût total (€)': Math.round(row.total * 100) / 100,
+      'Part du total (%)': Math.round(row.share * 10) / 10,
+      'Employés uniques': row.employees,
+      'Coût moyen / employé (€)': row.employees > 0 ? Math.round((row.total / row.employees) * 100) / 100 : 0
+    }));
+
+    const empAgg = {};
+    scopedEmployees.forEach(e => {
+      const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+      if (!empAgg[e.name]) {
+        empAgg[e.name] = { name: e.name, dept, total: 0, periods: new Set() };
+      }
+      empAgg[e.name].total += e.totalCost || 0;
+      empAgg[e.name].periods.add(e.period);
+    });
+
+    const empRows = Object.values(empAgg)
+      .sort((a, b) => b.total - a.total)
+      .map(e => ({
+        'Nom': e.name,
+        'Département': e.dept,
+        'Coût total (€)': Math.round(e.total * 100) / 100,
+        'Périodes': e.periods.size
+      }));
+
+    const detailRows = scopedEmployees.map(e => ({
       'Nom': e.name,
       'Département': e.department || departmentMapping[e.name] || 'Non assigné',
       'Fonction': e.function || '-',
       'Période': formatPeriod(e.period),
-      'Coût total (€)': Math.round(e.totalCost * 100) / 100
+      'Coût total (€)': Math.round((e.totalCost || 0) * 100) / 100
     }));
-    
-    // Créer le workbook
+
     const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.json_to_sheet(summaryRows);
-    const ws2 = XLSX.utils.json_to_sheet(deptRows);
-    const ws3 = XLSX.utils.json_to_sheet(detailData);
-    
-    XLSX.utils.book_append_sheet(wb, ws1, 'Résumé');
-    XLSX.utils.book_append_sheet(wb, ws2, 'Comparaison Départements');
-    XLSX.utils.book_append_sheet(wb, ws3, 'Détail employés');
-    
-    // Télécharger
-    const periodStr = selectedPeriods.length === 0 ? 'Complet' : selectedPeriods.map(formatPeriod).join('_');
-    XLSX.writeFile(wb, `Salarize_${activeCompany}_${periodStr}.xlsx`);
-    toast.success('Export Excel téléchargé');
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    const wsMonthly = XLSX.utils.json_to_sheet(monthlyRows);
+    const wsDept = XLSX.utils.json_to_sheet(deptRows);
+    const wsTopEmp = XLSX.utils.json_to_sheet(empRows);
+    const wsDetail = XLSX.utils.json_to_sheet(detailRows);
+
+    wsSummary['!cols'] = [{ wch: 24 }, { wch: 40 }];
+    wsMonthly['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 18 }];
+    wsDept['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 }];
+    wsTopEmp['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 12 }];
+    wsDetail['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 18 }, { wch: 18 }];
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Résumé');
+    XLSX.utils.book_append_sheet(wb, wsMonthly, 'Mensuel');
+    XLSX.utils.book_append_sheet(wb, wsDept, 'Départements');
+    XLSX.utils.book_append_sheet(wb, wsTopEmp, 'Employés (top)');
+    XLSX.utils.book_append_sheet(wb, wsDetail, 'Détail');
+
+    const filenameSuffix = targetYear ? targetYear : (scopedPeriods.length > 0 ? `${scopedPeriods[0]}_${scopedPeriods[scopedPeriods.length - 1]}` : 'export');
+    return { wb, filenameSuffix };
+  };
+
+  // Export Excel analytique
+  const exportToExcel = () => {
+    if (!activeCompany) return;
+
+    const { scopedEmployees, scopedPeriods, targetYear } = getExportScope();
+    if (scopedEmployees.length === 0) {
+      toast.error('Aucune donnée pour la période sélectionnée');
+      return;
+    }
+
+    const { wb, filenameSuffix } = buildAnalyticsWorkbook(scopedEmployees, scopedPeriods, targetYear);
+    XLSX.writeFile(wb, `Salarize_${activeCompany}_${filenameSuffix}.xlsx`);
+    toast.success('Export Excel analytique téléchargé');
   };
 
   // Export PDF
@@ -3283,55 +3381,11 @@ function AppContent() {
 
   // Export all data for a year to Excel
   const exportYearToExcel = (year) => {
-    const yearPeriods = periods.filter(p => p.startsWith(year)).sort();
-    if (yearPeriods.length === 0) return;
-    
-    const wb = XLSX.utils.book_new();
-    
-    // Create summary sheet
-    const summaryData = [
-      ['Période', 'Employés', 'Coût Total']
-    ];
-    
-    let grandTotal = 0;
-    yearPeriods.forEach(period => {
-      const periodEmps = employees.filter(e => e.period === period);
-      const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
-      grandTotal += total;
-      const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-      const month = monthNames[parseInt(period.substring(5), 10) - 1];
-      summaryData.push([month, periodEmps.length, total]);
-    });
-    summaryData.push([]);
-    summaryData.push(['TOTAL ANNÉE', '', grandTotal]);
-    
-    const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
-    summaryWs['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, summaryWs, 'Résumé');
-    
-    // Create sheet for each month
-    yearPeriods.forEach(period => {
-      const periodEmps = employees.filter(e => e.period === period);
-      const wsData = [['Nom', 'Département', 'Fonction', 'Coût Total']];
-      
-      periodEmps.forEach(emp => {
-        const dept = emp.department || departmentMapping[emp.name] || 'Non assigné';
-        wsData.push([emp.name, dept, emp.function || '', emp.totalCost]);
-      });
-      
-      const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
-      wsData.push([]);
-      wsData.push(['TOTAL', '', '', total]);
-      
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 20 }, { wch: 15 }];
-      
-      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-      const monthName = monthNames[parseInt(period.substring(5), 10) - 1];
-      XLSX.utils.book_append_sheet(wb, ws, monthName);
-    });
-    
-    XLSX.writeFile(wb, `${activeCompany}_${year}.xlsx`);
+    if (!activeCompany) return;
+    const { scopedEmployees, scopedPeriods, targetYear } = getExportScope(year);
+    if (scopedEmployees.length === 0) return;
+    const { wb } = buildAnalyticsWorkbook(scopedEmployees, scopedPeriods, targetYear);
+    XLSX.writeFile(wb, `Salarize_${activeCompany}_${year}.xlsx`);
   };
 
   const handleBrandColorChange = (color) => {
@@ -3393,33 +3447,55 @@ function AppContent() {
   };
 
   const handleExportPDF = () => {
+    if (!activeCompany) return;
+    const { scopedEmployees, scopedPeriods, targetYear } = getExportScope();
+    if (scopedEmployees.length === 0) {
+      toast.error('Aucune donnée pour la période sélectionnée');
+      return;
+    }
+
     // Récupérer la couleur de la société
     const brandColor = getBrandColor();
     const colors = getColorVariants(brandColor);
-    
-    // Calculer les données par mois
-    const monthlyData = periods.map(period => {
-      const periodEmps = employees.filter(e => e.period === period);
-      const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
-      const uniqueEmps = new Set(periodEmps.map(e => e.name)).size;
-      return { period, total, employees: uniqueEmps };
-    }).sort((a, b) => a.period.localeCompare(b.period));
 
-    // Calculer variation
-    const getVariation = (idx) => {
-      if (idx === 0) return '-';
-      const prev = monthlyData[idx - 1].total;
-      const curr = monthlyData[idx].total;
-      const pct = ((curr - prev) / prev * 100).toFixed(1);
-      return prev === 0 ? '-' : (curr >= prev ? `+${pct}%` : `${pct}%`);
-    };
+    const reportLabel = buildReportLabel(scopedPeriods, targetYear);
+    const totalCostValue = scopedEmployees.reduce((sum, e) => sum + (e.totalCost || 0), 0);
+    const uniqueEmployees = new Set(scopedEmployees.map(e => e.name)).size;
+    const totalPeriods = new Set(scopedEmployees.map(e => e.period)).size;
+    const avgMonthlyCost = totalPeriods > 0 ? totalCostValue / totalPeriods : 0;
+    const avgCostPerEmployee = uniqueEmployees > 0 ? totalCostValue / uniqueEmployees : 0;
+
+    const monthlySeries = buildMonthlySeries(scopedEmployees, scopedPeriods, targetYear);
+    const deptSeries = buildDeptSeries(scopedEmployees);
+    const topDepts = deptSeries.slice(0, 6);
+    const maxDeptCost = Math.max(...topDepts.map(d => d.total), 1);
+
+    const nonZeroMonths = monthlySeries.filter(m => m.total > 0);
+    const bestMonth = nonZeroMonths.length > 0
+      ? nonZeroMonths.reduce((a, b) => (a.total > b.total ? a : b))
+      : null;
+    const worstMonth = nonZeroMonths.length > 0
+      ? nonZeroMonths.reduce((a, b) => (a.total < b.total ? a : b))
+      : null;
+    const variations = monthlySeries.filter(m => m.variation !== null);
+    const biggestIncrease = variations.length > 0
+      ? variations.reduce((a, b) => (a.variation > b.variation ? a : b))
+      : null;
+    const biggestDrop = variations.length > 0
+      ? variations.reduce((a, b) => (a.variation < b.variation ? a : b))
+      : null;
+
+    const insights = [
+      bestMonth ? `Mois le plus coûteux: ${formatPeriod(bestMonth.period)} (€${bestMonth.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })})` : null,
+      worstMonth ? `Mois le plus bas: ${formatPeriod(worstMonth.period)} (€${worstMonth.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })})` : null,
+      biggestIncrease ? `Plus forte hausse: ${formatPeriod(biggestIncrease.period)} (${biggestIncrease.variation > 0 ? '+' : ''}${biggestIncrease.variation.toFixed(1)}% vs M-1)` : null,
+      biggestDrop ? `Plus forte baisse: ${formatPeriod(biggestDrop.period)} (${biggestDrop.variation.toFixed(1)}% vs M-1)` : null,
+      topDepts[0] ? `Département leader: ${topDepts[0].dept} (${topDepts[0].share.toFixed(1)}% du total)` : null
+    ].filter(Boolean).slice(0, 3);
 
     const logoHtml = companies[activeCompany]?.logo 
-      ? `<img src="${companies[activeCompany].logo}" style="width: 60px; height: 60px; border-radius: 12px; object-fit: cover;" />`
-      : `<div style="width: 60px; height: 60px; border-radius: 12px; background: ${colors.hex}; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 28px;">${activeCompany?.charAt(0) || 'S'}</div>`;
-
-    // Générer les barres de répartition
-    const maxDeptCost = Math.max(...sortedDepts.map(([_, d]) => d.total));
+      ? `<img src="${companies[activeCompany].logo}" style="width: 56px; height: 56px; border-radius: 12px; object-fit: cover;" />`
+      : `<div style="width: 56px; height: 56px; border-radius: 12px; background: ${colors.hex}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 26px;">${activeCompany?.charAt(0) || 'S'}</div>`;
 
     const html = `
       <!DOCTYPE html>
@@ -3431,48 +3507,48 @@ function AppContent() {
           * { margin: 0; padding: 0; box-sizing: border-box; }
           @page { size: A4; margin: 12mm; }
           body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: #1e293b;
-            padding: 32px;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            color: #0f172a;
+            padding: 28px;
             max-width: 210mm;
             margin: 0 auto;
             background: white;
-            font-size: 13px;
-            line-height: 1.5;
+            font-size: 12px;
+            line-height: 1.4;
           }
           .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 28px;
-            padding-bottom: 20px;
-            border-bottom: 3px solid ${colors.hex};
+            margin-bottom: 22px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid ${colors.hex};
           }
           .header-left {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 14px;
           }
           .header h1 {
-            font-size: 26px;
-            color: #1e293b;
+            font-size: 22px;
+            color: #0f172a;
             font-weight: 700;
           }
           .header-subtitle {
             color: #64748b;
-            font-size: 13px;
+            font-size: 11px;
             margin-top: 2px;
           }
           .brand {
             text-align: right;
           }
           .brand-name {
-            font-size: 22px;
+            font-size: 18px;
             font-weight: 800;
             color: ${colors.hex};
           }
           .brand-date {
-            font-size: 11px;
+            font-size: 10px;
             color: #94a3b8;
             margin-top: 4px;
           }
@@ -3481,15 +3557,15 @@ function AppContent() {
           .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 28px;
+            gap: 10px;
+            margin-bottom: 20px;
           }
           .stat-card {
-            background: ${colors.lightest};
-            border: 1px solid ${colors.lighter};
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
-            padding: 16px;
-            text-align: center;
+            padding: 14px 12px;
+            text-align: left;
           }
           .stat-card.highlight {
             background: ${colors.hex};
@@ -3500,13 +3576,13 @@ function AppContent() {
             color: white;
           }
           .stat-value {
-            font-size: 24px;
+            font-size: 18px;
             font-weight: 700;
-            color: ${colors.darkerHex};
+            color: #0f172a;
           }
           .stat-label {
             font-size: 10px;
-            color: ${colors.hex};
+            color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-top: 4px;
@@ -3515,13 +3591,13 @@ function AppContent() {
           
           /* Section Titles */
           .section {
-            margin-bottom: 24px;
+            margin-bottom: 18px;
           }
           .section-title {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 700;
-            color: #1e293b;
-            margin-bottom: 12px;
+            color: #0f172a;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -3529,7 +3605,7 @@ function AppContent() {
           .section-title::before {
             content: '';
             width: 4px;
-            height: 20px;
+            height: 16px;
             background: ${colors.hex};
             border-radius: 2px;
           }
@@ -3538,16 +3614,16 @@ function AppContent() {
           table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
+            font-size: 11px;
           }
           th {
             background: #F8FAFC;
-            padding: 10px 12px;
+            padding: 8px 10px;
             text-align: left;
             font-weight: 600;
             color: #475569;
             border-bottom: 2px solid #E2E8F0;
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 0.3px;
           }
@@ -3555,7 +3631,7 @@ function AppContent() {
             text-align: right;
           }
           td {
-            padding: 10px 12px;
+            padding: 8px 10px;
             border-bottom: 1px solid #F1F5F9;
           }
           tr:hover {
@@ -3569,24 +3645,24 @@ function AppContent() {
             border-bottom: none;
             color: ${colors.darkerHex};
           }
-          .positive { color: #DC2626; }
-          .negative { color: #16A34A; }
+          .positive { color: #DC2626; font-weight: 600; }
+          .negative { color: #16A34A; font-weight: 600; }
           
           /* Department Bars */
           .dept-row {
             display: flex;
             align-items: center;
-            padding: 8px 0;
+            padding: 6px 0;
             border-bottom: 1px solid #F1F5F9;
           }
           .dept-name {
-            width: 140px;
+            width: 120px;
             font-weight: 500;
-            font-size: 12px;
+            font-size: 11px;
           }
           .dept-bar-container {
             flex: 1;
-            height: 24px;
+            height: 18px;
             background: #F1F5F9;
             border-radius: 4px;
             margin: 0 12px;
@@ -3601,33 +3677,49 @@ function AppContent() {
             justify-content: flex-end;
             padding-right: 8px;
             color: white;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 600;
           }
           .dept-cost {
-            width: 100px;
+            width: 90px;
             text-align: right;
             font-weight: 600;
-            font-size: 12px;
+            font-size: 11px;
           }
           
           /* Two Columns Layout */
           .two-cols {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 24px;
+            gap: 18px;
+          }
+
+          .insights {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 11px;
+            color: #475569;
+          }
+          .insights ul {
+            padding-left: 16px;
+            margin-top: 6px;
+          }
+          .insights li {
+            margin: 4px 0;
           }
           
           /* Footer */
           .footer {
-            margin-top: 32px;
-            padding-top: 16px;
+            margin-top: 18px;
+            padding-top: 12px;
             border-top: 1px solid #E2E8F0;
             display: flex;
             justify-content: space-between;
             align-items: center;
             color: #94A3B8;
-            font-size: 10px;
+            font-size: 9px;
           }
           .footer-brand {
             display: flex;
@@ -3649,11 +3741,11 @@ function AppContent() {
             background: ${colors.hex};
             color: white;
             border: none;
-            padding: 14px 28px;
+            padding: 12px 20px;
             border-radius: 10px;
             font-weight: 600;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             box-shadow: 0 4px 15px rgba(${colors.r}, ${colors.g}, ${colors.b}, 0.3);
             display: flex;
             align-items: center;
@@ -3681,8 +3773,8 @@ function AppContent() {
           <div class="header-left">
             ${logoHtml}
             <div>
-              <h1>${activeCompany}</h1>
-              <div class="header-subtitle">Rapport des coûts salariaux • ${selectedPeriods.length === 0 ? 'Toutes périodes' : selectedPeriods.map(formatPeriod).join(', ')}</div>
+              <h1>Rapport Analytique</h1>
+              <div class="header-subtitle">${activeCompany} • ${reportLabel}</div>
             </div>
           </div>
           <div class="brand">
@@ -3693,37 +3785,20 @@ function AppContent() {
 
         <div class="stats-grid">
           <div class="stat-card highlight">
-            <div class="stat-value">€${totalCost.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+            <div class="stat-value">€${totalCostValue.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
             <div class="stat-label">Coût Total</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">${uniqueNames}</div>
-            <div class="stat-label">Employés</div>
+            <div class="stat-value">${uniqueEmployees}</div>
+            <div class="stat-label">Employés uniques</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">${Object.keys(deptStats).length}</div>
-            <div class="stat-label">Départements</div>
+            <div class="stat-value">€${avgMonthlyCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+            <div class="stat-label">Coût mensuel moyen</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">€${uniqueNames > 0 ? Math.round(totalCost / uniqueNames).toLocaleString('fr-BE') : 0}</div>
-            <div class="stat-label">Coût Moyen</div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">Répartition par département</div>
-          <div style="background: #FAFAFA; border-radius: 12px; padding: 16px;">
-            ${sortedDepts.map(([dept, data]) => `
-              <div class="dept-row">
-                <div class="dept-name">${dept}</div>
-                <div class="dept-bar-container">
-                  <div class="dept-bar" style="width: ${maxDeptCost > 0 ? (data.total / maxDeptCost * 100) : 0}%">
-                    ${totalCost > 0 ? (data.total / totalCost * 100).toFixed(1) : '0.0'}%
-                  </div>
-                </div>
-                <div class="dept-cost">€${data.total.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</div>
-              </div>
-            `).join('')}
+            <div class="stat-value">€${avgCostPerEmployee.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+            <div class="stat-label">Coût moyen / employé</div>
           </div>
         </div>
 
@@ -3739,20 +3814,48 @@ function AppContent() {
                 </tr>
               </thead>
               <tbody>
-                ${monthlyData.slice(-12).map((m, idx) => `
+                ${monthlySeries.map((m, idx) => `
                   <tr>
                     <td><strong>${formatPeriod(m.period)}</strong></td>
-                    <td class="${getVariation(idx).startsWith('+') ? 'positive' : getVariation(idx).startsWith('-') && getVariation(idx) !== '-' ? 'negative' : ''}">${getVariation(idx)}</td>
+                    <td class="${m.variation !== null && m.variation > 0 ? 'positive' : m.variation !== null && m.variation < 0 ? 'negative' : ''}">
+                      ${m.variation !== null ? `${m.variation > 0 ? '+' : ''}${m.variation.toFixed(1)}%` : '-'}
+                    </td>
                     <td><strong>€${m.total.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
                   </tr>
                 `).join('')}
                 <tr class="total-row">
                   <td><strong>Total</strong></td>
                   <td></td>
-                  <td><strong>€${monthlyData.reduce((s, m) => s + m.total, 0).toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
+                  <td><strong>€${monthlySeries.reduce((s, m) => s + m.total, 0).toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</strong></td>
                 </tr>
               </tbody>
             </table>
+          </div>
+          <div class="section">
+            <div class="section-title">Top départements</div>
+            <div style="background: #FAFAFA; border-radius: 12px; padding: 12px;">
+              ${topDepts.map(dept => `
+                <div class="dept-row">
+                  <div class="dept-name">${dept.dept}</div>
+                  <div class="dept-bar-container">
+                    <div class="dept-bar" style="width: ${maxDeptCost > 0 ? (dept.total / maxDeptCost * 100) : 0}%">
+                      ${dept.share.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div class="dept-cost">€${dept.total.toLocaleString('fr-BE', { minimumFractionDigits: 0 })}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Insights clés</div>
+          <div class="insights">
+            <div>Points marquants pour ${reportLabel} :</div>
+            <ul>
+              ${insights.map(item => `<li>${item}</li>`).join('')}
+            </ul>
           </div>
         </div>
 
