@@ -39,6 +39,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
+import { List } from 'react-window';
 
 // ============================================
 // IMPORTS FROM MODULAR STRUCTURE
@@ -6385,116 +6386,92 @@ L'équipe Salarize`;
                           : `Tout sélectionner (${allFilteredEmployeesForDept.length})`}
                       </span>
                       <span className="text-xs text-slate-500 tabular-nums">
-                        {deptPage * DEPT_PAGE_SIZE + 1}-{Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length)} sur {allFilteredEmployeesForDept.length}
+                        {allFilteredEmployeesForDept.length} membre{allFilteredEmployeesForDept.length > 1 ? 's' : ''}
                       </span>
                     </div>
 
-                    {/* Scrollable employee list */}
-                    <div className="max-h-96 overflow-y-auto">
-                    {filteredEmployeesForDept.map((emp, idx) => (
-                      <div
-                        key={emp.name}
-                        className={`group flex items-center gap-4 px-5 py-3.5 transition-all duration-200 border-b border-slate-800/30 ${
-                          selectedEmployees.has(emp.name)
-                            ? 'bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-l-2 border-l-violet-500'
-                            : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'
-                        }`}
-                        style={{ contain: 'layout style paint' }}
-                      >
-                        {/* Checkbox */}
-                        <input
-                          type="checkbox"
-                          id={`emp-checkbox-${emp.name.replace(/\s+/g, '-')}`}
-                          name={`empCheckbox_${emp.name.replace(/\s+/g, '_')}`}
-                          checked={selectedEmployees.has(emp.name)}
-                          onChange={e => {
-                            const newSet = new Set(selectedEmployees);
-                            if (e.target.checked) {
-                              newSet.add(emp.name);
-                            } else {
-                              newSet.delete(emp.name);
-                            }
-                            setSelectedEmployees(newSet);
-                          }}
-                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
-                        />
-
-                        {/* Avatar avec initiales */}
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all duration-200 ${
-                          emp.currentDept
-                            ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-lg shadow-violet-500/20'
-                            : 'bg-slate-700/80 text-slate-300 ring-2 ring-amber-500/30'
-                        }`}>
-                          {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-
-                        {/* Nom */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-white truncate text-sm">{emp.name}</p>
-                        </div>
-
-                        {/* Dropdown département */}
-                        <CustomSelect
-                          value={emp.currentDept || ''}
-                          disabled={isViewerOnly}
-                          onChange={val => {
-                            if (isViewerOnly) return;
-                            const newDept = val || null;
-                            if (newDept === emp.currentDept) return;
-
-                            const empCost = filtered
-                              .filter(em => em.name === emp.name)
-                              .reduce((sum, em) => sum + (em.totalCost || 0), 0);
-
-                            setPendingDeptChange({
-                              empName: emp.name,
-                              oldDept: emp.currentDept,
-                              newDept: newDept,
-                              empCost: empCost
-                            });
-                          }}
-                          options={deptSelectOptions}
-                          variant={emp.currentDept ? 'default' : 'warning'}
-                          dropdownPosition="auto"
-                          showIcons={true}
-                          className="w-36"
-                        />
-                      </div>
-                    ))}
-                    </div>
+                    {/* Virtualized employee list - ultra performant */}
+                    <List
+                      rowCount={allFilteredEmployeesForDept.length}
+                      rowHeight={56}
+                      style={{ height: 384, width: '100%' }}
+                      className="scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+                      rowProps={{
+                        employees: allFilteredEmployeesForDept,
+                        selectedEmployees,
+                        setSelectedEmployees,
+                        isViewerOnly,
+                        filtered,
+                        setPendingDeptChange,
+                        deptSelectOptions
+                      }}
+                      rowComponent={({ index, style, employees, selectedEmployees, setSelectedEmployees, isViewerOnly, filtered, setPendingDeptChange, deptSelectOptions }) => {
+                        const emp = employees[index];
+                        if (!emp) return null;
+                        return (
+                          <div
+                            style={style}
+                            className={`flex items-center gap-4 px-5 border-b border-slate-800/30 ${
+                              selectedEmployees.has(emp.name)
+                                ? 'bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-l-2 border-l-violet-500'
+                                : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedEmployees.has(emp.name)}
+                              onChange={e => {
+                                const newSet = new Set(selectedEmployees);
+                                if (e.target.checked) {
+                                  newSet.add(emp.name);
+                                } else {
+                                  newSet.delete(emp.name);
+                                }
+                                setSelectedEmployees(newSet);
+                              }}
+                              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
+                            />
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                              emp.currentDept
+                                ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
+                                : 'bg-slate-700 text-slate-300 ring-2 ring-amber-500/30'
+                            }`}>
+                              {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-white truncate text-sm">{emp.name}</p>
+                            </div>
+                            <CustomSelect
+                              value={emp.currentDept || ''}
+                              disabled={isViewerOnly}
+                              onChange={val => {
+                                if (isViewerOnly) return;
+                                const newDept = val || null;
+                                if (newDept === emp.currentDept) return;
+                                const empCost = filtered
+                                  .filter(em => em.name === emp.name)
+                                  .reduce((sum, em) => sum + (em.totalCost || 0), 0);
+                                setPendingDeptChange({
+                                  empName: emp.name,
+                                  oldDept: emp.currentDept,
+                                  newDept: newDept,
+                                  empCost: empCost
+                                });
+                              }}
+                              options={deptSelectOptions}
+                              variant={emp.currentDept ? 'default' : 'warning'}
+                              dropdownPosition="auto"
+                              showIcons={true}
+                              className="w-36"
+                            />
+                          </div>
+                        );
+                      }}
+                    />
                   </>
                 )}
               </div>
               
-              {/* Pagination */}
-              {deptTotalPages > 1 && (
-                <div className="flex items-center justify-between px-5 py-4 bg-slate-900/80 border-t border-slate-800/50">
-                  <button
-                    onClick={() => setDeptPage(p => Math.max(0, p - 1))}
-                    disabled={deptPage === 0}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Précédent
-                  </button>
-                  <span className="text-sm text-slate-400 font-medium">
-                    Page {deptPage + 1} / {deptTotalPages}
-                  </span>
-                  <button
-                    onClick={() => setDeptPage(p => Math.min(deptTotalPages - 1, p + 1))}
-                    disabled={deptPage >= deptTotalPages - 1}
-                    className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/5 rounded-xl disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                  >
-                    Suivant
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-
               {/* Footer */}
               <div className="px-5 py-5 bg-gradient-to-t from-slate-950 to-transparent border-t border-slate-800/50">
                 <button
