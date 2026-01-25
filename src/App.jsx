@@ -207,7 +207,6 @@ function AppContent() {
     totalCost: true,
     employees: true,
     departments: true,
-    avgCost: true,
     comparison: true,
     deptBreakdown: true
   });
@@ -1841,12 +1840,10 @@ function AppContent() {
     const series = periodList.map(period => {
       const entry = periodAgg[period] || { total: 0, names: new Set() };
       const employeesCount = entry.names.size;
-      const avgPerEmployee = employeesCount > 0 ? entry.total / employeesCount : 0;
       return {
         period,
         total: entry.total,
-        employees: employeesCount,
-        avgPerEmployee
+        employees: employeesCount
       };
     });
 
@@ -1904,15 +1901,13 @@ function AppContent() {
       ['Coût total', totalCostExport],
       ['Employés uniques', uniqueEmployees],
       ['Départements', deptSeries.length],
-      ['Périodes analysées', new Set(scopedEmployees.map(e => e.period)).size],
-      ['Coût moyen / employé', uniqueEmployees > 0 ? totalCostExport / uniqueEmployees : 0]
+      ['Périodes analysées', new Set(scopedEmployees.map(e => e.period)).size]
     ];
 
     const monthlyRows = monthlySeries.map(row => ({
       'Mois': formatPeriod(row.period),
       'Coût total (€)': Math.round(row.total * 100) / 100,
       'Employés uniques': row.employees,
-      'Coût moyen / employé (€)': Math.round(row.avgPerEmployee * 100) / 100,
       'Variation vs M-1 (%)': row.variation !== null ? Math.round(row.variation * 10) / 10 : null
     }));
 
@@ -1920,8 +1915,7 @@ function AppContent() {
       'Département': row.dept,
       'Coût total (€)': Math.round(row.total * 100) / 100,
       'Part du total (%)': Math.round(row.share * 10) / 10,
-      'Employés uniques': row.employees,
-      'Coût moyen / employé (€)': row.employees > 0 ? Math.round((row.total / row.employees) * 100) / 100 : 0
+      'Employés uniques': row.employees
     }));
 
     const empAgg = {};
@@ -1959,8 +1953,8 @@ function AppContent() {
     const wsDetail = XLSX.utils.json_to_sheet(detailRows);
 
     wsSummary['!cols'] = [{ wch: 24 }, { wch: 40 }];
-    wsMonthly['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 18 }];
-    wsDept['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 22 }];
+    wsMonthly['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
+    wsDept['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
     wsTopEmp['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 12 }];
     wsDetail['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 20 }, { wch: 18 }, { wch: 18 }];
 
@@ -2000,7 +1994,7 @@ function AppContent() {
     
     // Calculs
     const totalCostPdf = filteredData.reduce((sum, e) => sum + e.totalCost, 0);
-    const avgCost = totalCostPdf / filteredData.length;
+    const periodsCount = new Set(filteredData.map(e => e.period)).size;
     
     const deptData = {};
     filteredData.forEach(e => {
@@ -2059,7 +2053,7 @@ function AppContent() {
     
     doc.text(`Coût total: ${totalCost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`, 30, y + 12);
     doc.text(`Nombre d'employés: ${filtered.length}`, 30, y + 24);
-    doc.text(`Coût moyen: ${avgCost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`, pageWidth / 2, y + 12);
+    doc.text(`Périodes: ${periodsCount}`, pageWidth / 2, y + 12);
     doc.text(`Départements: ${Object.keys(deptData).length}`, pageWidth / 2, y + 24);
     
     y += 50;
@@ -2355,6 +2349,27 @@ function AppContent() {
   // Parser Securex amélioré
   const parseSecurex = (rows, filename) => {
     if (!rows || rows.length === 0) return null;
+    const normalizePeriodValue = (value) => {
+      if (!value) return null;
+      if (value instanceof Date && !isNaN(value)) {
+        return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`;
+      }
+      if (typeof value === 'number' && !isNaN(value)) {
+        const parsed = XLSX.SSF?.parse_date_code ? XLSX.SSF.parse_date_code(value) : null;
+        if (parsed && parsed.y && parsed.m) {
+          return `${parsed.y}-${String(parsed.m).padStart(2, '0')}`;
+        }
+      }
+      const str = String(value).trim();
+      if (!str) return null;
+      const iso = str.match(/(\d{4})[-\/](\d{2})/);
+      if (iso) return `${iso[1]}-${iso[2]}`;
+      const eu = str.match(/(\d{2})[-\/](\d{4})/);
+      if (eu) return `${eu[2]}-${eu[1]}`;
+      const compact = str.match(/^(\d{4})(\d{2})$/);
+      if (compact) return `${compact[1]}-${compact[2]}`;
+      return null;
+    };
     
     // Chercher des indices Securex
     let isSecurex = false;
@@ -2411,6 +2426,7 @@ function AppContent() {
       prenom: findColIdx(['prénom', 'prenom', 'voornaam', 'firstname']),
       dept: findColIdx(['département', 'departement', 'department', 'centre de coût', 'centre de cout', 'afdeling']),
       func: findColIdx(['fonction', 'functie', 'function']),
+      period: findColIdx(['année-mois', 'annee-mois', 'période', 'periode', 'mois', 'month', 'period']),
       cost: findColIdx(['coût total', 'cout total', 'totale loonkost', 'total', 'coût', 'cout', 'loonkost'])
     };
     
@@ -2419,10 +2435,10 @@ function AppContent() {
     if (cols.nom === -1 || cols.cost === -1) return null;
     
     // Détecter la période depuis le fichier ou les données
-    let period = 'Unknown';
+    let defaultPeriod = 'Unknown';
     const fileInfo = detectFileInfo(filename);
     if (fileInfo.suggestedPeriod) {
-      period = fileInfo.suggestedPeriod;
+      defaultPeriod = fileInfo.suggestedPeriod;
     } else {
       // Chercher dans les premières lignes
       for (let i = 0; i < Math.min(10, headerIdx); i++) {
@@ -2433,9 +2449,9 @@ function AppContent() {
         const match = rowStr.match(/(\d{2})[-\/](\d{4})|(\d{4})[-\/](\d{2})/);
         if (match) {
           if (match[1] && match[2]) {
-            period = `${match[2]}-${match[1]}`;
+            defaultPeriod = `${match[2]}-${match[1]}`;
           } else if (match[3] && match[4]) {
-            period = `${match[3]}-${match[4]}`;
+            defaultPeriod = `${match[3]}-${match[4]}`;
           }
           break;
         }
@@ -2443,6 +2459,7 @@ function AppContent() {
     }
     
     const emps = [];
+    const periodsSet = new Set();
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const r = rows[i];
       if (!r) continue;
@@ -2463,6 +2480,9 @@ function AppContent() {
         fullName = `${nom} ${String(r[cols.prenom]).trim()}`;
       }
       
+      const rowPeriod = cols.period !== -1 ? normalizePeriodValue(r[cols.period]) : null;
+      const period = rowPeriod || defaultPeriod || 'Unknown';
+      periodsSet.add(period);
       emps.push({
         name: fullName,
         department: cols.dept !== -1 && r[cols.dept] ? String(r[cols.dept]).trim() : null,
@@ -2473,92 +2493,132 @@ function AppContent() {
     }
     
     console.log('Securex parsed', emps.length, 'employees');
-    return emps.length > 0 ? { employees: emps, periods: [period], provider: 'securex' } : null;
+    const detectedPeriods = [...periodsSet].filter(Boolean).filter(p => p !== 'Unknown').sort();
+    const finalPeriods = detectedPeriods.length > 0 ? detectedPeriods : [defaultPeriod || 'Unknown'];
+    return emps.length > 0 ? { employees: emps, periods: finalPeriods, provider: 'securex' } : null;
   };
 
   // Parser générique amélioré qui essaie de détecter le format automatiquement
   const parseGeneric = (rows, filename) => {
     if (!rows || rows.length === 0) return null;
-    
-    // Chercher la ligne d'en-tête la plus probable
+
+    // Chercher la ligne d'en-tete la plus probable
     let headerIdx = -1;
     let bestScore = 0;
-    
-    const costKeywords = ['coût', 'cout', 'cost', 'loonkost', 'salaire', 'total', 'brut'];
-    const nameKeywords = ['nom', 'name', 'naam', 'werknemer', 'employé', 'employe'];
-    
+
+    const costKeywords = ['cout', 'cost', 'loonkost', 'salaire', 'total', 'brut'];
+    const nameKeywords = ['nom', 'name', 'naam', 'werknemer', 'employe'];
+
+    const normalizeString = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    const normalizePeriodValue = (value) => {
+      if (!value) return null;
+      if (value instanceof Date && !isNaN(value)) {
+        return value.getFullYear() + '-' + String(value.getMonth() + 1).padStart(2, '0');
+      }
+      if (typeof value === 'number' && !isNaN(value)) {
+        const parsed = XLSX.SSF && XLSX.SSF.parse_date_code ? XLSX.SSF.parse_date_code(value) : null;
+        if (parsed && parsed.y && parsed.m) {
+          return parsed.y + '-' + String(parsed.m).padStart(2, '0');
+        }
+      }
+      const str = String(value).trim();
+      if (!str) return null;
+      const iso = str.match(/(\d{4})[-\/](\d{2})/);
+      if (iso) return iso[1] + '-' + iso[2];
+      const eu = str.match(/(\d{2})[-\/](\d{4})/);
+      if (eu) return eu[2] + '-' + eu[1];
+      const compact = str.match(/^(\d{4})(\d{2})$/);
+      if (compact) return compact[1] + '-' + compact[2];
+      return null;
+    };
+
+    const normCost = costKeywords.map(k => normalizeString(k));
+    const normName = nameKeywords.map(k => normalizeString(k));
+
     for (let i = 0; i < Math.min(20, rows.length); i++) {
       const row = rows[i];
       if (!row || !Array.isArray(row)) continue;
-      
+
       let score = 0;
-      const rowLower = row.map(c => String(c || '').toLowerCase());
-      
+      const rowLower = row.map(c => normalizeString(c));
+
       for (const cell of rowLower) {
-        if (costKeywords.some(k => cell.includes(k))) score += 2;
-        if (nameKeywords.some(k => cell.includes(k))) score += 2;
-        if (cell.includes('département') || cell.includes('department')) score += 1;
+        if (normCost.some(k => cell.includes(k))) score += 2;
+        if (normName.some(k => cell.includes(k))) score += 2;
+        if (cell.includes('departement') || cell.includes('department')) score += 1;
         if (cell.includes('fonction') || cell.includes('function')) score += 1;
       }
-      
+
       if (score > bestScore) {
         bestScore = score;
         headerIdx = i;
       }
     }
-    
+
     if (headerIdx === -1 || bestScore < 3) return null;
-    
+
     console.log('Generic header found at row', headerIdx, 'score:', bestScore);
-    
+
     const h = rows[headerIdx];
-    
-    // Trouver les colonnes
+
     const findCol = (keywords) => {
+      const normalizedKeywords = keywords.map(k => normalizeString(k));
       for (let j = 0; j < h.length; j++) {
-        const cell = String(h[j] || '').toLowerCase();
-        for (const k of keywords) {
+        const cell = normalizeString(h[j]);
+        for (const k of normalizedKeywords) {
           if (cell.includes(k)) return j;
         }
       }
       return -1;
     };
-    
+
     const cols = {
       nom: findCol(nameKeywords),
+      prenom: findCol(['prenom', 'voornaam', 'firstname']),
+      period: findCol(['annee-mois', 'annee mois', 'periode', 'mois', 'month', 'period']),
       cost: findCol(costKeywords),
-      dept: findCol(['département', 'departement', 'department', 'centre', 'afdeling']),
+      dept: findCol(['departement', 'department', 'centre', 'afdeling']),
       func: findCol(['fonction', 'function', 'functie'])
     };
-    
+
     if (cols.nom === -1 || cols.cost === -1) return null;
-    
-    // Période depuis le nom du fichier
+
     const fileInfo = detectFileInfo(filename);
-    let period = fileInfo.suggestedPeriod || 'Unknown';
-    
+    const fallbackPeriod = fileInfo.suggestedPeriod || 'Unknown';
+
     const emps = [];
+    const periodsSet = new Set();
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const r = rows[i];
       if (!r || !r[cols.nom]) continue;
-      
+
       const nom = String(r[cols.nom]).trim();
       if (!nom || nom.toLowerCase() === 'total') continue;
-      
+
       const costVal = r[cols.cost];
       const cost = parseFloat(String(costVal).replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0;
       if (cost === 0) continue;
-      
+
+      const prenom = cols.prenom !== -1 && r[cols.prenom] ? String(r[cols.prenom]).trim() : '';
+      const fullName = prenom ? nom + ' ' + prenom : nom;
+
+      const rowPeriod = cols.period !== -1 ? normalizePeriodValue(r[cols.period]) : null;
+      const period = rowPeriod || fallbackPeriod || 'Unknown';
+      periodsSet.add(period);
+
       emps.push({
-        name: nom,
+        name: fullName,
         department: cols.dept !== -1 && r[cols.dept] ? String(r[cols.dept]).trim() : null,
         function: cols.func !== -1 && r[cols.func] ? String(r[cols.func]).trim() : '',
         totalCost: cost,
         period
       });
     }
-    
-    return emps.length > 0 ? { employees: emps, periods: [period], provider: 'generic' } : null;
+
+    const detectedPeriods = [...periodsSet].filter(Boolean).filter(p => p !== 'Unknown').sort();
+    const finalPeriods = detectedPeriods.length > 0 ? detectedPeriods : [fallbackPeriod || 'Unknown'];
+    return emps.length > 0 ? { employees: emps, periods: finalPeriods, provider: 'generic' } : null;
   };
 
   // Multi-fichiers: parser plusieurs fichiers et combiner les résultats
@@ -2682,10 +2742,17 @@ function AppContent() {
           console.log('Parsed successfully:', result.employees.length, 'employees, provider:', detectedProvider);
           setDebugMsg(`✓ ${result.employees.length} entrées (${detectedProvider})`);
           
+          const hasMultiplePeriods = Array.isArray(result.periods) && result.periods.length > 1;
+          const effectiveSuggested = hasMultiplePeriods
+            ? null
+            : (result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod);
+          
           // Stocker les données avec la période suggérée et les infos de confiance
           setPendingPeriodSelection({
             employees: result.employees,
-            suggestedPeriod: result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod,
+            periods: result.periods || [],
+            multiPeriods: hasMultiplePeriods,
+            suggestedPeriod: effectiveSuggested,
             detectedProvider,
             periodConfidence: periodAnalysis.confidence,
             periodSource: periodAnalysis.source,
@@ -3463,7 +3530,6 @@ function AppContent() {
     const uniqueEmployees = new Set(scopedEmployees.map(e => e.name)).size;
     const totalPeriods = new Set(scopedEmployees.map(e => e.period)).size;
     const avgMonthlyCost = totalPeriods > 0 ? totalCostValue / totalPeriods : 0;
-    const avgCostPerEmployee = uniqueEmployees > 0 ? totalCostValue / uniqueEmployees : 0;
 
     const monthlySeries = buildMonthlySeries(scopedEmployees, scopedPeriods, targetYear);
     const deptSeries = buildDeptSeries(scopedEmployees);
@@ -3797,8 +3863,8 @@ function AppContent() {
             <div class="stat-label">Coût mensuel moyen</div>
           </div>
           <div class="stat-card">
-            <div class="stat-value">€${avgCostPerEmployee.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
-            <div class="stat-label">Coût moyen / employé</div>
+            <div class="stat-value">${totalPeriods}</div>
+            <div class="stat-label">Périodes analysées</div>
           </div>
         </div>
 
@@ -3893,7 +3959,6 @@ function AppContent() {
       const totalCostValue = filtered.reduce((s, e) => s + e.totalCost, 0);
       const uniqueEmps = new Set(filtered.map(e => e.name)).size;
       const periodsCount = periods.length;
-      const avgCost = uniqueEmps > 0 ? totalCostValue / uniqueEmps : 0;
       
       const shareToken = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36);
       
@@ -4015,8 +4080,6 @@ ${senderName} vous partage un rapport salarial via Salarize.
 💰 Coût total: €${totalCostValue.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
 👥 Nombre d'employés: ${uniqueEmps}
 📅 Périodes analysées: ${periodsCount}
-📈 Coût moyen/employé: €${avgCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
-
 🏢 TOP DÉPARTEMENTS PAR COÛT
 ${topDepts}
 
@@ -4038,7 +4101,6 @@ L'équipe Salarize`;
             total_cost: `€${totalCostValue.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
             employee_count: uniqueEmps,
             periods_count: periodsCount,
-            avg_cost: `€${avgCost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
             top_departments: topDepts,
             message: shareMessage || 'Aucun message',
             html_content: shareHtml,
@@ -4282,12 +4344,6 @@ L'équipe Salarize`;
     const totalEmployeesAcrossPeriods = Object.values(periodCounts).reduce((sum, set) => sum + set.size, 0);
     return Math.round(totalEmployeesAcrossPeriods / filteredPeriodsCount);
   }, [filtered, filteredPeriodsCount]);
-  
-  // Coût moyen mensuel par employé
-  const avgMonthlyCostPerEmployee = useMemo(() => {
-    if (uniqueNames === 0 || filteredPeriodsCount === 0) return 0;
-    return totalCost / uniqueNames / filteredPeriodsCount;
-  }, [totalCost, uniqueNames, filteredPeriodsCount]);
   
   // Get unique years from periods
   const years = useMemo(() => 
@@ -5698,7 +5754,7 @@ L'équipe Salarize`;
             {/* Contenu */}
             <div className="p-5 sm:p-6">
               {/* Période suggérée */}
-              {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' && (
+              {!pendingPeriodSelection.multiPeriods && pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' && (
                 <div className={`mb-5 p-4 rounded-2xl flex items-center gap-3 ${
                   pendingPeriodSelection.periodConfidence >= 0.8 
                     ? 'bg-emerald-50 border-2 border-emerald-200' 
@@ -5734,6 +5790,28 @@ L'équipe Salarize`;
               )}
 
               {/* Sélecteur de période */}
+              {pendingPeriodSelection.multiPeriods && Array.isArray(pendingPeriodSelection.periods) && pendingPeriodSelection.periods.length > 1 && (
+                <div className="mb-5 p-4 rounded-2xl border-2 border-blue-200 bg-blue-50 flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-500">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-base text-blue-800">
+                      {pendingPeriodSelection.periods.length} periodes detectees
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      {(() => {
+                        const sorted = [...pendingPeriodSelection.periods].sort();
+                        return `${formatPeriod(sorted[0])} -> ${formatPeriod(sorted[sorted.length - 1])}`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!pendingPeriodSelection.multiPeriods && (
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   {pendingPeriodSelection.suggestedPeriod && pendingPeriodSelection.suggestedPeriod !== 'Unknown' 
@@ -5771,6 +5849,7 @@ L'équipe Salarize`;
                   </select>
                 </div>
               </div>
+              )}
               
               {/* Boutons d'action */}
               <div className="flex gap-2 sm:gap-3">
@@ -5788,20 +5867,28 @@ L'équipe Salarize`;
                   disabled={!importReady}
                   onClick={async () => {
                     if (!importReady) return;
-                    
-                    const year = document.getElementById('period-year').value;
-                    const month = document.getElementById('period-month').value;
-                    const period = `${year}-${month}`;
-                    
-                    const updatedEmployees = pendingPeriodSelection.employees.map(e => ({
-                      ...e,
-                      period
-                    }));
-                    
-                    const result = {
-                      employees: updatedEmployees,
-                      periods: [period]
-                    };
+                    const isMultiPeriod = pendingPeriodSelection.multiPeriods && Array.isArray(pendingPeriodSelection.periods);
+                    let result;
+                    if (isMultiPeriod) {
+                      result = {
+                        employees: pendingPeriodSelection.employees,
+                        periods: pendingPeriodSelection.periods
+                      };
+                    } else {
+                      const year = document.getElementById('period-year').value;
+                      const month = document.getElementById('period-month').value;
+                      const period = `${year}-${month}`;
+                      
+                      const updatedEmployees = pendingPeriodSelection.employees.map(e => ({
+                        ...e,
+                        period
+                      }));
+                      
+                      result = {
+                        employees: updatedEmployees,
+                        periods: [period]
+                      };
+                    }
                     
                     // Déterminer si c'est le dernier fichier du batch
                     const isLastFile = fileQueue.length === 0 || currentFileIndex >= fileQueue.length - 1;
@@ -5875,7 +5962,7 @@ L'équipe Salarize`;
               </div>
               
               {/* Bouton Import Rapide en bas - affiché quand confiance haute */}
-              {pendingPeriodSelection.periodConfidence >= 0.8 && activeCompany && view === 'dashboard' && (
+              {pendingPeriodSelection.periodConfidence >= 0.8 && !pendingPeriodSelection.multiPeriods && activeCompany && view === 'dashboard' && (
                 <div className="mt-4 pt-4 border-t border-slate-100">
                   <button
                     onClick={() => setShowQuickImportModal(true)}
@@ -8154,9 +8241,6 @@ L'équipe Salarize`;
                     }));
                     
                     const totalCost = empData.reduce((s, e) => s + e.totalCost, 0);
-                    const avgCost = empData.length > 0 ? totalCost / empData.length : 0;
-                    const minCost = empData.length > 0 ? Math.min(...empData.map(e => e.totalCost)) : 0;
-                    const maxCost = empData.length > 0 ? Math.max(...empData.map(e => e.totalCost)) : 0;
                     
                     // Variation
                     let variation = null;
@@ -8169,14 +8253,10 @@ L'équipe Salarize`;
                     return (
                       <>
                         {/* Stats */}
-                        <div className="grid grid-cols-4 gap-3 mb-6">
+                        <div className="grid grid-cols-3 gap-3 mb-6">
                           <div className="bg-slate-50 rounded-xl p-3 text-center">
                             <div className="text-xl font-bold text-slate-800">€{totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
                             <div className="text-xs text-slate-500">Total</div>
-                          </div>
-                          <div className="bg-slate-50 rounded-xl p-3 text-center">
-                            <div className="text-xl font-bold text-slate-800">€{avgCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
-                            <div className="text-xs text-slate-500">Moyenne</div>
                           </div>
                           <div className="bg-slate-50 rounded-xl p-3 text-center">
                             <div className="text-xl font-bold text-slate-800">{empData.length}</div>
@@ -8213,7 +8293,6 @@ L'équipe Salarize`;
                                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                 />
                                 <Bar dataKey="cost" fill="#8B5CF6" radius={[6, 6, 0, 0]} />
-                                <ReferenceLine y={avgCost} stroke="#A78BFA" strokeDasharray="5 5" />
                               </BarChart>
                             </ResponsiveContainer>
                           </div>
@@ -9092,7 +9171,6 @@ L'équipe Salarize`;
                     { key: 'totalCost', label: 'Coût Total', desc: 'Afficher le coût total avec variation' },
                     { key: 'employees', label: 'Nombre d\'employés', desc: 'Compteur d\'employés actifs' },
                     { key: 'departments', label: 'Départements', desc: 'Nombre de départements' },
-                    { key: 'avgCost', label: 'Coût Moyen', desc: 'Coût moyen par employé' },
                     { key: 'comparison', label: 'Cartes Comparaison', desc: 'Comparaisons vs M-1 et N-1' },
                     { key: 'deptBreakdown', label: 'Répartition Départements', desc: 'Graphique par département' }
                   ].map(item => (
@@ -9115,7 +9193,7 @@ L'équipe Salarize`;
                   <button
                     onClick={() => setVisibleKpis({
                       totalCost: true, employees: true, departments: true,
-                      avgCost: true, comparison: true, deptBreakdown: true
+                      comparison: true, deptBreakdown: true
                     })}
                     className="flex-1 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50"
                   >
