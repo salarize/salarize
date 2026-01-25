@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ╔═══════════════════════════════════════════════════════════════════════════════╗
  * ║                           SALARIZE - App.jsx                                   ║
  * ║                 Application principale de gestion salariale                    ║
@@ -151,6 +151,9 @@ function AppContent() {
   const [showDeptManager, setShowDeptManager] = useState(false);
   const [deptSearchTerm, setDeptSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
+  const [deptCompareMode, setDeptCompareMode] = useState(false);
+  const [deptCompareA, setDeptCompareA] = useState(null);
+  const [deptCompareB, setDeptCompareB] = useState(null);
   const [showRenameDept, setShowRenameDept] = useState(false);
   const [renameDeptOld, setRenameDeptOld] = useState('');
   const [renameDeptNew, setRenameDeptNew] = useState('');
@@ -4645,6 +4648,82 @@ L'équipe Salarize`;
     }
   }, [periods, periodFilter]);
 
+  const deptComparePeriods = useMemo(() => {
+    let list = [...periods];
+    if (selectedYear !== 'all') {
+      list = list.filter(p => p.startsWith(selectedYear));
+    }
+    return list.sort();
+  }, [periods, selectedYear]);
+
+  useEffect(() => {
+    if (deptComparePeriods.length === 0) {
+      if (deptCompareA || deptCompareB) {
+        setDeptCompareA(null);
+        setDeptCompareB(null);
+      }
+      return;
+    }
+
+    const last = deptComparePeriods[deptComparePeriods.length - 1];
+    const prev = deptComparePeriods.length > 1 ? deptComparePeriods[deptComparePeriods.length - 2] : last;
+
+    if (!deptCompareB || !deptComparePeriods.includes(deptCompareB)) {
+      setDeptCompareB(last);
+    }
+    if (!deptCompareA || !deptComparePeriods.includes(deptCompareA)) {
+      setDeptCompareA(prev);
+    }
+  }, [deptComparePeriods, deptCompareA, deptCompareB]);
+
+  const deptCompareData = useMemo(() => {
+    if (!deptCompareA || !deptCompareB) return null;
+
+    const collect = (period) => {
+      const stats = {};
+      let total = 0;
+      employees.forEach(e => {
+        if (e.period !== period) return;
+        const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+        if (!stats[dept]) stats[dept] = { cost: 0, count: 0 };
+        stats[dept].cost += e.totalCost || 0;
+        stats[dept].count += 1;
+        total += e.totalCost || 0;
+      });
+      return { stats, total };
+    };
+
+    const a = collect(deptCompareA);
+    const b = collect(deptCompareB);
+    const depts = new Set([...Object.keys(a.stats), ...Object.keys(b.stats)]);
+
+    const rows = [...depts].map((dept) => {
+      const costA = a.stats[dept]?.cost || 0;
+      const costB = b.stats[dept]?.cost || 0;
+      const shareA = a.total > 0 ? (costA / a.total) * 100 : 0;
+      const shareB = b.total > 0 ? (costB / b.total) * 100 : 0;
+      return {
+        dept,
+        costA,
+        costB,
+        shareA,
+        shareB,
+        deltaShare: shareB - shareA,
+        deltaCost: costB - costA
+      };
+    });
+
+    rows.sort((x, y) => Math.abs(y.deltaShare) - Math.abs(x.deltaShare));
+
+    return {
+      periodA: deptCompareA,
+      periodB: deptCompareB,
+      totalA: a.total,
+      totalB: b.total,
+      rows
+    };
+  }, [deptCompareA, deptCompareB, employees, departmentMapping]);
+
   // === GÉNÉRATION AUTOMATIQUE DES ALERTES ===
   const generatedAlerts = useMemo(() => {
     const alertsList = [];
@@ -7721,11 +7800,34 @@ L'équipe Salarize`;
         {/* Departments - Version Simple sans scroll */}
         {visibleKpis.deptBreakdown && (
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base">📊 Répartition par Département</h2>
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setDeptCompareMode(false)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    !deptCompareMode
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Répartition
+                </button>
+                <button
+                  onClick={() => setDeptCompareMode(true)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    deptCompareMode
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Comparer 2 mois
+                </button>
+              </div>
+            </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Filtre par mois - Pills élégantes */}
-              {periods.length > 1 && (
+              {!deptCompareMode && periods.length > 1 && (
                 <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
                   <button
                     onClick={() => setDeptPeriodFilter('all')}
@@ -7753,71 +7855,191 @@ L'équipe Salarize`;
                   </select>
                 </div>
               )}
-              <span className="text-xs text-slate-400 ml-2">{filteredSortedDepts.length} dép.</span>
+              <span className="text-xs text-slate-400 ml-2">
+                {!deptCompareMode ? `${filteredSortedDepts.length} dép.` : ''}
+              </span>
             </div>
           </div>
-          
           {/* Header de colonnes */}
-          <div className="hidden sm:flex items-center gap-3 py-2 mb-2 border-b border-slate-100 text-xs font-medium text-slate-400">
-            <div className="w-32 sm:w-40 flex-shrink-0">Département</div>
-            <div className="flex-1">Répartition</div>
-            <div className="w-12 text-right">%</div>
-            <div className="w-14 text-right">Var.</div>
-            <div className="w-24 text-right">Montant</div>
-          </div>
-          
-          <div className="space-y-2">
-            {filteredSortedDepts
-              .filter(([_, data]) => data.total > 0)
-              .map(([dept, data]) => {
-              const comparison = deptStatsWithComparison[dept] || {};
-              const pct = filteredTotalCost > 0 ? ((data.total / filteredTotalCost) * 100).toFixed(1) : '0.0';
-              const barWidth = filteredMaxCost > 0 ? Math.max(5, (data.total / filteredMaxCost) * 100) : 5;
-
-              return (
-                <div key={dept} className="flex items-center gap-3 py-2">
-                  {/* Nom du département */}
-                  <div className="w-32 sm:w-40 flex-shrink-0">
-                    <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
-                    <span className="text-xs text-slate-400">{data.uniqueCount || data.count} emp.</span>
-                  </div>
-                  
-                  {/* Barre de progression */}
-                  <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all duration-500" 
-                      style={{ 
-                        width: `${barWidth}%`,
-                        background: `rgb(${getBrandColor()})`
-                      }} 
-                    />
-                  </div>
-                  
-                  {/* Pourcentage */}
-                  <span className="w-12 text-right text-xs font-medium text-slate-500">{pct}%</span>
-                  
-                  {/* Variation */}
-                  {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 ? (
-                    <span className={`w-14 text-right text-xs font-semibold ${
-                      comparison.variationVsPrevMonth >= 0 ? 'text-red-600' : 'text-emerald-600'
-                    }`}>
-                      {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
-                    </span>
-                  ) : (
-                    <span className="w-14"></span>
-                  )}
-                  
-                  {/* Montant */}
-                  <span className="w-24 text-right font-bold text-slate-800 text-sm">
-                    €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
-                  </span>
+          {deptCompareMode ? (
+            <div className="space-y-4">
+              {deptComparePeriods.length < 2 ? (
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-500">
+                  Ajoutez au moins deux mois pour comparer les répartitions.
                 </div>
-              );
-            })}
-          </div>
-          
+              ) : (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">Période A</span>
+                      <select
+                        value={deptCompareA || ''}
+                        onChange={e => setDeptCompareA(e.target.value)}
+                        className="px-2 py-1 text-xs font-medium rounded-md border border-slate-200 bg-white"
+                      >
+                        {deptComparePeriods.map(p => (
+                          <option key={p} value={p}>{formatPeriod(p)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">Période B</span>
+                      <select
+                        value={deptCompareB || ''}
+                        onChange={e => setDeptCompareB(e.target.value)}
+                        className="px-2 py-1 text-xs font-medium rounded-md border border-slate-200 bg-white"
+                      >
+                        {deptComparePeriods.map(p => (
+                          <option key={p} value={p}>{formatPeriod(p)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <span className="text-xs text-slate-400 sm:ml-auto">Δ = B - A</span>
+                  </div>
+
+                  {deptCompareData && (() => {
+                    const totalDelta = deptCompareData.totalB - deptCompareData.totalA;
+                    const totalDeltaPct = deptCompareData.totalA > 0 ? (totalDelta / deptCompareData.totalA) * 100 : 0;
+                    const totalDeltaUp = totalDelta > 0;
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="rounded-xl border border-slate-100 bg-white p-3">
+                            <div className="text-xs text-slate-500">Total {formatPeriod(deptCompareData.periodA)}</div>
+                            <div className="text-lg font-bold text-slate-800">€{deptCompareData.totalA.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                            <div className="text-xs text-slate-400">{deptCompareData.rows.length} dép.</div>
+                          </div>
+                          <div className="rounded-xl border border-slate-100 bg-white p-3">
+                            <div className="text-xs text-slate-500">Total {formatPeriod(deptCompareData.periodB)}</div>
+                            <div className="text-lg font-bold text-slate-800">€{deptCompareData.totalB.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                            <div className="text-xs text-slate-400">{deptCompareData.rows.length} dép.</div>
+                          </div>
+                          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                            <div className="text-xs text-slate-500">Δ total</div>
+                            <div className={`text-lg font-bold ${totalDelta === 0 ? 'text-slate-500' : totalDeltaUp ? 'text-red-600' : 'text-emerald-600'}`}>
+                              {totalDelta === 0 ? '—' : totalDeltaUp ? '+' : '-'}€{Math.abs(totalDelta).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                            </div>
+                            <div className={`text-xs ${totalDelta === 0 ? 'text-slate-400' : totalDeltaUp ? 'text-red-600' : 'text-emerald-600'}`}>
+                              {totalDelta === 0 ? '0.0' : totalDeltaUp ? '+' : '-'}{Math.abs(totalDeltaPct).toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="hidden sm:grid grid-cols-12 gap-3 py-2 border-b border-slate-100 text-xs font-medium text-slate-400">
+                          <div className="col-span-3">Département</div>
+                          <div className="col-span-3">Période A</div>
+                          <div className="col-span-3">Période B</div>
+                          <div className="col-span-3 text-right">Δ</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {deptCompareData.rows.map((row) => {
+                            const deltaShareUp = row.deltaShare > 0;
+                            const deltaCostUp = row.deltaCost > 0;
+                            const deltaShareClass = row.deltaShare === 0 ? 'text-slate-400' : deltaShareUp ? 'text-red-600' : 'text-emerald-600';
+                            const deltaCostClass = row.deltaCost === 0 ? 'text-slate-400' : deltaCostUp ? 'text-red-600' : 'text-emerald-600';
+                            const arrow = row.deltaShare === 0 ? '→' : deltaShareUp ? '↑' : '↓';
+                            const deltaCostSign = row.deltaCost > 0 ? '+' : row.deltaCost < 0 ? '-' : '';
+
+                            return (
+                              <div key={row.dept} className="grid grid-cols-1 sm:grid-cols-12 gap-3 py-3 border-b border-slate-100 last:border-b-0">
+                                <div className="sm:col-span-3">
+                                  <div className="text-sm font-semibold text-slate-800">{row.dept}</div>
+                                </div>
+                                <div className="sm:col-span-3">
+                                  <div className="text-xs text-slate-400 sm:hidden">Période A</div>
+                                  <div className="text-base font-semibold text-slate-800">{row.shareA.toFixed(1)}%</div>
+                                  <div className="text-xs text-slate-500">€{row.costA.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                                </div>
+                                <div className="sm:col-span-3">
+                                  <div className="text-xs text-slate-400 sm:hidden">Période B</div>
+                                  <div className="text-base font-semibold text-slate-800">{row.shareB.toFixed(1)}%</div>
+                                  <div className="text-xs text-slate-500">€{row.costB.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</div>
+                                </div>
+                                <div className="sm:col-span-3 sm:text-right">
+                                  <div className="text-xs text-slate-400 sm:hidden">Δ</div>
+                                  <div className={`text-sm font-semibold ${deltaShareClass}`}>
+                                    {arrow}{Math.abs(row.deltaShare).toFixed(1)}%
+                                  </div>
+                                  <div className={`text-xs ${deltaCostClass}`}>
+                                    {deltaCostSign}€{Math.abs(row.deltaCost).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="hidden sm:flex items-center gap-3 py-2 mb-2 border-b border-slate-100 text-xs font-medium text-slate-400">
+                <div className="w-32 sm:w-40 flex-shrink-0">Département</div>
+                <div className="flex-1">Répartition</div>
+                <div className="w-12 text-right">%</div>
+                <div className="w-14 text-right">Var.</div>
+                <div className="w-24 text-right">Montant</div>
+              </div>
+
+              <div className="space-y-2">
+                {filteredSortedDepts
+                  .filter(([_, data]) => data.total > 0)
+                  .map(([dept, data]) => {
+                  const comparison = deptStatsWithComparison[dept] || {};
+                  const pct = filteredTotalCost > 0 ? ((data.total / filteredTotalCost) * 100).toFixed(1) : '0.0';
+                  const barWidth = filteredMaxCost > 0 ? Math.max(5, (data.total / filteredMaxCost) * 100) : 5;
+
+                  return (
+                    <div key={dept} className="flex items-center gap-3 py-2">
+                      {/* Nom du département */}
+                      <div className="w-32 sm:w-40 flex-shrink-0">
+                        <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
+                        <span className="text-xs text-slate-400">{data.uniqueCount || data.count} emp.</span>
+                      </div>
+
+                      {/* Barre de progression */}
+                      <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${barWidth}%`,
+                            background: `rgb(${getBrandColor()})`
+                          }}
+                        />
+                      </div>
+
+                      {/* Pourcentage */}
+                      <span className="w-12 text-right text-xs font-medium text-slate-500">{pct}%</span>
+
+                      {/* Variation */}
+                      {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 ? (
+                        <span className={`w-14 text-right text-xs font-semibold ${
+                          comparison.variationVsPrevMonth >= 0 ? 'text-red-600' : 'text-emerald-600'
+                        }`}>
+                          {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span className="w-14"></span>
+                      )}
+
+                      {/* Montant */}
+                      <span className="w-24 text-right font-bold text-slate-800 text-sm">
+                        €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
           {/* Résumé des tendances */}
-          {Object.keys(deptStatsWithComparison).length > 0 && comparisonData && (() => {
+          {!deptCompareMode && Object.keys(deptStatsWithComparison).length > 0 && comparisonData && (() => {
             const sorted = Object.entries(deptStatsWithComparison)
               .filter(([_dept, d]) => d.variationVsPrevMonth !== null && d.variationVsPrevMonth !== 0)
               .sort((a, b) => (b[1].variationVsPrevMonth || 0) - (a[1].variationVsPrevMonth || 0));
@@ -9504,3 +9726,4 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
