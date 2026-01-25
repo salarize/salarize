@@ -7689,8 +7689,15 @@ L'équipe Salarize`;
                 });
 
                 return (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={enrichedData} margin={{ top: 25, right: 30, left: 20, bottom: 10 }}>
+                <div className="relative h-full">
+                  <div className="absolute right-2 top-2 z-10 rounded-lg border border-slate-200 bg-white/90 px-3 py-2 text-xs text-slate-600 shadow-sm backdrop-blur">
+                    <span className="text-slate-400">Moyenne</span>
+                    <div className="text-sm font-semibold text-slate-800">
+                      €{avgTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={enrichedData} margin={{ top: 25, right: 30, left: 20, bottom: 10 }}>
                     <defs>
                       <linearGradient id="barGradientNormal" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={`rgb(${getBrandColor()})`} stopOpacity={1}/>
@@ -7781,8 +7788,9 @@ L'équipe Salarize`;
                         />
                       ))}
                     </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
                 );
               })() : (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400">
@@ -7943,7 +7951,10 @@ L'équipe Salarize`;
                             const deltaCostSign = row.deltaCost > 0 ? '+' : row.deltaCost < 0 ? '-' : '';
 
                             return (
-                              <div key={row.dept} className="grid grid-cols-1 sm:grid-cols-12 gap-3 py-3 border-b border-slate-100 last:border-b-0">
+                              <div
+                                key={row.dept}
+                                className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3 sm:p-0 sm:py-3 border border-slate-100 sm:border-0 sm:border-b rounded-lg sm:rounded-none"
+                              >
                                 <div className="sm:col-span-3">
                                   <div className="text-sm font-semibold text-slate-800">{row.dept}</div>
                                 </div>
@@ -7995,40 +8006,57 @@ L'équipe Salarize`;
                   const barWidth = filteredMaxCost > 0 ? Math.max(5, (data.total / filteredMaxCost) * 100) : 5;
 
                   return (
-                    <div key={dept} className="flex items-center gap-3 py-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-0 sm:py-2 border border-slate-100 sm:border-0 sm:border-b rounded-lg sm:rounded-none">
                       {/* Nom du département */}
-                      <div className="w-32 sm:w-40 flex-shrink-0">
+                      <div className="sm:w-32 sm:w-40 flex-shrink-0">
                         <span className="font-medium text-slate-700 text-sm truncate block">{dept}</span>
                         <span className="text-xs text-slate-400">{data.uniqueCount || data.count} emp.</span>
                       </div>
-
-                      {/* Barre de progression */}
-                      <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${barWidth}%`,
-                            background: `rgb(${getBrandColor()})`
-                          }}
-                        />
+                      
+                      {/* Barre de progression + métriques mobile */}
+                      <div className="flex-1">
+                        <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${barWidth}%`,
+                              background: `rgb(${getBrandColor()})`
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between mt-2 text-xs sm:hidden">
+                          <span className="text-slate-500">{pct}%</span>
+                          {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 ? (
+                            <span className={`font-semibold ${
+                              comparison.variationVsPrevMonth >= 0 ? 'text-red-600' : 'text-emerald-600'
+                            }`}>
+                              {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                          <span className="font-semibold text-slate-700">
+                            €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
                       </div>
-
+                      
                       {/* Pourcentage */}
-                      <span className="w-12 text-right text-xs font-medium text-slate-500">{pct}%</span>
-
+                      <span className="hidden sm:inline w-12 text-right text-xs font-medium text-slate-500">{pct}%</span>
+                      
                       {/* Variation */}
                       {comparison.variationVsPrevMonth !== null && comparison.variationVsPrevMonth !== 0 ? (
-                        <span className={`w-14 text-right text-xs font-semibold ${
+                        <span className={`hidden sm:inline w-14 text-right text-xs font-semibold ${
                           comparison.variationVsPrevMonth >= 0 ? 'text-red-600' : 'text-emerald-600'
                         }`}>
                           {comparison.variationVsPrevMonth >= 0 ? '↑' : '↓'}{Math.abs(comparison.variationVsPrevMonth).toFixed(0)}%
                         </span>
                       ) : (
-                        <span className="w-14"></span>
+                        <span className="hidden sm:inline w-14"></span>
                       )}
-
+                      
                       {/* Montant */}
-                      <span className="w-24 text-right font-bold text-slate-800 text-sm">
+                      <span className="hidden sm:inline w-24 text-right font-bold text-slate-800 text-sm">
                         €{data.total.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
                       </span>
                     </div>
@@ -9708,6 +9736,63 @@ L'équipe Salarize`;
             </div>
           </div>
         )}
+        {/* SEO Content */}
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="max-w-4xl">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">
+              Salarize : reporting des coûts salariaux clair et actionnable
+            </h2>
+            <p className="text-slate-600 text-sm sm:text-base mb-3">
+              Salarize aide les équipes RH et finance à analyser la masse salariale par mois, par département et par entité.
+              Visualisez l’évolution des coûts, comparez deux périodes, et partagez des rapports prêts pour la direction.
+            </p>
+            <p className="text-slate-600 text-sm sm:text-base mb-4">
+              L’objectif : gagner du temps sur l’analyse des coûts salariaux, détecter les écarts et mieux piloter le budget.
+              Les exports Excel et PDF facilitent la communication avec les managers et le CEO.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
+                <h3 className="text-sm font-semibold text-slate-800 mb-2">Points clés</h3>
+                <ul className="text-sm text-slate-600 space-y-1">
+                  <li>• Répartition des coûts salariaux par département</li>
+                  <li>• Comparaison multi‑périodes (mois A vs mois B)</li>
+                  <li>• KPIs clairs : total, variations, parts en %</li>
+                  <li>• Exports PDF / Excel pour le reporting</li>
+                </ul>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
+                <h3 className="text-sm font-semibold text-slate-800 mb-2">Pour qui ?</h3>
+                <ul className="text-sm text-slate-600 space-y-1">
+                  <li>• PME et ETI</li>
+                  <li>• Équipes RH / finance</li>
+                  <li>• Direction générale</li>
+                  <li>• Cabinets et partenaires paie</li>
+                </ul>
+              </div>
+            </div>
+            <div className="border-t border-slate-100 pt-4">
+              <h3 className="text-sm font-semibold text-slate-800 mb-2">FAQ rapide</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600">
+                <div>
+                  <p className="font-medium text-slate-700">Comment comparer deux mois ?</p>
+                  <p>Activez “Comparer 2 mois” et sélectionnez les périodes A et B.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-700">Puis‑je partager un rapport ?</p>
+                  <p>Oui, exportez en PDF ou Excel pour partager facilement.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-700">Quels indicateurs sont visibles ?</p>
+                  <p>Total, répartition en %, variations et tendances.</p>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-700">Salarize est‑il adapté aux multi‑sociétés ?</p>
+                  <p>Oui, vous pouvez gérer plusieurs entités et comparer leurs coûts.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
         </>
         )}
       </main>
