@@ -2,12 +2,18 @@ import React, { useState } from 'react';
 
 function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage }) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const handleNav = (page) => {
+    setCurrentPage(page);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900/80 backdrop-blur-lg border-b border-white/10 z-50">
       <div className="max-w-6xl mx-auto h-full px-6 flex items-center justify-between">
         {/* Logo */}
-        <button onClick={() => setCurrentPage('home')} className="flex items-center gap-2">
+        <button onClick={() => handleNav('home')} className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">S</span>
           </div>
@@ -17,32 +23,32 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-6">
           <button
-            onClick={() => setCurrentPage('home')}
+            onClick={() => handleNav('home')}
             className={`text-sm font-medium transition-colors ${currentPage === 'home' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
           >
             Accueil
           </button>
           <button
-            onClick={() => setCurrentPage('features')}
+            onClick={() => handleNav('features')}
             className={`text-sm font-medium transition-colors ${currentPage === 'features' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
           >
             Fonctionnalites
           </button>
           <button
-            onClick={() => setCurrentPage('pricing')}
+            onClick={() => handleNav('pricing')}
             className={`text-sm font-medium transition-colors ${currentPage === 'pricing' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
           >
             Tarifs
           </button>
           <button
-            onClick={() => setCurrentPage('demo')}
+            onClick={() => handleNav('demo')}
             className={`text-sm font-medium transition-colors ${currentPage === 'demo' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
           >
             Demo
           </button>
           {user && (
             <button
-              onClick={() => setCurrentPage('dashboard')}
+              onClick={() => handleNav('dashboard')}
               className={`text-sm font-medium transition-colors ${currentPage === 'dashboard' ? 'text-white' : 'text-slate-400 hover:text-white'}`}
             >
               Dashboard
@@ -81,7 +87,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
                       <p className="text-slate-400 text-xs mt-0.5">{user.email}</p>
                     </div>
                     <button
-                      onClick={() => { setCurrentPage('profile'); setShowDropdown(false); }}
+                      onClick={() => { handleNav('profile'); setShowDropdown(false); }}
                       className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/50 flex items-center gap-3"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,7 +96,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
                       Mon profil
                     </button>
                     <button
-                      onClick={() => { setCurrentPage('dashboard'); setShowDropdown(false); }}
+                      onClick={() => { handleNav('dashboard'); setShowDropdown(false); }}
                       className="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700/50 flex items-center gap-3"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
