@@ -62,3 +62,8 @@ git push           # Deploy sur GitHub Pages
 2. `npm run build` - genere les fichiers dans `dist/`
 3. `git add -A && git commit -m "message"`
 4. `git push` - GitHub Pages deploie automatiquement depuis `dist/`
+
+### 7. Regle UI/SEO
+
+- Le contenu SEO (blocs explicatifs, FAQ marketing, texte long SEO) doit etre affiche uniquement sur la landing page publique.
+- Ne jamais afficher ces blocs dans les vues applicatives authentifiees (dashboard, pages internes, etats connectes).

@@ -9736,7 +9736,8 @@ L'équipe Salarize`;
             </div>
           </div>
         )}
-        {/* SEO Content */}
+        {/* SEO Content (landing page only) */}
+        {currentPage === 'home' && !user && (
         <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
           <div className="max-w-4xl">
             <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-2">
@@ -9793,6 +9794,7 @@ L'équipe Salarize`;
             </div>
           </div>
         </section>
+        )}
         </>
         )}
       </main>
