@@ -40,6 +40,7 @@
 - **Departements:** Les mappings doivent etre sauvegardes dans `department_mappings`
 - **Sessions:** Verifier que le token d'invitation est traite apres OAuth redirect
 - **Permissions:** Verifier `isViewerOnly` avant toute action de modification
+- **Heures prestees:** Toute logique d'heures doit persister dans `employees.paid_hours` (import, sauvegarde Supabase, restauration backup) pour alimenter les graphiques par periode/departement
 
 ### 4. Stack technique
 

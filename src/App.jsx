@@ -18,7 +18,7 @@
  * ║  📦 SCHÉMA SUPABASE REQUIS:                                                   ║
  * ║  ─────────────────────────────────────────────────────────────────────────────║
  * ║  companies: id, user_id, name, logo, brand_color, website                    ║
- * ║  employees: id, company_id, name, department, function, period, total_cost   ║
+ * ║  employees: id, company_id, name, department, function, period, total_cost, paid_hours ║
  * ║  department_mappings: id, company_id, employee_name, department              ║
  * ║  invitations: id, company_id, email, role, status, display_name*, invited_by ║
  * ║                                                                               ║
@@ -1116,6 +1116,7 @@ function AppContent() {
             department: finalDept,  // Priorité au mapping
             function: e.function,
             totalCost: parseFloat(e.total_cost) || 0,
+            paidHours: parseFloat(e.paid_hours || e.paidHours) || 0,
             period: e.period
           };
         });
@@ -1436,6 +1437,7 @@ function AppContent() {
    * │ - function (TEXT) - Fonction/poste (nullable)                          │
    * │ - period (TEXT) - Format "YYYY-MM"                                     │
    * │ - total_cost (NUMERIC) - Coût salarial total                           │
+   * │ - paid_hours (NUMERIC) - Heures prestées                               │
    * │ - created_at (TIMESTAMP)                                               │
    * └─────────────────────────────────────────────────────────────────────────┘
    * ┌─────────────────────────────────────────────────────────────────────────┐
@@ -1546,13 +1548,40 @@ function AppContent() {
             .eq('id', companyId);
         }
 
+        let paidHoursColumnAvailable = true;
+
         // Récupérer l'état actuel de la DB AVANT modification
         // Note: Supabase limite par défaut à 1000 lignes
-        const { data: currentDbEmployees } = await supabase
+        let currentDbEmployees = [];
+        let currentDbError = null;
+
+        const initialDbQuery = await supabase
           .from('employees')
-          .select('id, name, period, total_cost')
+          .select('id, name, period, total_cost, paid_hours')
           .eq('company_id', companyId)
           .limit(10000);
+
+        currentDbEmployees = initialDbQuery.data || [];
+        currentDbError = initialDbQuery.error;
+
+        if (currentDbError && String(currentDbError.message || '').toLowerCase().includes('paid_hours')) {
+          console.warn('[Salarize] Colonne paid_hours absente en DB, fallback sans heures (migration requise).');
+          paidHoursColumnAvailable = false;
+
+          const fallbackDbQuery = await supabase
+            .from('employees')
+            .select('id, name, period, total_cost')
+            .eq('company_id', companyId)
+            .limit(10000);
+
+          currentDbEmployees = fallbackDbQuery.data || [];
+          currentDbError = fallbackDbQuery.error;
+        }
+
+        if (currentDbError) {
+          console.error('[Salarize] Erreur lecture employees:', currentDbError);
+          currentDbEmployees = [];
+        }
 
         const dbState = {
           employeeCount: currentDbEmployees?.length || 0,
@@ -1661,14 +1690,22 @@ function AppContent() {
             }
 
             // Préparer les données à insérer
-            const employeesToInsert = emps.map(e => ({
-              company_id: companyId,
-              name: e.name,
-              department: e.department || latestCompanyData.mapping?.[e.name] || null,
-              function: e.function || null,
-              total_cost: e.totalCost,
-              period: e.period
-            }));
+            const employeesToInsert = emps.map(e => {
+              const baseEmployee = {
+                company_id: companyId,
+                name: e.name,
+                department: e.department || latestCompanyData.mapping?.[e.name] || null,
+                function: e.function || null,
+                total_cost: e.totalCost,
+                period: e.period
+              };
+
+              if (paidHoursColumnAvailable) {
+                baseEmployee.paid_hours = parseFloat(e.paidHours || e.paid_hours) || 0;
+              }
+
+              return baseEmployee;
+            });
 
             // Insert par batch avec retry
             const batchSize = 500;
@@ -2430,7 +2467,8 @@ function AppContent() {
       dept: findColIdx(['département', 'departement', 'department', 'centre de coût', 'centre de cout', 'afdeling']),
       func: findColIdx(['fonction', 'functie', 'function']),
       period: findColIdx(['année-mois', 'annee-mois', 'période', 'periode', 'mois', 'month', 'period']),
-      cost: findColIdx(['coût total', 'cout total', 'totale loonkost', 'total', 'coût', 'cout', 'loonkost'])
+      cost: findColIdx(['coût total', 'cout total', 'totale loonkost', 'total', 'coût', 'cout', 'loonkost']),
+      hours: findColIdx(['heures prestées', 'heures prestees', 'betaalde uren', 'paid hours', 'hours', 'uren'])
     };
     
     console.log('Securex columns:', cols);
@@ -2510,6 +2548,7 @@ function AppContent() {
     let bestScore = 0;
 
     const costKeywords = ['cout', 'cost', 'loonkost', 'salaire', 'total', 'brut'];
+    const hoursKeywords = ['heures', 'heure', 'uren', 'uur', 'hours', 'betaalde uren', 'heures prestees', 'heures prestées', 'paid hours'];
     const nameKeywords = ['nom', 'name', 'naam', 'werknemer', 'employe'];
 
     const normalizeString = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -2582,7 +2621,8 @@ function AppContent() {
       period: findCol(['annee-mois', 'annee mois', 'periode', 'mois', 'month', 'period']),
       cost: findCol(costKeywords),
       dept: findCol(['departement', 'department', 'centre', 'afdeling']),
-      func: findCol(['fonction', 'function', 'functie'])
+      func: findCol(['fonction', 'function', 'functie']),
+      hours: findCol(hoursKeywords)
     };
 
     if (cols.nom === -1 || cols.cost === -1) return null;
@@ -2602,6 +2642,9 @@ function AppContent() {
       const costVal = r[cols.cost];
       const cost = parseFloat(String(costVal).replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0;
       if (cost === 0) continue;
+      const paidHours = cols.hours !== -1
+        ? (parseFloat(String(r[cols.hours]).replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0)
+        : 0;
 
       const prenom = cols.prenom !== -1 && r[cols.prenom] ? String(r[cols.prenom]).trim() : '';
       const fullName = prenom ? nom + ' ' + prenom : nom;
@@ -2615,6 +2658,7 @@ function AppContent() {
         department: cols.dept !== -1 && r[cols.dept] ? String(r[cols.dept]).trim() : null,
         function: cols.func !== -1 && r[cols.func] ? String(r[cols.func]).trim() : '',
         totalCost: cost,
+        paidHours,
         period
       });
     }
@@ -2958,11 +3002,19 @@ function AppContent() {
     console.log('Acerta header found at row', headerIdx);
 
     const h = rows[headerIdx];
+    const findCol = (names) => {
+      for (const name of names) {
+        const idx = h.findIndex(c => c && String(c).toLowerCase().includes(name.toLowerCase()));
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
     const cols = {
       nom: h.indexOf('Nom'),
       dept: h.indexOf('Centre de frais'),
       func: h.indexOf('Fonction'),
-      cost: h.indexOf('Coûts salariaux totaux')
+      cost: h.indexOf('Coûts salariaux totaux'),
+      hours: findCol(['heures prestées', 'heures prestees', 'betaalde uren', 'paid hours', 'hours', 'uren'])
     };
     
     console.log('Acerta columns:', cols);
@@ -2992,12 +3044,14 @@ function AppContent() {
       
       const cost = parseFloat(r[cols.cost]) || 0;
       if (cost === 0) continue;
+      const paidHours = cols.hours !== -1 ? (parseFloat(r[cols.hours]) || 0) : 0;
       
       emps.push({
         name: String(r[cols.nom]),
         department: r[cols.dept] ? String(r[cols.dept]) : null,
         function: r[cols.func] ? String(r[cols.func]) : '',
         totalCost: cost,
+        paidHours,
         period
       });
     }
@@ -3043,6 +3097,7 @@ function AppContent() {
       nom: h.indexOf('Naam'),
       cost: h.indexOf('Totale loonkost'),
       dept: findCol(['Kostenplaatscode', 'Kostenplaats']),
+      hours: findCol(['Betaalde uren', 'betaalde uren', 'Uren', 'uren']),
       dateIn: h.indexOf('Datum in dienst'),
       dateOut: h.indexOf('Datum uit dienst')
     };
@@ -3063,6 +3118,7 @@ function AppContent() {
       
       const cost = parseFloat(r[cols.cost]) || 0;
       if (cost === 0) continue;
+      const paidHours = cols.hours !== -1 ? (parseFloat(r[cols.hours]) || 0) : 0;
       
       // Département
       let department = null;
@@ -3098,6 +3154,7 @@ function AppContent() {
         department,
         function: '',
         totalCost: cost,
+        paidHours,
         period
       });
     }
@@ -3128,7 +3185,12 @@ function AppContent() {
       period: h.findIndex(c => c === 'Année-mois'),
       nom: h.findIndex(c => c && String(c).includes('Nom')),
       prenom: h.findIndex(c => c && String(c).includes('Prénom')),
-      cost: h.findIndex(c => c === 'Net' || (c && String(c).includes('Coût')))
+      cost: h.findIndex(c => c === 'Net' || (c && String(c).includes('Coût'))),
+      hours: h.findIndex(c => {
+        if (!c) return false;
+        const cell = String(c).toLowerCase();
+        return cell.includes('heures') || cell.includes('hours') || cell.includes('uren') || cell.includes('betaalde');
+      })
     };
 
     if (cols.nom === -1 || cols.cost === -1) return null;
@@ -3141,6 +3203,7 @@ function AppContent() {
       if (!r || !r[cols.nom]) continue;
       const cost = parseFloat(r[cols.cost]) || 0;
       if (cost === 0) continue;
+      const paidHours = cols.hours !== -1 ? (parseFloat(r[cols.hours]) || 0) : 0;
       
       const prenom = cols.prenom !== -1 && r[cols.prenom] ? String(r[cols.prenom]) : '';
       const nom = String(r[cols.nom]);
@@ -3153,6 +3216,7 @@ function AppContent() {
         department: cols.dept !== -1 && r[cols.dept] ? String(r[cols.dept]) : null,
         function: '',
         totalCost: cost,
+        paidHours,
         period
       });
     }
@@ -4396,6 +4460,44 @@ L'équipe Salarize`;
         };
       }).sort((a, b) => a.period.localeCompare(b.period));
   }, [periods, employees, selectedYear, selectedPeriods, periodFilter]);
+
+  const HOURS_BAR_COLORS = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
+
+  // Heures prestées par période / département (grouped bars)
+  const hoursByDeptChart = useMemo(() => {
+    const periodList = chartData.map(d => d.period);
+    if (periodList.length === 0) return { data: [], departments: [] };
+
+    const deptSet = new Set();
+    filtered.forEach(e => {
+      const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+      deptSet.add(dept);
+    });
+    const departments = [...deptSet].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+    const rawData = periodList.map(period => {
+      const row = { period };
+      departments.forEach(dept => { row[dept] = 0; });
+      filtered.forEach(e => {
+        if (e.period !== period) return;
+        const dept = e.department || departmentMapping[e.name] || 'Non assigné';
+        const hours = parseFloat(e.paidHours || e.paid_hours) || 0;
+        row[dept] += hours;
+      });
+      return row;
+    });
+
+    const visibleDepartments = departments.filter(dept => rawData.some(row => (row[dept] || 0) > 0));
+    const data = rawData.map(row => {
+      const entry = { period: row.period };
+      visibleDepartments.forEach(dept => {
+        entry[dept] = Math.round((row[dept] || 0) * 100) / 100;
+      });
+      return entry;
+    });
+
+    return { data, departments: visibleDepartments };
+  }, [chartData, filtered, departmentMapping]);
   
   // Années uniques pour les couleurs
   const uniqueYears = useMemo(() => 
@@ -7454,6 +7556,7 @@ L'équipe Salarize`;
                                     department: e.department,
                                     function: e.function,
                                     totalCost: parseFloat(e.total_cost || e.totalCost) || 0,
+                                    paidHours: parseFloat(e.paid_hours || e.paidHours) || 0,
                                     period: e.period
                                   }));
 
@@ -7489,12 +7592,25 @@ L'équipe Salarize`;
                                           department: e.department,
                                           function: e.function,
                                           total_cost: e.totalCost,
+                                          paid_hours: parseFloat(e.paidHours || e.paid_hours) || 0,
                                           period: e.period
                                         }));
 
                                         const batchSize = 500;
                                         for (let i = 0; i < employeesToInsert.length; i += batchSize) {
-                                          await supabase.from('employees').insert(employeesToInsert.slice(i, i + batchSize));
+                                          const batch = employeesToInsert.slice(i, i + batchSize);
+                                          let { error: restoreInsertError } = await supabase.from('employees').insert(batch);
+
+                                          if (restoreInsertError && String(restoreInsertError.message || '').toLowerCase().includes('paid_hours')) {
+                                            console.warn('[Salarize] Colonne paid_hours absente en DB pendant restauration, fallback sans heures.');
+                                            const fallbackBatch = batch.map(({ paid_hours, ...rest }) => rest);
+                                            const { error: fallbackRestoreError } = await supabase.from('employees').insert(fallbackBatch);
+                                            restoreInsertError = fallbackRestoreError;
+                                          }
+
+                                          if (restoreInsertError) {
+                                            throw restoreInsertError;
+                                          }
                                         }
                                       }
 
@@ -7804,6 +7920,65 @@ L'équipe Salarize`;
               </div>
           </div>
         )}
+
+        {/* Heures prestées par département / période */}
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-slate-800 text-sm sm:text-base">⏱️ Heures prestées par département et par période</h2>
+            <div className="text-xs text-slate-500">
+              {hoursByDeptChart.departments.length} département{hoursByDeptChart.departments.length > 1 ? 's' : ''}
+            </div>
+          </div>
+
+          <div className="h-[380px]">
+            {hoursByDeptChart.data.length > 0 && hoursByDeptChart.departments.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={hoursByDeptChart.data} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    tickFormatter={(value) => {
+                      const month = parseInt(value.substring(5), 10);
+                      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                      const year = value.substring(2, 4);
+                      return `${monthNames[month - 1]} '${year}`;
+                    }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${Number(value).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}h`}
+                  />
+                  <Tooltip
+                    labelFormatter={(label) => formatPeriod(label)}
+                    formatter={(value, name) => [
+                      `${Number(value).toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h`,
+                      name
+                    ]}
+                  />
+                  <Legend />
+                  {hoursByDeptChart.departments.map((dept, index) => (
+                    <Bar
+                      key={dept}
+                      dataKey={dept}
+                      fill={HOURS_BAR_COLORS[index % HOURS_BAR_COLORS.length]}
+                      radius={[3, 3, 0, 0]}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                <p className="font-medium text-slate-500">Aucune heure prestée disponible</p>
+                <p className="text-sm mt-1">dans les données importées pour cette vue</p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Departments - Version Simple sans scroll */}
         {visibleKpis.deptBreakdown && (
