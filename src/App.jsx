@@ -38,7 +38,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
 import { List } from 'react-window';
 
 // ============================================
@@ -121,6 +121,14 @@ function AppContent() {
       return `${months[monthIndex]} ${year}`;
     }
     return period;
+  };
+
+  const formatHoursValue = (value, compact = false) => {
+    const num = Number(value) || 0;
+    if (compact && Math.abs(num) >= 1000) {
+      return `${(num / 1000).toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k h`;
+    }
+    return `${num.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h`;
   };
 
   const [companies, setCompanies] = useState({});
@@ -4466,7 +4474,7 @@ L'équipe Salarize`;
   // Heures prestées par période / département (grouped bars)
   const hoursByDeptChart = useMemo(() => {
     const periodList = chartData.map(d => d.period);
-    if (periodList.length === 0) return { data: [], departments: [] };
+    if (periodList.length === 0) return { data: [], departments: [], totalHours: 0, maxHours: 0 };
 
     const deptSet = new Set();
     filtered.forEach(e => {
@@ -4484,6 +4492,7 @@ L'équipe Salarize`;
         const hours = parseFloat(e.paidHours || e.paid_hours) || 0;
         row[dept] += hours;
       });
+      row.__totalHours = departments.reduce((sum, dept) => sum + (row[dept] || 0), 0);
       return row;
     });
 
@@ -4493,11 +4502,17 @@ L'équipe Salarize`;
       visibleDepartments.forEach(dept => {
         entry[dept] = Math.round((row[dept] || 0) * 100) / 100;
       });
+      entry.__totalHours = Math.round((row.__totalHours || 0) * 100) / 100;
       return entry;
     });
 
-    return { data, departments: visibleDepartments };
+    const totalHours = data.reduce((sum, row) => sum + (row.__totalHours || 0), 0);
+    const maxHours = data.reduce((max, row) => Math.max(max, row.__totalHours || 0), 0);
+
+    return { data, departments: visibleDepartments, totalHours, maxHours };
   }, [chartData, filtered, departmentMapping]);
+
+  const showHoursLabels = hoursByDeptChart.data.length <= 6 && hoursByDeptChart.departments.length <= 5;
   
   // Années uniques pour les couleurs
   const uniqueYears = useMemo(() => 
@@ -7924,9 +7939,17 @@ L'équipe Salarize`;
         {/* Heures prestées par département / période */}
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-slate-800 text-sm sm:text-base">⏱️ Heures prestées par département et par période</h2>
-            <div className="text-xs text-slate-500">
-              {hoursByDeptChart.departments.length} département{hoursByDeptChart.departments.length > 1 ? 's' : ''}
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base">⏱️ Heures prestées par département et par période</h2>
+              <p className="text-xs text-slate-500 mt-1">Chaque groupe = 1 période, chaque barre = 1 département</p>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-slate-500">
+                {hoursByDeptChart.departments.length} département{hoursByDeptChart.departments.length > 1 ? 's' : ''}
+              </div>
+              <div className="text-sm font-semibold text-slate-700 mt-1">
+                Total: {formatHoursValue(hoursByDeptChart.totalHours)}
+              </div>
             </div>
           </div>
 
@@ -7948,17 +7971,38 @@ L'équipe Salarize`;
                     }}
                   />
                   <YAxis
+                    width={74}
                     tick={{ fontSize: 12, fill: '#64748b' }}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `${Number(value).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}h`}
+                    tickFormatter={(value) => formatHoursValue(value, true)}
                   />
                   <Tooltip
-                    labelFormatter={(label) => formatPeriod(label)}
-                    formatter={(value, name) => [
-                      `${Number(value).toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h`,
-                      name
-                    ]}
+                    cursor={{ fill: 'rgba(15, 23, 42, 0.04)' }}
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || payload.length === 0) return null;
+
+                      const rows = payload
+                        .filter(item => Number(item?.value) > 0)
+                        .sort((a, b) => Number(b.value) - Number(a.value));
+
+                      const total = Number(payload[0]?.payload?.__totalHours) || 0;
+
+                      return (
+                        <div className="bg-slate-900 p-3 rounded-lg shadow-xl border border-slate-700 min-w-[240px]">
+                          <p className="text-slate-400 text-xs mb-1">{formatPeriod(label)}</p>
+                          <p className="text-white font-bold text-lg mb-2">{formatHoursValue(total)}</p>
+                          <div className="border-t border-slate-700 pt-2 space-y-1 max-h-44 overflow-y-auto">
+                            {rows.map((row) => (
+                              <div key={row.name} className="flex items-center justify-between gap-3 text-xs">
+                                <span className="text-slate-300 truncate">{row.name}</span>
+                                <span className="text-white font-medium">{formatHoursValue(row.value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }}
                   />
                   <Legend />
                   {hoursByDeptChart.departments.map((dept, index) => (
@@ -7967,6 +8011,16 @@ L'équipe Salarize`;
                       dataKey={dept}
                       fill={HOURS_BAR_COLORS[index % HOURS_BAR_COLORS.length]}
                       radius={[3, 3, 0, 0]}
+                      maxBarSize={42}
+                    >
+                      {showHoursLabels && (
+                        <LabelList
+                          dataKey={dept}
+                          position="top"
+                          formatter={(v) => (Number(v) > 0 ? Number(v).toLocaleString('fr-BE', { maximumFractionDigits: 0 }) : '')}
+                          style={{ fill: '#334155', fontSize: 10, fontWeight: 600 }}
+                        />
+                      )}
                     />
                   ))}
                 </BarChart>
@@ -8282,210 +8336,6 @@ L'équipe Salarize`;
         </div>
         )}
 
-        {/* Employee Detail Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100">
-          <div className="p-6 border-b border-slate-100">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <h2 className="font-bold text-slate-800">👥 Détail par Employé</h2>
-              
-              <div className="flex flex-col sm:flex-row gap-3">
-                {/* Search */}
-                <div className="relative">
-                  <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Rechercher..."
-                    value={empSearchTerm || ''}
-                    onChange={e => setEmpSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg w-full sm:w-48 focus:border-violet-500 outline-none text-sm"
-                  />
-                </div>
-                
-                {/* Department filter */}
-                <select
-                  value={empDeptFilter || 'all'}
-                  onChange={e => setEmpDeptFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-                >
-                  <option value="all">Tous les départements</option>
-                  {Object.keys(deptStats).sort().map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
-                
-                {/* Sort */}
-                <select
-                  value={empSortBy || 'cost-desc'}
-                  onChange={e => setEmpSortBy(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-                >
-                  <option value="cost-desc">Coût ↓</option>
-                  <option value="cost-asc">Coût ↑</option>
-                  <option value="name-asc">Nom A→Z</option>
-                  <option value="name-desc">Nom Z→A</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          
-          {/* Employee Cards Grid */}
-          <div className="p-6">
-            {(() => {
-              // Filter and sort employees
-              let filtered = empList.filter(e => {
-                if (debouncedEmpSearch && !e.name.toLowerCase().includes(debouncedEmpSearch.toLowerCase())) return false;
-                if (empDeptFilter && empDeptFilter !== 'all' && e.dept !== empDeptFilter) return false;
-                return true;
-              });
-              
-              // Sort
-              filtered.sort((a, b) => {
-                switch (empSortBy || 'cost-desc') {
-                  case 'cost-desc': return b.cost - a.cost;
-                  case 'cost-asc': return a.cost - b.cost;
-                  case 'name-asc': return a.name.localeCompare(b.name);
-                  case 'name-desc': return b.name.localeCompare(a.name);
-                  default: return 0;
-                }
-              });
-              
-              // Pagination
-              const itemsPerPage = 12;
-              const totalPages = Math.ceil(filtered.length / itemsPerPage);
-              const currentPage = empCurrentPage || 1;
-              const startIdx = (currentPage - 1) * itemsPerPage;
-              const paginatedEmps = filtered.slice(startIdx, startIdx + itemsPerPage);
-              
-              if (filtered.length === 0) {
-                return (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                    <p className="text-slate-500 font-medium">Aucun employé trouvé</p>
-                    <p className="text-slate-400 text-sm mt-1">Essayez de modifier vos filtres</p>
-                  </div>
-                );
-              }
-              
-              return (
-                <>
-                  {/* Results count */}
-                  <p className="text-sm text-slate-500 mb-4">
-                    {filtered.length} employé{filtered.length > 1 ? 's' : ''} 
-                    {debouncedEmpSearch || (empDeptFilter && empDeptFilter !== 'all') ? ' trouvé' + (filtered.length > 1 ? 's' : '') : ''}
-                  </p>
-                  
-                  {/* Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-                    {paginatedEmps.map((e, i) => (
-                      <div 
-                        key={i} 
-                        onClick={() => setSelectedEmployee(e.name)}
-                        className="bg-slate-50 rounded-xl p-4 hover:bg-slate-100 transition-colors border border-slate-100 hover:border-slate-200 cursor-pointer"
-                      >
-                        <div className="flex items-start gap-3">
-                          {/* Avatar */}
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                            e.dept === 'Non assigné' 
-                              ? 'bg-amber-100 text-amber-600' 
-                              : 'bg-violet-100 text-violet-600'
-                          }`}>
-                            {e.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-800 truncate">{e.name}</p>
-                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${
-                              e.dept === 'Non assigné' 
-                                ? 'bg-amber-100 text-amber-700' 
-                                : 'bg-slate-200 text-slate-600'
-                            }`}>
-                              {e.dept}
-                            </span>
-                          </div>
-                          
-                          <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                          </svg>
-                        </div>
-                        
-                        <div className="mt-3 pt-3 border-t border-slate-200">
-                          <p className="text-lg font-bold text-slate-800">
-                            €{e.cost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => setEmpCurrentPage(Math.max(1, currentPage - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        ← Préc.
-                      </button>
-                      
-                      <div className="flex gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
-                          }
-                          
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setEmpCurrentPage(pageNum)}
-                              className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                                currentPage === pageNum
-                                  ? 'bg-violet-500 text-white'
-                                  : 'border border-slate-200 hover:bg-slate-50'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      
-                      <button
-                        onClick={() => setEmpCurrentPage(Math.min(totalPages, currentPage + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-                      >
-                        Suiv. →
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Total */}
-                  <div className="mt-6 pt-4 border-t border-slate-200 flex justify-between items-center">
-                    <span className="font-bold text-slate-700">Total ({filtered.length} employés)</span>
-                    <span className="text-xl font-bold text-violet-600">
-                      €{filtered.reduce((sum, e) => sum + e.cost, 0).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-        
         {/* Bouton de comparaison flottant */}
         {periods.length >= 2 && (
           <button
