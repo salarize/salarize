@@ -38,7 +38,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
-import { List } from 'react-window';
 
 // ============================================
 // IMPORTS FROM MODULAR STRUCTURE
@@ -273,7 +272,7 @@ function AppContent() {
   const [createdDepartments, setCreatedDepartments] = useState([]); // Départements créés manuellement
   const [deptPage, setDeptPage] = useState(0); // Pagination du gestionnaire de départements
   const [pendingDeptChange, setPendingDeptChange] = useState(null); // { empName, oldDept, newDept, empCost } pour confirmation
-  const DEPT_PAGE_SIZE = 30; // Nombre d'employés par page
+  const DEPT_PAGE_SIZE = 10; // Nombre d'employés par page
   const [showInviteModal, setShowInviteModal] = useState(false); // Inviter un CEO
   const [inviteEmail, setInviteEmail] = useState(''); // Email d'invitation
   const [inviteRole, setInviteRole] = useState('viewer'); // Rôle de l'invité
@@ -5137,6 +5136,31 @@ L'équipe Salarize`;
     [allFilteredEmployeesForDept.length]
   );
 
+  const allFilteredEmployeeNames = useMemo(
+    () => allFilteredEmployeesForDept.map(emp => emp.name),
+    [allFilteredEmployeesForDept]
+  );
+
+  const selectedFilteredCount = useMemo(
+    () => allFilteredEmployeeNames.reduce((count, name) => count + (selectedEmployees.has(name) ? 1 : 0), 0),
+    [allFilteredEmployeeNames, selectedEmployees]
+  );
+
+  const isAllFilteredSelected = allFilteredEmployeeNames.length > 0 && selectedFilteredCount === allFilteredEmployeeNames.length;
+  const isSomeFilteredSelected = selectedFilteredCount > 0 && !isAllFilteredSelected;
+
+  const deptStartIndex = allFilteredEmployeesForDept.length === 0 ? 0 : (deptPage * DEPT_PAGE_SIZE) + 1;
+  const deptEndIndex = Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length);
+
+  const deptPageNumbers = useMemo(() => {
+    if (deptTotalPages <= 1) return [];
+    const windowSize = 5;
+    const start = Math.max(0, deptPage - Math.floor(windowSize / 2));
+    const end = Math.min(deptTotalPages - 1, start + windowSize - 1);
+    const normalizedStart = Math.max(0, end - windowSize + 1);
+    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
+  }, [deptPage, deptTotalPages]);
+
   // Options mémoïsées pour le dropdown des départements (évite recréation à chaque render)
   const deptSelectOptions = useMemo(() => [
     { value: '', label: 'Non assigné' },
@@ -5147,6 +5171,17 @@ L'équipe Salarize`;
   useEffect(() => {
     setDeptPage(0);
   }, [debouncedDeptSearch, deptFilter]);
+
+  // Garde la page courante valide quand le nombre de résultats change.
+  useEffect(() => {
+    if (deptTotalPages === 0 && deptPage !== 0) {
+      setDeptPage(0);
+      return;
+    }
+    if (deptTotalPages > 0 && deptPage >= deptTotalPages) {
+      setDeptPage(deptTotalPages - 1);
+    }
+  }, [deptPage, deptTotalPages]);
 
   // === FONCTION LOG ACTIVITÉ ===
   const logActivity = useCallback((action, details) => {
@@ -6852,7 +6887,7 @@ L'équipe Salarize`;
               
               {/* Employee list - Optimisé avec useMemo */}
               <div className="bg-gradient-to-b from-slate-800/20 to-slate-900/40">
-                {filteredEmployeesForDept.length === 0 ? (
+                {allFilteredEmployeesForDept.length === 0 ? (
                   <div className="p-12 text-center">
                     <div className="w-20 h-20 bg-gradient-to-br from-slate-800 to-slate-700 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl">
                       <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6870,113 +6905,161 @@ L'équipe Salarize`;
                         type="checkbox"
                         id="select-all-employees"
                         name="selectAllEmployees"
-                        checked={allFilteredEmployeesForDept.length > 0 && allFilteredEmployeesForDept.every(e => selectedEmployees.has(e.name))}
+                        checked={isAllFilteredSelected}
                         ref={el => {
                           if (el) {
-                            const allSelected = allFilteredEmployeesForDept.every(e => selectedEmployees.has(e.name));
-                            const someSelected = allFilteredEmployeesForDept.some(e => selectedEmployees.has(e.name));
-                            el.indeterminate = someSelected && !allSelected;
+                            el.indeterminate = isSomeFilteredSelected;
                           }
                         }}
                         onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedEmployees(new Set([...selectedEmployees, ...allFilteredEmployeesForDept.map(emp => emp.name)]));
-                          } else {
-                            const newSet = new Set(selectedEmployees);
-                            allFilteredEmployeesForDept.forEach(emp => newSet.delete(emp.name));
-                            setSelectedEmployees(newSet);
-                          }
+                          setSelectedEmployees(prev => {
+                            const next = new Set(prev);
+                            if (e.target.checked) {
+                              allFilteredEmployeeNames.forEach(name => next.add(name));
+                            } else {
+                              allFilteredEmployeeNames.forEach(name => next.delete(name));
+                            }
+                            return next;
+                          });
                         }}
                         className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
                       />
-                      <span className="text-xs font-medium text-slate-400 flex-1">
-                        {selectedEmployees.size > 0
-                          ? `${selectedEmployees.size} sélectionné${selectedEmployees.size > 1 ? 's' : ''}`
+                      <span className="text-xs font-medium text-slate-300 flex-1 min-w-0">
+                        {selectedFilteredCount > 0
+                          ? `${selectedFilteredCount}/${allFilteredEmployeesForDept.length} sélectionnés (filtre actif)`
                           : `Tout sélectionner (${allFilteredEmployeesForDept.length})`}
                       </span>
-                      <span className="text-xs text-slate-500 tabular-nums">
-                        {allFilteredEmployeesForDept.length} membre{allFilteredEmployeesForDept.length > 1 ? 's' : ''}
+                      <span className="text-xs text-slate-500 tabular-nums hidden sm:inline">
+                        Affichage {deptStartIndex}-{deptEndIndex}
                       </span>
                     </div>
 
-                    {/* Virtualized employee list - ultra performant */}
-                    <List
-                      rowCount={allFilteredEmployeesForDept.length}
-                      rowHeight={56}
-                      style={{ height: 384, width: '100%' }}
-                      className="scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
-                      rowProps={{
-                        employees: allFilteredEmployeesForDept,
-                        selectedEmployees,
-                        setSelectedEmployees,
-                        isViewerOnly,
-                        filtered,
-                        setPendingDeptChange,
-                        deptSelectOptions
-                      }}
-                      rowComponent={({ index, style, employees, selectedEmployees, setSelectedEmployees, isViewerOnly, filtered, setPendingDeptChange, deptSelectOptions }) => {
-                        const emp = employees[index];
-                        if (!emp) return null;
-                        return (
-                          <div
-                            style={style}
-                            className={`flex items-center gap-4 px-5 border-b border-slate-800/30 ${
-                              selectedEmployees.has(emp.name)
-                                ? 'bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-l-2 border-l-violet-500'
-                                : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedEmployees.has(emp.name)}
-                              onChange={e => {
-                                const newSet = new Set(selectedEmployees);
+                    <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                      {filteredEmployeesForDept.map((emp) => (
+                        <div
+                          key={emp.name}
+                          className={`flex items-center gap-4 px-5 py-3 border-b border-slate-800/30 ${
+                            selectedEmployees.has(emp.name)
+                              ? 'bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-l-2 border-l-violet-500'
+                              : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedEmployees.has(emp.name)}
+                            onChange={e => {
+                              setSelectedEmployees(prev => {
+                                const next = new Set(prev);
                                 if (e.target.checked) {
-                                  newSet.add(emp.name);
+                                  next.add(emp.name);
                                 } else {
-                                  newSet.delete(emp.name);
+                                  next.delete(emp.name);
                                 }
-                                setSelectedEmployees(newSet);
-                              }}
-                              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
-                            />
-                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                              emp.currentDept
-                                ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
-                                : 'bg-slate-700 text-slate-300 ring-2 ring-amber-500/30'
-                            }`}>
-                              {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-white truncate text-sm">{emp.name}</p>
-                            </div>
-                            <CustomSelect
-                              value={emp.currentDept || ''}
-                              disabled={isViewerOnly}
-                              onChange={val => {
-                                if (isViewerOnly) return;
-                                const newDept = val || null;
-                                if (newDept === emp.currentDept) return;
-                                const empCost = filtered
-                                  .filter(em => em.name === emp.name)
-                                  .reduce((sum, em) => sum + (em.totalCost || 0), 0);
-                                setPendingDeptChange({
-                                  empName: emp.name,
-                                  oldDept: emp.currentDept,
-                                  newDept: newDept,
-                                  empCost: empCost
-                                });
-                              }}
-                              options={deptSelectOptions}
-                              variant={emp.currentDept ? 'default' : 'warning'}
-                              dropdownPosition="auto"
-                              showIcons={true}
-                              className="w-36"
-                            />
+                                return next;
+                              });
+                            }}
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
+                          />
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                            emp.currentDept
+                              ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
+                              : 'bg-slate-700 text-slate-300 ring-2 ring-amber-500/30'
+                          }`}>
+                            {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                           </div>
-                        );
-                      }}
-                    />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-white truncate text-sm">{emp.name}</p>
+                          </div>
+                          <CustomSelect
+                            value={emp.currentDept || ''}
+                            disabled={isViewerOnly}
+                            onChange={val => {
+                              if (isViewerOnly) return;
+                              const newDept = val || null;
+                              if (newDept === emp.currentDept) return;
+                              const empCost = filtered
+                                .filter(em => em.name === emp.name)
+                                .reduce((sum, em) => sum + (em.totalCost || 0), 0);
+                              setPendingDeptChange({
+                                empName: emp.name,
+                                oldDept: emp.currentDept,
+                                newDept: newDept,
+                                empCost: empCost
+                              });
+                            }}
+                            options={deptSelectOptions}
+                            variant={emp.currentDept ? 'default' : 'warning'}
+                            dropdownPosition="auto"
+                            showIcons={true}
+                            className="w-36"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {deptTotalPages > 1 && (
+                      <div className="flex items-center justify-between gap-3 px-5 py-3 bg-slate-900/50 border-t border-slate-800/60">
+                        <button
+                          onClick={() => setDeptPage(prev => Math.max(0, prev - 1))}
+                          disabled={deptPage === 0}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Précédent
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          {deptPageNumbers[0] > 0 && (
+                            <>
+                              <button
+                                onClick={() => setDeptPage(0)}
+                                className="w-8 h-8 text-xs rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors"
+                              >
+                                1
+                              </button>
+                              {deptPageNumbers[0] > 1 && (
+                                <span className="px-1 text-slate-500 text-xs">...</span>
+                              )}
+                            </>
+                          )}
+
+                          {deptPageNumbers.map(pageIndex => (
+                            <button
+                              key={pageIndex}
+                              onClick={() => setDeptPage(pageIndex)}
+                              className={`w-8 h-8 text-xs rounded-lg border transition-colors ${
+                                pageIndex === deptPage
+                                  ? 'border-violet-500 bg-violet-500/20 text-white'
+                                  : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+                              }`}
+                            >
+                              {pageIndex + 1}
+                            </button>
+                          ))}
+
+                          {deptPageNumbers[deptPageNumbers.length - 1] < deptTotalPages - 1 && (
+                            <>
+                              {deptPageNumbers[deptPageNumbers.length - 1] < deptTotalPages - 2 && (
+                                <span className="px-1 text-slate-500 text-xs">...</span>
+                              )}
+                              <button
+                                onClick={() => setDeptPage(deptTotalPages - 1)}
+                                className="w-8 h-8 text-xs rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors"
+                              >
+                                {deptTotalPages}
+                              </button>
+                            </>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => setDeptPage(prev => Math.min(deptTotalPages - 1, prev + 1))}
+                          disabled={deptPage >= deptTotalPages - 1}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Suivant
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
