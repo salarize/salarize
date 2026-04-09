@@ -131,6 +131,44 @@ function AppContent() {
     return `${num.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h`;
   };
 
+  const normalizeEmail = (value) => (value || '').trim().toLowerCase();
+
+  const canonicalizeInvitationEmail = (value) => {
+    const normalized = normalizeEmail(value);
+    if (!normalized.includes('@')) return normalized;
+
+    const [localRaw, domainRaw] = normalized.split('@');
+    const domain = domainRaw.toLowerCase();
+
+    // Gmail aliases: dots and +tag should map to the same mailbox.
+    if (domain === 'gmail.com' || domain === 'googlemail.com') {
+      const local = localRaw.split('+')[0].replace(/\./g, '');
+      return `${local}@gmail.com`;
+    }
+
+    return normalized;
+  };
+
+  const buildEmailCandidates = (value) => {
+    const normalized = normalizeEmail(value);
+    if (!normalized.includes('@')) return [];
+
+    const [localRaw, domainRaw] = normalized.split('@');
+    const domain = domainRaw.toLowerCase();
+    const candidates = new Set([normalized]);
+
+    if (domain === 'gmail.com' || domain === 'googlemail.com') {
+      const local = localRaw.split('+')[0];
+      const compact = local.replace(/\./g, '');
+      candidates.add(`${local}@gmail.com`);
+      candidates.add(`${local}@googlemail.com`);
+      candidates.add(`${compact}@gmail.com`);
+      candidates.add(`${compact}@googlemail.com`);
+    }
+
+    return [...candidates];
+  };
+
   const [companies, setCompanies] = useState({});
   const [activeCompany, setActiveCompany] = useState(null);
   const [employees, setEmployees] = useState([]);
@@ -714,7 +752,12 @@ function AppContent() {
 
         // Vérifier si l'utilisateur est déjà connecté
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        const hasOAuthTokensInHash =
+          window.location.hash &&
+          window.location.hash.includes('access_token') &&
+          window.location.hash.includes('refresh_token');
+
+        if (!session && !hasOAuthTokensInHash) {
           // Pas connecté → afficher le modal d'auth
           setShowAuthModal(true);
           setIsLoading(false);
@@ -772,7 +815,7 @@ function AppContent() {
               provider: user.app_metadata?.provider || 'email'
             });
             // Ne pas mettre dashboard ici - loadFromSupabase décidera
-            loadFromSupabase(user.id);
+            loadFromSupabase(user.id, user.email);
             setIsLoading(false);
             return;
           }
@@ -800,7 +843,7 @@ function AppContent() {
         // Ne charger que si pas déjà chargé ET si on n'est pas en mode recovery
         if (!dataLoadedRef.current && !isRecoveryModeRef.current) {
           dataLoadedRef.current = true;
-          loadFromSupabase(session.user.id);
+          loadFromSupabase(session.user.id, session.user.email);
         }
       } else {
         if (!dataLoadedRef.current) {
@@ -850,7 +893,7 @@ function AppContent() {
         if (!dataLoadedRef.current) {
           dataLoadedRef.current = true;
           setIsLoadingData(true);
-          loadFromSupabase(session.user.id);
+          loadFromSupabase(session.user.id, session.user.email);
         } else {
           // Données déjà chargées, s'assurer qu'on va au dashboard
           setIsLoadingData(false);
@@ -890,14 +933,27 @@ function AppContent() {
   };
 
   // Load data from Supabase
-  const loadFromSupabase = async (userId) => {
+  const loadFromSupabase = async (userId, userEmailHint = null) => {
     console.log('[Salarize] Loading data from Supabase for user:', userId);
     setIsLoadingData(true);
     try {
-      // Get user email for invitation lookup
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const userEmail = currentUser?.email;
-      console.log('[Salarize] User email:', userEmail);
+      // Get the most reliable email available to resolve invitations.
+      let userEmail = normalizeEmail(userEmailHint);
+
+      if (!userEmail) {
+        const { data: { session: activeSession } } = await supabase.auth.getSession();
+        userEmail = normalizeEmail(activeSession?.user?.email);
+      }
+
+      if (!userEmail) {
+        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error('[Salarize] Error loading current auth user:', userError);
+        }
+        userEmail = normalizeEmail(currentUser?.email);
+      }
+
+      console.log('[Salarize] User email:', userEmail || '(missing)');
 
       // Load user's own companies
       const { data: companiesData, error: companiesError } = await supabase
@@ -914,6 +970,7 @@ function AppContent() {
 
       // Load shared companies via invitations
       let sharedCompaniesData = [];
+      let invitationsForUser = [];
 
       // Vérifier si un token d'invitation est en attente (depuis le lien d'invitation)
       const pendingInviteToken = localStorage.getItem('pending_invite_token');
@@ -941,13 +998,18 @@ function AppContent() {
           // Accepter l'invitation seulement si elle est encore pending
           if (tokenInvite.status === 'pending') {
             console.log('[Salarize] Attempting to accept invitation...');
+            const invitationUpdate = {
+              status: 'accepted',
+              accepted_at: new Date().toISOString()
+            };
+
+            if (userEmail) {
+              invitationUpdate.invited_email = userEmail;
+            }
+
             const { data: updateData, error: updateError } = await supabase
               .from('invitations')
-              .update({
-                status: 'accepted',
-                accepted_at: new Date().toISOString(),
-                invited_email: userEmail
-              })
+              .update(invitationUpdate)
               .eq('id', tokenInvite.id)
               .select();
 
@@ -984,16 +1046,50 @@ function AppContent() {
       }
 
       if (userEmail) {
-        // Find all invitations for this email (pending or accepted)
-        const { data: invitations, error: invError } = await supabase
-          .from('invitations')
-          .select('*')
-          .eq('invited_email', userEmail);
+        const emailCandidates = buildEmailCandidates(userEmail);
+        const candidateFilter = emailCandidates
+          .map(email => `invited_email.ilike."${email.replace(/"/g, '\\"')}"`)
+          .join(',');
 
-        if (invError) {
-          console.error('[Salarize] Error loading invitations:', invError);
-        } else if (invitations && invitations.length > 0) {
+        let invitations = [];
+        if (candidateFilter) {
+          const { data: directInvites, error: directError } = await supabase
+            .from('invitations')
+            .select('*')
+            .or(candidateFilter);
+
+          if (directError) {
+            console.error('[Salarize] Error loading invitations:', directError);
+          } else {
+            invitations = directInvites || [];
+          }
+        }
+
+        // Fallback for Gmail aliases where dots/+tags differ between invite and Google identity.
+        if (invitations.length === 0 && canonicalizeInvitationEmail(userEmail).endsWith('@gmail.com')) {
+          const [gmailResult, googlemailResult] = await Promise.all([
+            supabase.from('invitations').select('*').ilike('invited_email', '%@gmail.com'),
+            supabase.from('invitations').select('*').ilike('invited_email', '%@googlemail.com')
+          ]);
+
+          const fallbackRows = [
+            ...(gmailResult.data || []),
+            ...(googlemailResult.data || [])
+          ];
+
+          const canonicalUserEmail = canonicalizeInvitationEmail(userEmail);
+          const deduped = new Map();
+          fallbackRows.forEach(invite => {
+            if (canonicalizeInvitationEmail(invite.invited_email) === canonicalUserEmail) {
+              deduped.set(invite.id, invite);
+            }
+          });
+          invitations = [...deduped.values()];
+        }
+
+        if (invitations.length > 0) {
           console.log('[Salarize] Found invitations:', invitations.length);
+          invitationsForUser = invitations;
 
           // Mark pending invitations as accepted
           const pendingInvites = invitations.filter(inv => inv.status === 'pending');
@@ -1011,7 +1107,7 @@ function AppContent() {
           }
 
           // Get the company IDs from accepted/pending invitations
-          const sharedCompanyIds = invitations.map(inv => inv.company_id);
+          const sharedCompanyIds = [...new Set(invitations.map(inv => inv.company_id))];
 
           if (sharedCompanyIds.length > 0) {
             const { data: sharedComps, error: sharedError } = await supabase
@@ -1040,12 +1136,8 @@ function AppContent() {
         invitationRoles[tokenInviteCompanyId] = tokenInviteRole;
       }
 
-      if (userEmail) {
-        const { data: invs } = await supabase
-          .from('invitations')
-          .select('company_id, role')
-          .eq('invited_email', userEmail);
-        (invs || []).forEach(inv => {
+      if (invitationsForUser.length > 0) {
+        invitationsForUser.forEach(inv => {
           invitationRoles[inv.company_id] = inv.role;
         });
       }
@@ -2170,7 +2262,7 @@ function AppContent() {
     if (userData?.id) {
       dataLoadedRef.current = true;
       setIsLoadingData(true);
-      loadFromSupabase(userData.id);
+      loadFromSupabase(userData.id, userData.email);
     }
   };
 
@@ -8021,7 +8113,7 @@ L'équipe Salarize`;
                           style={{ fill: '#334155', fontSize: 10, fontWeight: 600 }}
                         />
                       )}
-                    />
+                    </Bar>
                   ))}
                 </BarChart>
               </ResponsiveContainer>

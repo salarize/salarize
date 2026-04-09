@@ -30,10 +30,16 @@ function AuthModal({ isOpen, onClose, onSuccess, defaultTab = 'login', inviteInf
         localStorage.setItem('pending_invite_token', inviteToken);
       }
 
+      const redirectUrl = new URL(window.location.href);
+      redirectUrl.hash = '';
+      if (inviteToken) {
+        redirectUrl.searchParams.set('invite', inviteToken);
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: redirectUrl.toString(),
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
