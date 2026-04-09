@@ -180,20 +180,32 @@ function CustomSelect({
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const horizontalPadding = 8;
       const spaceBelow = viewportHeight - rect.bottom;
       const spaceAbove = rect.top;
       const dropdownHeight = Math.min(filteredOptions.length * 42 + (searchable ? 52 : 8), 280);
+      const desiredWidth = Math.max(rect.width, 180);
+      const width = Math.min(desiredWidth, viewportWidth - horizontalPadding * 2);
 
       let showOnTop = dropdownPosition === "top";
       if (dropdownPosition === "auto") {
         showOnTop = spaceBelow < dropdownHeight && spaceAbove > spaceBelow;
       }
 
+      const left = Math.min(
+        Math.max(rect.left, horizontalPadding),
+        viewportWidth - width - horizontalPadding
+      );
+      const top = showOnTop
+        ? Math.max(8, rect.top - dropdownHeight - 4)
+        : rect.bottom + 4;
+
       setDropdownStyle({
         position: 'fixed',
-        left: rect.left,
-        width: Math.max(rect.width, 180),
-        top: showOnTop ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+        left,
+        width,
+        top,
         maxHeight: showOnTop ? Math.min(spaceAbove - 8, 280) : Math.min(spaceBelow - 8, 280),
       });
 

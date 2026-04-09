@@ -1,9 +1,36 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage }) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShowDropdown(false);
+        setShowMobileMenu(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setShowMobileMenu(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleNav = (page) => {
     setCurrentPage(page);
+    setShowDropdown(false);
+    setShowMobileMenu(false);
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     }
@@ -11,7 +38,7 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900/80 backdrop-blur-lg border-b border-white/10 z-50">
-      <div className="max-w-6xl mx-auto h-full px-6 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between">
         {/* Logo */}
         <button onClick={() => handleNav('home')} className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center">
@@ -56,13 +83,30 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
           )}
         </nav>
 
-        {/* Auth */}
-        <div className="relative">
+        {/* Auth + Mobile Nav Toggle */}
+        <div className="relative flex items-center gap-2">
+          <button
+            onClick={() => setShowMobileMenu((prev) => !prev)}
+            className="md:hidden p-2 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-slate-200 transition-colors"
+            aria-label="Ouvrir le menu"
+            aria-expanded={showMobileMenu}
+          >
+            {showMobileMenu ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+
           {user ? (
             <>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 {user.picture && user.provider === 'google' ? (
                   <img src={user.picture} alt="" className="w-7 h-7 rounded-full" />
@@ -120,17 +164,70 @@ function LandingHeader({ user, onLogin, onLogout, currentPage, setCurrentPage })
               )}
             </>
           ) : (
-            <button
-              onClick={onLogin}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-violet-500/25"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-              </svg>
-              Connexion
-            </button>
-          )}
+              <button
+                onClick={onLogin}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white text-sm font-medium rounded-lg transition-all shadow-lg shadow-violet-500/25"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                Connexion
+              </button>
+            )}
         </div>
+
+        {/* Mobile menu panel */}
+        {showMobileMenu && (
+          <>
+            <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setShowMobileMenu(false)} />
+            <div className="fixed top-16 left-0 right-0 px-4 z-50 md:hidden">
+              <div className="rounded-2xl border border-slate-700/80 bg-slate-900/95 backdrop-blur-xl shadow-2xl shadow-black/30 p-2">
+                <button
+                  onClick={() => handleNav('home')}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    currentPage === 'home' ? 'bg-violet-500/20 text-white' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Accueil
+                </button>
+                <button
+                  onClick={() => handleNav('features')}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    currentPage === 'features' ? 'bg-violet-500/20 text-white' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Fonctionnalites
+                </button>
+                <button
+                  onClick={() => handleNav('pricing')}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    currentPage === 'pricing' ? 'bg-violet-500/20 text-white' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Tarifs
+                </button>
+                <button
+                  onClick={() => handleNav('demo')}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                    currentPage === 'demo' ? 'bg-violet-500/20 text-white' : 'text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  Demo
+                </button>
+                {user && (
+                  <button
+                    onClick={() => handleNav('dashboard')}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                      currentPage === 'dashboard' ? 'bg-violet-500/20 text-white' : 'text-slate-300 hover:bg-white/5'
+                    }`}
+                  >
+                    Dashboard
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </header>
   );

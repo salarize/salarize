@@ -12,7 +12,7 @@ function PricingPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
         <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-fuchsia-600/20" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-violet-500/20 to-transparent rounded-full blur-3xl" />
 
-        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-28 sm:pt-32 pb-14 sm:pb-16">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-6">
               <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -20,10 +20,10 @@ function PricingPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
               </svg>
               <span className="text-emerald-400 text-sm font-medium">14 jours d'essai gratuit sur tous les plans</span>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold text-white mb-6">
               Des tarifs <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">simples et transparents</span>
             </h1>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-8">
+            <p className="text-base sm:text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-8">
               Choisissez le plan qui correspond a vos besoins. Evoluez quand vous voulez.
             </p>
 
@@ -48,12 +48,12 @@ function PricingPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
       </div>
 
       {/* Pricing Cards */}
-      <div className="max-w-6xl mx-auto px-6 py-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-16">
         <div className="grid md:grid-cols-3 gap-8">
           {PRICING_PLANS.map((plan, index) => (
             <div
               key={plan.name}
-              className={`relative bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border transition-all hover:-translate-y-1 ${
+              className={`relative bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-6 sm:p-8 border transition-all hover:-translate-y-1 ${
                 plan.popular
                   ? 'border-violet-500 shadow-lg shadow-violet-500/20'
                   : 'border-slate-700/50 hover:border-slate-600'

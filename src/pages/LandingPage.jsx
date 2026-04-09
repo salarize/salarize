@@ -10,7 +10,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
         <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-fuchsia-600/20" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-violet-500/30 to-transparent rounded-full blur-3xl" />
 
-        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-20">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-28 sm:pt-32 pb-16 sm:pb-20">
           <div className="text-center">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full mb-8">
@@ -19,7 +19,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
             </div>
 
             {/* Title */}
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
               Analysez vos couts
               <br />
               <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-violet-400 bg-clip-text text-transparent">
@@ -28,7 +28,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
             </h1>
 
             {/* Subtitle */}
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
+            <p className="text-base sm:text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
               Importez vos fichiers de secretariat social, visualisez vos donnees par departement,
               et exportez des rapports professionnels en quelques clics.
             </p>
@@ -141,7 +141,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
       </div>
 
       {/* Features Section */}
-      <div className="max-w-6xl mx-auto px-6 py-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Tout ce dont vous avez besoin
@@ -153,7 +153,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
 
         <div className="grid md:grid-cols-3 gap-8">
           {/* Feature 1 */}
-          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
+          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-6 sm:p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
             <div className="w-14 h-14 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -166,7 +166,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
           </div>
 
           {/* Feature 2 */}
-          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
+          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-6 sm:p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
             <div className="w-14 h-14 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -179,7 +179,7 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
           </div>
 
           {/* Feature 3 */}
-          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
+          <div className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-6 sm:p-8 border border-slate-700/50 hover:border-violet-500/50 transition-colors group">
             <div className="w-14 h-14 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -194,8 +194,8 @@ function LandingPage({ onLogin, user, onGoToDashboard, onViewDemo, setCurrentPag
       </div>
 
       {/* CTA Section */}
-      <div className="max-w-6xl mx-auto px-6 py-20">
-        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 rounded-3xl p-12 border border-violet-500/20 text-center">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 rounded-3xl p-6 sm:p-12 border border-violet-500/20 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             {user ? 'Accedez a votre dashboard' : 'Pret a simplifier votre gestion ?'}
           </h2>

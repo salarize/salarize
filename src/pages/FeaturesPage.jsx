@@ -72,12 +72,12 @@ function FeaturesPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
         <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-slate-950 to-fuchsia-600/20" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-b from-violet-500/20 to-transparent rounded-full blur-3xl" />
 
-        <div className="relative max-w-6xl mx-auto px-6 pt-32 pb-16">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-28 sm:pt-32 pb-14 sm:pb-16">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold text-white mb-6">
               Fonctionnalites
             </h1>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-slate-400 max-w-2xl mx-auto">
               Decouvrez tous les outils pour simplifier votre analyse salariale
             </p>
           </div>
@@ -85,12 +85,12 @@ function FeaturesPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
       </div>
 
       {/* Features Grid */}
-      <div className="max-w-6xl mx-auto px-6 py-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-16">
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
             <div
               key={index}
-              className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-8 border border-slate-700/50 hover:border-violet-500/50 transition-all hover:-translate-y-1"
+              className="bg-gradient-to-b from-slate-800/50 to-slate-900/50 rounded-2xl p-6 sm:p-8 border border-slate-700/50 hover:border-violet-500/50 transition-all hover:-translate-y-1"
             >
               <div className="w-16 h-16 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center mb-6 text-violet-400">
                 {feature.icon}
@@ -113,8 +113,8 @@ function FeaturesPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
       </div>
 
       {/* CTA */}
-      <div className="max-w-6xl mx-auto px-6 py-16">
-        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 rounded-3xl p-12 border border-violet-500/20 text-center">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-16">
+        <div className="bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 rounded-3xl p-6 sm:p-12 border border-violet-500/20 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
             Pret a commencer ?
           </h2>
