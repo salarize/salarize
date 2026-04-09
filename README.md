@@ -67,7 +67,9 @@ npm install
 4. Va dans "Credentials" → "Create Credentials" → "OAuth 2.0 Client IDs"
 5. Type: Web application
 6. Authorized JavaScript origins: `http://localhost:5173`
-7. Copie le Client ID dans `src/main.jsx`
+7. Copie le Client ID dans `.env`:
+   `VITE_GOOGLE_CLIENT_ID=ton_client_id.apps.googleusercontent.com`
+8. Tu peux partir de `.env.example`
 
 ## Lancer en développement
 

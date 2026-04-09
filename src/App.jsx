@@ -37,7 +37,6 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
 import { List } from 'react-window';
 
@@ -101,6 +100,14 @@ import TimesheetPage from './components/timesheet/TimesheetPage';
 
 // Styles
 import './styles/animations.css';
+
+let xlsxLoader = null;
+const loadXLSX = async () => {
+  if (!xlsxLoader) {
+    xlsxLoader = import('xlsx');
+  }
+  return xlsxLoader;
+};
 
 // ============================================
 // MAIN APP CONTENT
@@ -2025,7 +2032,8 @@ function AppContent() {
     return `${formatPeriod(scopedPeriods[0])} - ${formatPeriod(scopedPeriods[scopedPeriods.length - 1])}`;
   };
 
-  const buildAnalyticsWorkbook = (scopedEmployees, scopedPeriods, targetYear) => {
+  const buildAnalyticsWorkbook = async (scopedEmployees, scopedPeriods, targetYear) => {
+    const XLSX = await loadXLSX();
     const reportLabel = buildReportLabel(scopedPeriods, targetYear);
     const totalCostExport = scopedEmployees.reduce((sum, e) => sum + (e.totalCost || 0), 0);
     const uniqueEmployees = new Set(scopedEmployees.map(e => e.name)).size;
@@ -2109,7 +2117,7 @@ function AppContent() {
   };
 
   // Export Excel analytique
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (!activeCompany) return;
 
     const { scopedEmployees, scopedPeriods, targetYear } = getExportScope();
@@ -2118,9 +2126,15 @@ function AppContent() {
       return;
     }
 
-    const { wb, filenameSuffix } = buildAnalyticsWorkbook(scopedEmployees, scopedPeriods, targetYear);
-    XLSX.writeFile(wb, `Salarize_${activeCompany}_${filenameSuffix}.xlsx`);
-    toast.success('Export Excel analytique téléchargé');
+    try {
+      const XLSX = await loadXLSX();
+      const { wb, filenameSuffix } = await buildAnalyticsWorkbook(scopedEmployees, scopedPeriods, targetYear);
+      XLSX.writeFile(wb, `Salarize_${activeCompany}_${filenameSuffix}.xlsx`);
+      toast.success('Export Excel analytique téléchargé');
+    } catch (err) {
+      console.error('[Salarize] Export Excel failed:', err);
+      toast.error("Erreur lors de l'export Excel");
+    }
   };
 
   // Export PDF
@@ -2487,7 +2501,7 @@ function AppContent() {
   };
 
   // Parser Securex amélioré
-  const parseSecurex = (rows, filename) => {
+  const parseSecurex = (rows, filename, xlsxLib = null) => {
     if (!rows || rows.length === 0) return null;
     const normalizePeriodValue = (value) => {
       if (!value) return null;
@@ -2495,7 +2509,7 @@ function AppContent() {
         return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`;
       }
       if (typeof value === 'number' && !isNaN(value)) {
-        const parsed = XLSX.SSF?.parse_date_code ? XLSX.SSF.parse_date_code(value) : null;
+        const parsed = xlsxLib?.SSF?.parse_date_code ? xlsxLib.SSF.parse_date_code(value) : null;
         if (parsed && parsed.y && parsed.m) {
           return `${parsed.y}-${String(parsed.m).padStart(2, '0')}`;
         }
@@ -2640,7 +2654,7 @@ function AppContent() {
   };
 
   // Parser générique amélioré qui essaie de détecter le format automatiquement
-  const parseGeneric = (rows, filename) => {
+  const parseGeneric = (rows, filename, xlsxLib = null) => {
     if (!rows || rows.length === 0) return null;
 
     // Chercher la ligne d'en-tete la plus probable
@@ -2659,7 +2673,7 @@ function AppContent() {
         return value.getFullYear() + '-' + String(value.getMonth() + 1).padStart(2, '0');
       }
       if (typeof value === 'number' && !isNaN(value)) {
-        const parsed = XLSX.SSF && XLSX.SSF.parse_date_code ? XLSX.SSF.parse_date_code(value) : null;
+        const parsed = xlsxLib?.SSF?.parse_date_code ? xlsxLib.SSF.parse_date_code(value) : null;
         if (parsed && parsed.y && parsed.m) {
           return parsed.y + '-' + String(parsed.m).padStart(2, '0');
         }
@@ -2771,6 +2785,7 @@ function AppContent() {
   // Multi-fichiers: parser plusieurs fichiers et combiner les résultats
   const parseMultipleFiles = async (files) => {
     const results = [];
+    const XLSX = await loadXLSX();
     
     for (const file of files) {
       try {
@@ -2792,8 +2807,8 @@ function AppContent() {
         // Essayer tous les parsers
         let result = parseAcerta(rows);
         if (!result) result = parseAcertaNL(rows);
-        if (!result) result = parseSecurex(rows, file.name);
-        if (!result) result = parseGeneric(rows, file.name);
+        if (!result) result = parseSecurex(rows, file.name, XLSX);
+        if (!result) result = parseGeneric(rows, file.name, XLSX);
         
         if (result && result.employees.length > 0) {
           // Utiliser la période suggérée depuis le nom du fichier si disponible
@@ -2827,8 +2842,9 @@ function AppContent() {
       setDebugMsg('Lecture...');
       
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
+          const XLSX = await loadXLSX();
           const data = new Uint8Array(e.target.result);
           const wb = XLSX.read(data, { type: 'array' });
           
@@ -2860,11 +2876,11 @@ function AppContent() {
             detectedProvider = 'acerta-nl';
           }
           if (!result) {
-            result = parseSecurex(rows, file.name);
+            result = parseSecurex(rows, file.name, XLSX);
             detectedProvider = 'securex';
           }
           if (!result) {
-            result = parseGeneric(rows, file.name);
+            result = parseGeneric(rows, file.name, XLSX);
             detectedProvider = 'generic';
           }
           
@@ -2961,8 +2977,9 @@ function AppContent() {
     const parseAndImportFile = (file) => {
       return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           try {
+            const XLSX = await loadXLSX();
             const data = new Uint8Array(e.target.result);
             const wb = XLSX.read(data, { type: 'array' });
 
@@ -2981,8 +2998,8 @@ function AppContent() {
             // Parser le fichier
             let result = parseAcerta(rows);
             if (!result) result = parseAcertaNL(rows);
-            if (!result) result = parseSecurex(rows, file.name);
-            if (!result) result = parseGeneric(rows, file.name);
+            if (!result) result = parseSecurex(rows, file.name, XLSX);
+            if (!result) result = parseGeneric(rows, file.name, XLSX);
 
             if (!result || result.employees.length === 0) {
               console.log(`[Salarize] ⚠️ Fichier ignoré (non reconnu): ${file.name}`);
@@ -3563,63 +3580,77 @@ function AppContent() {
   };
 
   // Export period data to Excel
-  const exportPeriodToExcel = (period) => {
+  const exportPeriodToExcel = async (period) => {
     const periodEmps = employees.filter(e => e.period === period);
     if (periodEmps.length === 0) return;
     
-    // Create worksheet data
-    const wsData = [
-      ['Nom', 'Département', 'Fonction', 'Coût Total', 'Période']
-    ];
-    
-    periodEmps.forEach(emp => {
-      const dept = emp.department || departmentMapping[emp.name] || 'Non assigné';
-      wsData.push([
-        emp.name,
-        dept,
-        emp.function || '',
-        emp.totalCost,
-        period
-      ]);
-    });
-    
-    // Add total row
-    const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
-    wsData.push([]);
-    wsData.push(['TOTAL', '', '', total, '']);
-    
-    // Create workbook
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    
-    // Set column widths
-    ws['!cols'] = [
-      { wch: 30 }, // Nom
-      { wch: 20 }, // Département
-      { wch: 20 }, // Fonction
-      { wch: 15 }, // Coût
-      { wch: 12 }  // Période
-    ];
-    
-    XLSX.utils.book_append_sheet(wb, ws, 'Données');
-    
-    // Generate filename
-    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-    const year = period.substring(0, 4);
-    const month = monthNames[parseInt(period.substring(5), 10) - 1];
-    const filename = `${activeCompany}_${month}_${year}.xlsx`;
-    
-    // Download
-    XLSX.writeFile(wb, filename);
+    try {
+      const XLSX = await loadXLSX();
+
+      // Create worksheet data
+      const wsData = [
+        ['Nom', 'Département', 'Fonction', 'Coût Total', 'Période']
+      ];
+      
+      periodEmps.forEach(emp => {
+        const dept = emp.department || departmentMapping[emp.name] || 'Non assigné';
+        wsData.push([
+          emp.name,
+          dept,
+          emp.function || '',
+          emp.totalCost,
+          period
+        ]);
+      });
+      
+      // Add total row
+      const total = periodEmps.reduce((s, e) => s + e.totalCost, 0);
+      wsData.push([]);
+      wsData.push(['TOTAL', '', '', total, '']);
+      
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 30 }, // Nom
+        { wch: 20 }, // Département
+        { wch: 20 }, // Fonction
+        { wch: 15 }, // Coût
+        { wch: 12 }  // Période
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, ws, 'Données');
+      
+      // Generate filename
+      const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+      const year = period.substring(0, 4);
+      const month = monthNames[parseInt(period.substring(5), 10) - 1];
+      const filename = `${activeCompany}_${month}_${year}.xlsx`;
+      
+      // Download
+      XLSX.writeFile(wb, filename);
+    } catch (err) {
+      console.error('[Salarize] Export period Excel failed:', err);
+      toast.error("Erreur lors de l'export Excel");
+    }
   };
 
   // Export all data for a year to Excel
-  const exportYearToExcel = (year) => {
+  const exportYearToExcel = async (year) => {
     if (!activeCompany) return;
     const { scopedEmployees, scopedPeriods, targetYear } = getExportScope(year);
     if (scopedEmployees.length === 0) return;
-    const { wb } = buildAnalyticsWorkbook(scopedEmployees, scopedPeriods, targetYear);
-    XLSX.writeFile(wb, `Salarize_${activeCompany}_${year}.xlsx`);
+
+    try {
+      const XLSX = await loadXLSX();
+      const { wb } = await buildAnalyticsWorkbook(scopedEmployees, scopedPeriods, targetYear);
+      XLSX.writeFile(wb, `Salarize_${activeCompany}_${year}.xlsx`);
+    } catch (err) {
+      console.error('[Salarize] Export year Excel failed:', err);
+      toast.error("Erreur lors de l'export Excel");
+    }
   };
 
   const handleBrandColorChange = (color) => {
