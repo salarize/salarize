@@ -105,6 +105,7 @@ const CookiesPage = lazy(() => import('./pages/CookiesPage'));
 const DemoPage = lazy(() => import('./pages/DemoPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const TimesheetPage = lazy(() => import('./components/timesheet/TimesheetPage'));
+const SuppliersDashboardPage = lazy(() => import('./components/suppliers/SuppliersDashboardPage'));
 
 let xlsxLoader = null;
 const loadXLSX = async () => {
@@ -203,6 +204,7 @@ function AppContent() {
   const actionsMenuRef = useRef(null);
   const [companyOrder, setCompanyOrder] = useState([]); // Ordre des sociétés dans la sidebar (drag & drop)
   const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
+  const [showSuppliersDashboard, setShowSuppliersDashboard] = useState(false);
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
   const isRecoveryModeRef = useRef(
     typeof window !== 'undefined' && 
@@ -960,6 +962,7 @@ function AppContent() {
         setActiveCompany(null);
         setEmployees([]);
         setMaterialCosts([]);
+        setShowSuppliersDashboard(false);
         setShowMaterialsPanel(false);
         setView('upload');
         setCurrentPage('home');
@@ -2425,6 +2428,7 @@ function AppContent() {
     setActiveCompany(null);
     setEmployees([]);
     setMaterialCosts([]);
+    setShowSuppliersDashboard(false);
     setShowMaterialsPanel(false);
     setView('upload');
   };
@@ -3984,6 +3988,7 @@ function AppContent() {
     setActiveCompany(name);
     setEmployees([]);
     setMaterialCosts([]);
+    setShowSuppliersDashboard(false);
     setShowMaterialsPanel(false);
     setDepartmentMapping({});
     setPeriods([]);
@@ -4861,6 +4866,7 @@ L'équipe Salarize`;
     companiesRef.current = newCompanies;
     setEmployees([]);
     setMaterialCosts([]);
+    setShowSuppliersDashboard(false);
     setShowMaterialsPanel(false);
     setPeriods([]);
     setDepartmentMapping({});
@@ -4916,6 +4922,7 @@ L'équipe Salarize`;
       setActiveCompany(null);
       setEmployees([]);
       setMaterialCosts([]);
+      setShowSuppliersDashboard(false);
       setShowMaterialsPanel(false);
       setPeriods([]);
       setDepartmentMapping({});
@@ -6361,6 +6368,16 @@ L'équipe Salarize`;
             onTimesheetClick={() => setShowTimesheet(true)}
             departmentMapping={departmentMapping}
             employees={employees}
+            currentModule="payroll"
+            onPayrollClick={() => {
+              setShowSuppliersDashboard(false);
+              setSidebarOpen(false);
+            }}
+            onSuppliersClick={() => {
+              setView('dashboard');
+              setShowSuppliersDashboard(true);
+              setSidebarOpen(false);
+            }}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -6463,7 +6480,14 @@ L'équipe Salarize`;
           companies={companies}
           activeCompany={activeCompany}
           onSelectCompany={(name) => { loadCompany(name); setSidebarOpen(false); }}
-          onImportClick={() => { setShowImportModal(true); setSidebarOpen(false); }}
+          onImportClick={() => {
+            if (showSuppliersDashboard) {
+              setShowMaterialImportModal(true);
+            } else {
+              setShowImportModal(true);
+            }
+            setSidebarOpen(false);
+          }}
           onAddCompany={() => { setShowNewCompanyModal(true); setSidebarOpen(false); }}
           onManageData={() => { setShowDataManager(true); setSidebarOpen(false); }}
           onManageDepts={() => { setShowDeptManager(true); setSidebarOpen(false); }}
@@ -6477,6 +6501,9 @@ L'équipe Salarize`;
           onTimesheetClick={() => { setShowTimesheet(true); setSidebarOpen(false); }}
           departmentMapping={departmentMapping}
           employees={employees}
+          currentModule={showSuppliersDashboard ? 'suppliers' : 'payroll'}
+          onPayrollClick={() => { setShowSuppliersDashboard(false); setSidebarOpen(false); }}
+          onSuppliersClick={() => { setShowSuppliersDashboard(true); setSidebarOpen(false); }}
         />
         <DashboardHeader 
           user={user} 
@@ -7927,6 +7954,15 @@ L'équipe Salarize`;
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <LoadingSpinner size="lg" text="Chargement des données" subtext="Veuillez patienter..." />
           </div>
+        ) : showSuppliersDashboard ? (
+          <SuppliersDashboardPage
+            activeCompany={activeCompany}
+            materialCosts={materialCosts}
+            isViewerOnly={isViewerOnly}
+            onBackToPayroll={() => setShowSuppliersDashboard(false)}
+            onInvite={() => setShowInviteModal(true)}
+            onImportFile={handleMaterialFileChange}
+          />
         ) : (
         <>
         {/* Company Header Card */}
@@ -8158,14 +8194,14 @@ L'équipe Salarize`;
                   onClick={() => {
                     setShowExportMenu(false);
                     setShowActionsMenu(false);
-                    setShowMaterialImportModal(true);
+                    setShowSuppliersDashboard(true);
                   }}
                   className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 backdrop-blur rounded-xl transition-all text-sm font-medium text-emerald-100 border border-emerald-400/30"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V7a2 2 0 00-2-2h-3l-2-2H8a2 2 0 00-2 2v2m14 6v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-6m14 0h-3m-8 0H6m3 0v-3m0 3v3m6-6v3m0 3v-3" />
                   </svg>
-                  <span className="hidden sm:inline">Matières</span>
+                  <span className="hidden sm:inline">Fournisseurs</span>
                 </button>
               )}
 
@@ -8310,127 +8346,31 @@ L'équipe Salarize`;
         </div>
 
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <h2 className="font-bold text-slate-800 text-sm sm:text-base">🥬 Dashboard coût matière première</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Plateforme unifiée</p>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base mt-1">Module coûts fournisseurs</h2>
               <p className="text-xs text-slate-500 mt-1">
-                Analyse par article (SKU / code-barres) et par fournisseur
+                Tableau distinct du module salaires, inspiré d'un pilotage achats type ERP.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowSuppliersDashboard(true)}
+                className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+              >
+                Ouvrir dashboard fournisseurs
+              </button>
               {!isViewerOnly && (
                 <button
                   onClick={() => setShowMaterialImportModal(true)}
-                  className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                  className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  Importer matières
+                  Importer achats
                 </button>
               )}
-              <button
-                onClick={() => setShowMaterialsPanel((prev) => !prev)}
-                className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                {showMaterialsPanel ? 'Masquer' : 'Afficher'}
-              </button>
             </div>
           </div>
-
-          {showMaterialsPanel && (
-            <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <p className="text-xs text-slate-500">Coût total matière</p>
-                  <p className="text-lg font-bold text-slate-800">€{materialKpis.totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <p className="text-xs text-slate-500">Articles</p>
-                  <p className="text-lg font-bold text-slate-800">{materialKpis.articleCount}</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <p className="text-xs text-slate-500">Fournisseurs</p>
-                  <p className="text-lg font-bold text-slate-800">{materialKpis.supplierCount}</p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <p className="text-xs text-slate-500">Coût unitaire moyen</p>
-                  <p className="text-lg font-bold text-slate-800">€{materialKpis.weightedUnitCost.toLocaleString('fr-BE', { maximumFractionDigits: 2 })}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col lg:flex-row gap-2 mb-4">
-                <input
-                  type="text"
-                  placeholder="Rechercher article / SKU / fournisseur"
-                  value={materialSearch}
-                  onChange={(e) => setMaterialSearch(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
-                />
-                <select
-                  value={materialPeriodFilter}
-                  onChange={(e) => setMaterialPeriodFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-                >
-                  <option value="all">Toutes les périodes</option>
-                  {materialPeriods.map((period) => (
-                    <option key={period} value={period}>{formatPeriod(period)}</option>
-                  ))}
-                </select>
-                <select
-                  value={materialSupplierFilter}
-                  onChange={(e) => setMaterialSupplierFilter(e.target.value)}
-                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-                >
-                  <option value="all">Tous les fournisseurs</option>
-                  {materialSuppliers.map((supplier) => (
-                    <option key={supplier} value={supplier}>{supplier}</option>
-                  ))}
-                </select>
-              </div>
-
-              {filteredMaterialCosts.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-500 text-sm">
-                  Aucune donnée matière première. Importez un fichier pour activer cette vue.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-slate-100 p-4">
-                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Top fournisseurs par coût</h3>
-                    <div className="h-72">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={materialSupplierRows.slice(0, 8)} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                          <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
-                          <YAxis type="category" dataKey="supplier" width={130} tick={{ fontSize: 11, fill: '#475569' }} />
-                          <Tooltip formatter={(value) => `€${Number(value).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`} />
-                          <Bar dataKey="totalCost" fill="#10b981" radius={[4, 4, 4, 4]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-100 p-4">
-                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Articles (SKU / code-barres)</h3>
-                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
-                      {materialArticleRows.slice(0, 12).map((row) => (
-                        <div key={`${row.sku}-${row.barcode}-${row.article}`} className="py-2.5 flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-800 truncate">{row.article}</p>
-                            <p className="text-xs text-slate-500 truncate">
-                              {row.sku ? `SKU: ${row.sku}` : row.barcode ? `Code-barres: ${row.barcode}` : 'SKU non renseigné'}
-                            </p>
-                            <p className="text-xs text-slate-400">{row.supplierCount} fournisseur(s)</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-sm font-semibold text-slate-800">€{row.totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
-                            <p className="text-xs text-slate-500">{row.totalQty.toLocaleString('fr-BE', { maximumFractionDigits: 2 })} unités</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
         </div>
 
         {/* Data Manager Modal */}
