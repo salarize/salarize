@@ -14,7 +14,10 @@
       "Bash(tree:*)",
       "Bash(npx eslint:*)",
       "Bash(node -e:*)",
-      "Bash(nslookup:*)"
+      "Bash(nslookup:*)",
+      "Bash(npm install:*)",
+      "Bash(npm i:*)",
+      "Bash(codex)"
     ]
   }
 }
