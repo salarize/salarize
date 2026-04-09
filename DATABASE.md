@@ -198,3 +198,35 @@ CREATE POLICY "invitations_all" ON invitations FOR ALL TO authenticated USING (t
 - **momoabdouni2@gmail.com**: InvitÃ© sur Mamy Home (role: viewer)
 
 Token d'invitation actif: `5c33132e-bf3e-4ea2-a186-873b85b09def`
+
+---
+
+## Module Matiere Premiere (optionnel)
+
+Pour activer la persistance Supabase du dashboard matiere premiere, creez la table suivante:
+
+```sql
+CREATE TABLE IF NOT EXISTS material_costs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  period TEXT,
+  sku TEXT,
+  barcode TEXT,
+  article_name TEXT,
+  supplier TEXT,
+  category TEXT,
+  unit TEXT,
+  quantity NUMERIC DEFAULT 0,
+  unit_cost NUMERIC DEFAULT 0,
+  total_cost NUMERIC DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE material_costs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "material_costs_all" ON material_costs;
+CREATE POLICY "material_costs_all"
+ON material_costs FOR ALL TO authenticated
+USING (true)
+WITH CHECK (true);
+```

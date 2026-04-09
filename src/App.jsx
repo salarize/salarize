@@ -163,11 +163,21 @@ function AppContent() {
   const [showDataManager, setShowDataManager] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'clear' | 'delete' | 'deletePeriod', period?: string }
   const [showLogoMenu, setShowLogoMenu] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showCompanySettings, setShowCompanySettings] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showMaterialImportModal, setShowMaterialImportModal] = useState(false);
+  const [materialImportBusy, setMaterialImportBusy] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingPeriodSelection, setPendingPeriodSelection] = useState(null); // { data, detectedPeriods }
   const [showQuickImportModal, setShowQuickImportModal] = useState(false); // Modal d'import rapide avec liste des fichiers
+  const [showMaterialsPanel, setShowMaterialsPanel] = useState(false);
+  const [materialCosts, setMaterialCosts] = useState([]);
+  const [materialSearch, setMaterialSearch] = useState('');
+  const [materialSupplierFilter, setMaterialSupplierFilter] = useState('all');
+  const [materialPeriodFilter, setMaterialPeriodFilter] = useState('all');
+  const [payrollAiModel, setPayrollAiModel] = useState({ aliases: {}, trainedSamples: 0, lastUpdated: null });
   const [showDeptManager, setShowDeptManager] = useState(false);
   const [deptSearchTerm, setDeptSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('all');
@@ -189,6 +199,8 @@ function AppContent() {
   const [lastSaved, setLastSaved] = useState(null);
   const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
   const companiesRef = useRef({}); // Ref pour tracker companies en temps réel (pour imports multiples)
+  const exportMenuRef = useRef(null);
+  const actionsMenuRef = useRef(null);
   const [companyOrder, setCompanyOrder] = useState([]); // Ordre des sociétés dans la sidebar (drag & drop)
   const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
@@ -266,6 +278,7 @@ function AppContent() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordError, setResetPasswordError] = useState('');
+  const PAYROLL_AI_MODEL_STORAGE_KEY = 'salarize_payroll_ai_model_v1';
 
   // Fonction pour mettre à jour le mot de passe
   const handleUpdatePassword = async () => {
@@ -626,6 +639,23 @@ function AppContent() {
     setEmpCurrentPage(1);
   }, [debouncedEmpSearch, empDeptFilter, empSortBy]);
 
+  // Close header dropdown menus when clicking outside
+  useEffect(() => {
+    if (!showExportMenu && !showActionsMenu) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        setShowExportMenu(false);
+      }
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target)) {
+        setShowActionsMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showExportMenu, showActionsMenu]);
+
   // Auto-show onboarding for new users
   useEffect(() => {
     if (!isLoading && !isLoadingData && user && !localStorage.getItem('salarize_onboarding_done')) {
@@ -637,12 +667,36 @@ function AppContent() {
     }
   }, [isLoading, isLoadingData, user]);
 
+  // Prevent background scroll when department manager is open
+  useEffect(() => {
+    if (!showDeptManager) return undefined;
+
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyOverscroll = document.body.style.overscrollBehavior;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.overscrollBehavior = 'none';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.overscrollBehavior = prevBodyOverscroll;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
+    };
+  }, [showDeptManager]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Escape - fermer les modals
       if (e.key === 'Escape') {
         if (showOnboarding) { setShowOnboarding(false); setOnboardingStep(0); }
+        else if (showExportMenu) setShowExportMenu(false);
+        else if (showActionsMenu) setShowActionsMenu(false);
         else if (showExportModal) setShowExportModal(false);
         else if (showDataManager) { setShowDataManager(false); setConfirmAction(null); }
         else if (showDeptManager) { setShowDeptManager(false); setSelectedEmployees(new Set()); }
@@ -678,7 +732,7 @@ function AppContent() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, activeCompany, employees.length]);
+  }, [showOnboarding, showExportMenu, showActionsMenu, showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, activeCompany, employees.length]);
 
   // Délai avant de pouvoir importer (évite les clics trop rapides)
   useEffect(() => {
@@ -688,6 +742,32 @@ function AppContent() {
       return () => clearTimeout(timer);
     }
   }, [pendingPeriodSelection]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PAYROLL_AI_MODEL_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          setPayrollAiModel({
+            aliases: parsed.aliases || {},
+            trainedSamples: Number(parsed.trainedSamples) || 0,
+            lastUpdated: parsed.lastUpdated || null
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[Salarize] Impossible de charger le modèle IA de mapping:', err);
+    }
+  }, [PAYROLL_AI_MODEL_STORAGE_KEY]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PAYROLL_AI_MODEL_STORAGE_KEY, JSON.stringify(payrollAiModel));
+    } catch (err) {
+      console.warn('[Salarize] Impossible de sauvegarder le modèle IA de mapping:', err);
+    }
+  }, [PAYROLL_AI_MODEL_STORAGE_KEY, payrollAiModel]);
 
   // Synchroniser companiesRef avec companies state
   useEffect(() => {
@@ -879,6 +959,8 @@ function AppContent() {
         setCompanies({});
         setActiveCompany(null);
         setEmployees([]);
+        setMaterialCosts([]);
+        setShowMaterialsPanel(false);
         setView('upload');
         setCurrentPage('home');
       }
@@ -1128,6 +1210,7 @@ function AppContent() {
       console.log('[Salarize] Total companies to load:', allCompanies.length);
 
       const loadedCompanies = {};
+      let materialCostsTableAvailable = true;
 
       for (const company of allCompanies) {
         console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
@@ -1180,6 +1263,40 @@ function AppContent() {
         });
         console.log(`[Salarize] Loaded ${Object.keys(mapping).length} mappings for ${company.name}:`, mapping);
 
+        let materialCostsData = [];
+        if (materialCostsTableAvailable) {
+          const { data: materialsData, error: materialsError } = await supabase
+            .from('material_costs')
+            .select('*')
+            .eq('company_id', company.id)
+            .limit(20000);
+
+          if (materialsError) {
+            const msg = String(materialsError.message || '').toLowerCase();
+            const missingTable = msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation'));
+            if (missingTable) {
+              materialCostsTableAvailable = false;
+              console.warn('[Salarize] Table material_costs absente: module matière première en mode local.');
+            } else {
+              console.error('[Salarize] Error loading material_costs:', materialsError);
+            }
+          } else {
+            materialCostsData = (materialsData || []).map((m) => ({
+              id: m.id,
+              article: m.article_name || m.article || '',
+              sku: m.sku || '',
+              barcode: m.barcode || '',
+              supplier: m.supplier || 'Non renseigné',
+              category: m.category || '',
+              unit: m.unit || '',
+              quantity: parseLocaleNumber(m.quantity),
+              unitCost: parseLocaleNumber(m.unit_cost),
+              totalCost: parseLocaleNumber(m.total_cost),
+              period: m.period || 'Unknown'
+            }));
+          }
+        }
+
         const emps = allEmployeesData.map(e => {
           const finalDept = mapping[e.name] || e.department;
           if (mapping[e.name] && mapping[e.name] !== e.department) {
@@ -1204,6 +1321,7 @@ function AppContent() {
           id: company.id,
           employees: emps,
           mapping,
+          materialCosts: materialCostsData,
           periods,
           logo: company.logo,
           brandColor: company.brand_color,
@@ -1361,9 +1479,11 @@ function AppContent() {
         timestamp: new Date().toISOString(),
         companyName,
         employees: data.employees || [],
+        materialCosts: data.materialCosts || [],
         periods: data.periods || [],
         mapping: data.mapping || {},
         employeeCount: data.employees?.length || 0,
+        materialCount: data.materialCosts?.length || 0,
         periodCount: data.periods?.length || 0
       };
       localStorage.setItem(backupKey, JSON.stringify(backup));
@@ -1558,6 +1678,7 @@ function AppContent() {
 
     try {
       const latestCompanies = companiesRef.current;
+      let materialCostsTableAvailable = true;
 
       for (const [companyName, companyData] of Object.entries(latestCompanies)) {
         // Skip shared companies (viewer can't modify)
@@ -1691,7 +1812,8 @@ function AppContent() {
             const backupData = {
               employees: currentDbEmployees,
               periods: dbState.periods,
-              mapping: latestCompanyData.mapping
+              mapping: latestCompanyData.mapping,
+              materialCosts: latestCompanyData.materialCosts || []
             };
             createLocalBackup(companyName, backupData);
           }
@@ -1705,7 +1827,8 @@ function AppContent() {
           createLocalBackup(companyName, {
             employees: currentDbEmployees,
             periods: dbState.periods,
-            mapping: latestCompanyData.mapping
+            mapping: latestCompanyData.mapping,
+            materialCosts: latestCompanyData.materialCosts || []
           });
         }
 
@@ -1848,6 +1971,53 @@ function AppContent() {
             console.error('[Salarize] Erreur insertion mappings:', mapError);
           } else {
             console.log(`[Salarize] ✓ ${mappingsToInsert.length} mappings sauvegardés`);
+          }
+        }
+
+        // SYNC COÛTS MATIÈRE PREMIÈRE (optionnel si table disponible)
+        const materialEntries = latestCompanyData.materialCosts || [];
+        if (materialCostsTableAvailable) {
+          const { error: materialDeleteError } = await supabase
+            .from('material_costs')
+            .delete()
+            .eq('company_id', companyId);
+
+          if (materialDeleteError) {
+            const msg = String(materialDeleteError.message || '').toLowerCase();
+            const missingTable = msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation'));
+            if (missingTable) {
+              materialCostsTableAvailable = false;
+              console.warn('[Salarize] Table material_costs absente: sync matière première ignorée.');
+            } else {
+              console.error('[Salarize] Erreur suppression material_costs:', materialDeleteError);
+            }
+          } else if (materialEntries.length > 0) {
+            const payload = materialEntries.map((entry) => ({
+              company_id: companyId,
+              period: entry.period || null,
+              sku: entry.sku || null,
+              barcode: entry.barcode || null,
+              article_name: entry.article || null,
+              supplier: entry.supplier || null,
+              category: entry.category || null,
+              unit: entry.unit || null,
+              quantity: parseLocaleNumber(entry.quantity),
+              unit_cost: parseLocaleNumber(entry.unitCost),
+              total_cost: parseLocaleNumber(entry.totalCost)
+            }));
+
+            const batchSize = 500;
+            for (let i = 0; i < payload.length; i += batchSize) {
+              const batch = payload.slice(i, i + batchSize);
+              const { error: materialInsertError } = await supabase
+                .from('material_costs')
+                .insert(batch);
+
+              if (materialInsertError) {
+                console.error('[Salarize] Erreur insertion material_costs:', materialInsertError);
+                break;
+              }
+            }
           }
         }
 
@@ -2254,6 +2424,8 @@ function AppContent() {
     setCompanies({});
     setActiveCompany(null);
     setEmployees([]);
+    setMaterialCosts([]);
+    setShowMaterialsPanel(false);
     setView('upload');
   };
 
@@ -2264,6 +2436,11 @@ function AppContent() {
     setEmployees(c.employees || []);
     setDepartmentMapping(c.mapping || {});
     setPeriods(c.periods || []);
+    setMaterialCosts(c.materialCosts || []);
+    setMaterialSearch('');
+    setMaterialSupplierFilter('all');
+    setMaterialPeriodFilter('all');
+    setShowMaterialsPanel((c.materialCosts || []).length > 0);
     setCreatedDepartments(c.createdDepartments || []);
     setSelectedPeriods([]);
     setView('dashboard');
@@ -2346,6 +2523,102 @@ function AppContent() {
     }
     
     return { provider, suggestedPeriod };
+  };
+
+  const normalizeLabelToken = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+
+  const parseLocaleNumber = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    const cleaned = String(value).replace(/\s/g, '').replace(/[^\d,.-]/g, '');
+    if (!cleaned) return 0;
+
+    const hasComma = cleaned.includes(',');
+    const hasDot = cleaned.includes('.');
+
+    if (hasComma && hasDot) {
+      const lastComma = cleaned.lastIndexOf(',');
+      const lastDot = cleaned.lastIndexOf('.');
+      if (lastComma > lastDot) {
+        return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0;
+      }
+      return parseFloat(cleaned.replace(/,/g, '')) || 0;
+    }
+
+    if (hasComma) {
+      return parseFloat(cleaned.replace(',', '.')) || 0;
+    }
+    return parseFloat(cleaned) || 0;
+  };
+
+  const normalizePeriodValue = (value, xlsxLib = null) => {
+    if (!value) return null;
+    if (value instanceof Date && !Number.isNaN(value)) {
+      return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`;
+    }
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+      const parsed = xlsxLib?.SSF?.parse_date_code ? xlsxLib.SSF.parse_date_code(value) : null;
+      if (parsed && parsed.y && parsed.m) {
+        return `${parsed.y}-${String(parsed.m).padStart(2, '0')}`;
+      }
+    }
+    const str = String(value).trim();
+    if (!str) return null;
+
+    const iso = str.match(/(20\d{2})[-\/.](0[1-9]|1[0-2])/);
+    if (iso) return `${iso[1]}-${iso[2]}`;
+
+    const eu = str.match(/(0[1-9]|1[0-2])[-\/.](20\d{2})/);
+    if (eu) return `${eu[2]}-${eu[1]}`;
+
+    const compact = str.match(/^(20\d{2})(0[1-9]|1[0-2])$/);
+    if (compact) return `${compact[1]}-${compact[2]}`;
+
+    return null;
+  };
+
+  const inferPayrollCategoriesFromHeaders = (headerRow = []) => {
+    const vocab = {
+      charges_sociales: ['onss', 'cotisation', 'charge patronale', 'sociale'],
+      primes_bonus: ['prime', 'bonus', 'commission', '13e', 'treizieme'],
+      avantages: ['atn', 'avantage', 'ticket', 'cheque repas', 'voiture'],
+      heures_supp: ['heure sup', 'overtime', 'supplementaire'],
+      absences: ['absence', 'maladie', 'conge', 'vacance']
+    };
+    const headerTokens = headerRow.map(cell => normalizeLabelToken(cell)).join(' | ');
+    return Object.entries(vocab)
+      .filter(([, keys]) => keys.some(k => headerTokens.includes(normalizeLabelToken(k))))
+      .map(([name]) => name);
+  };
+
+  const trainPayrollAiModelFromHeader = (headerRow, cols) => {
+    if (!Array.isArray(headerRow) || !cols) return;
+    const fields = ['nom', 'prenom', 'period', 'cost', 'dept', 'func', 'hours'];
+    const normalizedHeader = headerRow.map(cell => normalizeLabelToken(cell));
+
+    setPayrollAiModel((prev) => {
+      const nextAliases = { ...(prev.aliases || {}) };
+      fields.forEach((field) => {
+        const idx = cols[field];
+        if (idx === undefined || idx === null || idx < 0 || idx >= normalizedHeader.length) return;
+        const token = normalizedHeader[idx];
+        if (!token) return;
+        if (!nextAliases[field]) nextAliases[field] = {};
+        nextAliases[field][token] = (nextAliases[field][token] || 0) + 1;
+      });
+
+      return {
+        aliases: nextAliases,
+        trainedSamples: (prev.trainedSamples || 0) + 1,
+        lastUpdated: new Date().toISOString()
+      };
+    });
   };
 
   // ========== SYSTÈME DE DÉTECTION AUTOMATIQUE MULTI-FORMAT ==========
@@ -2631,30 +2904,16 @@ function AppContent() {
     const costKeywords = ['cout', 'cost', 'loonkost', 'salaire', 'total', 'brut'];
     const hoursKeywords = ['heures', 'heure', 'uren', 'uur', 'hours', 'betaalde uren', 'heures prestees', 'heures prestées', 'paid hours'];
     const nameKeywords = ['nom', 'name', 'naam', 'werknemer', 'employe'];
+    const periodKeywords = ['annee-mois', 'annee mois', 'periode', 'mois', 'month', 'period'];
+    const deptKeywords = ['departement', 'department', 'centre', 'afdeling'];
+    const funcKeywords = ['fonction', 'function', 'functie'];
+    const firstNameKeywords = ['prenom', 'voornaam', 'firstname'];
 
-    const normalizeString = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    const normalizePeriodValue = (value) => {
-      if (!value) return null;
-      if (value instanceof Date && !isNaN(value)) {
-        return value.getFullYear() + '-' + String(value.getMonth() + 1).padStart(2, '0');
-      }
-      if (typeof value === 'number' && !isNaN(value)) {
-        const parsed = xlsxLib?.SSF?.parse_date_code ? xlsxLib.SSF.parse_date_code(value) : null;
-        if (parsed && parsed.y && parsed.m) {
-          return parsed.y + '-' + String(parsed.m).padStart(2, '0');
-        }
-      }
-      const str = String(value).trim();
-      if (!str) return null;
-      const iso = str.match(/(\d{4})[-\/](\d{2})/);
-      if (iso) return iso[1] + '-' + iso[2];
-      const eu = str.match(/(\d{2})[-\/](\d{4})/);
-      if (eu) return eu[2] + '-' + eu[1];
-      const compact = str.match(/^(\d{4})(\d{2})$/);
-      if (compact) return compact[1] + '-' + compact[2];
-      return null;
-    };
+    const normalizeString = (value) =>
+      String(value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
 
     const normCost = costKeywords.map(k => normalizeString(k));
     const normName = nameKeywords.map(k => normalizeString(k));
@@ -2696,14 +2955,56 @@ function AppContent() {
       return -1;
     };
 
-    const cols = {
+    const aiFindCol = (field) => {
+      const headerCells = h.map(cell => normalizeLabelToken(cell));
+      const aliases = Object.entries(payrollAiModel?.aliases?.[field] || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20);
+      if (aliases.length === 0) return -1;
+
+      let bestIdx = -1;
+      let bestAliasScore = 0;
+      headerCells.forEach((cell, idx) => {
+        if (!cell) return;
+        aliases.forEach(([alias, weight]) => {
+          if (cell === alias) {
+            if (weight > bestAliasScore) {
+              bestAliasScore = weight;
+              bestIdx = idx;
+            }
+            return;
+          }
+          if (cell.includes(alias) || alias.includes(cell)) {
+            const fuzzyScore = weight * 0.7;
+            if (fuzzyScore > bestAliasScore) {
+              bestAliasScore = fuzzyScore;
+              bestIdx = idx;
+            }
+          }
+        });
+      });
+      return bestIdx;
+    };
+
+    let cols = {
       nom: findCol(nameKeywords),
-      prenom: findCol(['prenom', 'voornaam', 'firstname']),
-      period: findCol(['annee-mois', 'annee mois', 'periode', 'mois', 'month', 'period']),
+      prenom: findCol(firstNameKeywords),
+      period: findCol(periodKeywords),
       cost: findCol(costKeywords),
-      dept: findCol(['departement', 'department', 'centre', 'afdeling']),
-      func: findCol(['fonction', 'function', 'functie']),
+      dept: findCol(deptKeywords),
+      func: findCol(funcKeywords),
       hours: findCol(hoursKeywords)
+    };
+
+    cols = {
+      ...cols,
+      nom: cols.nom !== -1 ? cols.nom : aiFindCol('nom'),
+      prenom: cols.prenom !== -1 ? cols.prenom : aiFindCol('prenom'),
+      period: cols.period !== -1 ? cols.period : aiFindCol('period'),
+      cost: cols.cost !== -1 ? cols.cost : aiFindCol('cost'),
+      dept: cols.dept !== -1 ? cols.dept : aiFindCol('dept'),
+      func: cols.func !== -1 ? cols.func : aiFindCol('func'),
+      hours: cols.hours !== -1 ? cols.hours : aiFindCol('hours')
     };
 
     if (cols.nom === -1 || cols.cost === -1) return null;
@@ -2721,16 +3022,16 @@ function AppContent() {
       if (!nom || nom.toLowerCase() === 'total') continue;
 
       const costVal = r[cols.cost];
-      const cost = parseFloat(String(costVal).replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0;
+      const cost = parseLocaleNumber(costVal);
       if (cost === 0) continue;
       const paidHours = cols.hours !== -1
-        ? (parseFloat(String(r[cols.hours]).replace(/[^\d.,\-]/g, '').replace(',', '.')) || 0)
+        ? parseLocaleNumber(r[cols.hours])
         : 0;
 
       const prenom = cols.prenom !== -1 && r[cols.prenom] ? String(r[cols.prenom]).trim() : '';
       const fullName = prenom ? nom + ' ' + prenom : nom;
 
-      const rowPeriod = cols.period !== -1 ? normalizePeriodValue(r[cols.period]) : null;
+      const rowPeriod = cols.period !== -1 ? normalizePeriodValue(r[cols.period], xlsxLib) : null;
       const period = rowPeriod || fallbackPeriod || 'Unknown';
       periodsSet.add(period);
 
@@ -2746,7 +3047,233 @@ function AppContent() {
 
     const detectedPeriods = [...periodsSet].filter(Boolean).filter(p => p !== 'Unknown').sort();
     const finalPeriods = detectedPeriods.length > 0 ? detectedPeriods : [fallbackPeriod || 'Unknown'];
-    return emps.length > 0 ? { employees: emps, periods: finalPeriods, provider: 'generic' } : null;
+    if (emps.length === 0) return null;
+
+    trainPayrollAiModelFromHeader(h, cols);
+    const mappedColsCount = Object.values(cols).filter(idx => idx !== -1).length;
+    const categories = inferPayrollCategoriesFromHeaders(h);
+    const confidence = Math.min(
+      0.98,
+      0.45 +
+        (cols.nom !== -1 ? 0.2 : 0) +
+        (cols.cost !== -1 ? 0.2 : 0) +
+        (cols.period !== -1 ? 0.08 : 0) +
+        (cols.hours !== -1 ? 0.07 : 0) +
+        (categories.length > 0 ? 0.05 : 0)
+    );
+
+    return {
+      employees: emps,
+      periods: finalPeriods,
+      provider: 'generic',
+      aiMapping: {
+        confidence,
+        mappedColumns: mappedColsCount,
+        columns: {
+          nom: cols.nom,
+          prenom: cols.prenom,
+          period: cols.period,
+          cost: cols.cost,
+          dept: cols.dept,
+          func: cols.func,
+          hours: cols.hours
+        },
+        categories,
+        trainedSamples: (payrollAiModel?.trainedSamples || 0) + 1
+      }
+    };
+  };
+
+  const parseMaterialCosts = (rows, filename, xlsxLib = null) => {
+    if (!rows || rows.length === 0) return null;
+
+    const articleKeywords = ['article', 'designation', 'produit', 'product', 'item', 'description', 'matiere', 'matiere premiere'];
+    const skuKeywords = ['sku', 'reference', 'ref', 'code article', 'item code'];
+    const barcodeKeywords = ['barcode', 'ean', 'code barre', 'gtin'];
+    const supplierKeywords = ['fournisseur', 'supplier', 'vendor', 'provider'];
+    const qtyKeywords = ['quantite', 'qty', 'quantity', 'volume', 'poids', 'weight'];
+    const unitKeywords = ['unite', 'unit', 'uom'];
+    const unitCostKeywords = ['prix unitaire', 'cout unitaire', 'cost unit', 'unit cost', 'purchase price', 'prix achat'];
+    const totalCostKeywords = ['cout total', 'total cost', 'montant', 'amount', 'total', 'net amount'];
+    const periodKeywords = ['periode', 'period', 'mois', 'date', 'month'];
+    const categoryKeywords = ['categorie', 'category', 'famille', 'type'];
+
+    let headerIdx = -1;
+    let bestScore = 0;
+    for (let i = 0; i < Math.min(30, rows.length); i++) {
+      const row = rows[i];
+      if (!Array.isArray(row)) continue;
+      const normalized = row.map(c => normalizeLabelToken(c));
+      let score = 0;
+      normalized.forEach((cell) => {
+        if (!cell) return;
+        if (articleKeywords.some(k => cell.includes(normalizeLabelToken(k)))) score += 2;
+        if (supplierKeywords.some(k => cell.includes(normalizeLabelToken(k)))) score += 2;
+        if (totalCostKeywords.some(k => cell.includes(normalizeLabelToken(k)))) score += 2;
+        if (skuKeywords.some(k => cell.includes(normalizeLabelToken(k)))) score += 1;
+        if (barcodeKeywords.some(k => cell.includes(normalizeLabelToken(k)))) score += 1;
+      });
+      if (score > bestScore) {
+        bestScore = score;
+        headerIdx = i;
+      }
+    }
+
+    if (headerIdx === -1 || bestScore < 4) return null;
+
+    const header = rows[headerIdx];
+    const findCol = (keywords) => {
+      const normalizedKeywords = keywords.map(k => normalizeLabelToken(k));
+      for (let idx = 0; idx < header.length; idx++) {
+        const token = normalizeLabelToken(header[idx]);
+        if (!token) continue;
+        if (normalizedKeywords.some(k => token.includes(k))) return idx;
+      }
+      return -1;
+    };
+
+    const cols = {
+      article: findCol(articleKeywords),
+      sku: findCol(skuKeywords),
+      barcode: findCol(barcodeKeywords),
+      supplier: findCol(supplierKeywords),
+      quantity: findCol(qtyKeywords),
+      unit: findCol(unitKeywords),
+      unitCost: findCol(unitCostKeywords),
+      totalCost: findCol(totalCostKeywords),
+      period: findCol(periodKeywords),
+      category: findCol(categoryKeywords)
+    };
+
+    if (cols.article === -1 && cols.sku === -1 && cols.barcode === -1) return null;
+    if (cols.totalCost === -1 && cols.unitCost === -1) return null;
+
+    const filePeriod = detectFileInfo(filename)?.suggestedPeriod;
+    const defaultPeriod = filePeriod || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const parsedRows = [];
+
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!Array.isArray(row)) continue;
+
+      const article = cols.article !== -1 && row[cols.article] ? String(row[cols.article]).trim() : '';
+      const sku = cols.sku !== -1 && row[cols.sku] ? String(row[cols.sku]).trim() : '';
+      const barcode = cols.barcode !== -1 && row[cols.barcode] ? String(row[cols.barcode]).trim() : '';
+      const supplier = cols.supplier !== -1 && row[cols.supplier] ? String(row[cols.supplier]).trim() : 'Non renseigné';
+      const category = cols.category !== -1 && row[cols.category] ? String(row[cols.category]).trim() : '';
+      const unit = cols.unit !== -1 && row[cols.unit] ? String(row[cols.unit]).trim() : '';
+      const quantity = cols.quantity !== -1 ? parseLocaleNumber(row[cols.quantity]) : 0;
+      const unitCost = cols.unitCost !== -1 ? parseLocaleNumber(row[cols.unitCost]) : 0;
+
+      if (!article && !sku && !barcode) continue;
+      if (normalizeLabelToken(article) === 'total') continue;
+
+      let totalCost = cols.totalCost !== -1 ? parseLocaleNumber(row[cols.totalCost]) : 0;
+      if (!totalCost && quantity > 0 && unitCost > 0) {
+        totalCost = quantity * unitCost;
+      }
+      if (!totalCost || totalCost <= 0) continue;
+
+      const periodRaw = cols.period !== -1 ? row[cols.period] : null;
+      const period = normalizePeriodValue(periodRaw, xlsxLib) || defaultPeriod;
+
+      parsedRows.push({
+        article: article || sku || barcode,
+        sku,
+        barcode,
+        supplier,
+        category,
+        unit,
+        quantity: Math.round(quantity * 1000) / 1000,
+        unitCost: Math.round(unitCost * 10000) / 10000,
+        totalCost: Math.round(totalCost * 100) / 100,
+        period
+      });
+    }
+
+    if (parsedRows.length === 0) return null;
+
+    return {
+      rows: parsedRows,
+      provider: 'materials',
+      detectedColumns: Object.values(cols).filter(idx => idx !== -1).length
+    };
+  };
+
+  const importMaterialCostsToCompany = async (companyName, rows, sourceFileName = '') => {
+    if (!companyName || !Array.isArray(rows) || rows.length === 0) return;
+
+    const currentCompanies = companiesRef.current;
+    const existing = currentCompanies[companyName] || { employees: [], mapping: {}, periods: [], materialCosts: [] };
+    const existingRows = existing.materialCosts || [];
+
+    const buildKey = (entry) => {
+      const total = parseLocaleNumber(entry.totalCost).toFixed(2);
+      return [
+        entry.period || 'Unknown',
+        normalizeLabelToken(entry.supplier || 'na'),
+        normalizeLabelToken(entry.sku || 'na'),
+        normalizeLabelToken(entry.barcode || 'na'),
+        normalizeLabelToken(entry.article || 'na'),
+        total
+      ].join('|');
+    };
+
+    const mergedMap = new Map();
+    existingRows.forEach((entry) => mergedMap.set(buildKey(entry), entry));
+    rows.forEach((entry) => mergedMap.set(buildKey(entry), entry));
+    const mergedRows = Array.from(mergedMap.values());
+
+    const newCompany = {
+      ...existing,
+      materialCosts: mergedRows
+    };
+    const newCompanies = { ...currentCompanies, [companyName]: newCompany };
+
+    setCompanies(newCompanies);
+    companiesRef.current = newCompanies;
+    setMaterialCosts(mergedRows);
+    setShowMaterialsPanel(true);
+    setMaterialSearch('');
+    setMaterialSupplierFilter('all');
+    setMaterialPeriodFilter('all');
+
+    // Backup local immédiat, même si l'utilisateur est connecté (fallback si table manquante)
+    saveToLocalStorage(newCompanies, companyName);
+    await saveAll(newCompanies, companyName);
+    toast.success(`Matière première importée: ${rows.length} lignes (${sourceFileName || 'fichier'})`);
+  };
+
+  const handleMaterialFileChange = async (event) => {
+    const file = event?.target?.files?.[0];
+    if (!file || !activeCompany) return;
+
+    setMaterialImportBusy(true);
+    try {
+      const data = await file.arrayBuffer();
+      const XLSX = await loadXLSX();
+      const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+      const sheetName = wb.SheetNames?.[0];
+      if (!sheetName) {
+        toast.error('Fichier matière première invalide');
+        return;
+      }
+      const sheet = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      const parsed = parseMaterialCosts(rows, file.name, XLSX);
+      if (!parsed || !parsed.rows?.length) {
+        toast.error('Format non reconnu. Vérifiez les colonnes SKU/article/fournisseur/coût.');
+        return;
+      }
+      await importMaterialCostsToCompany(activeCompany, parsed.rows, file.name);
+      setShowMaterialImportModal(false);
+    } catch (err) {
+      console.error('[Salarize] Erreur import matière première:', err);
+      toast.error('Erreur pendant l’import matière première');
+    } finally {
+      setMaterialImportBusy(false);
+      if (event?.target) event.target.value = '';
+    }
   };
 
   // Multi-fichiers: parser plusieurs fichiers et combiner les résultats
@@ -2884,6 +3411,7 @@ function AppContent() {
             multiPeriods: hasMultiplePeriods,
             suggestedPeriod: effectiveSuggested,
             detectedProvider,
+            aiMapping: result.aiMapping || null,
             periodConfidence: periodAnalysis.confidence,
             periodSource: periodAnalysis.source,
             fileName: file.name
@@ -3330,7 +3858,7 @@ function AppContent() {
 
     // Utiliser la ref pour avoir les données les plus récentes (important pour imports multiples)
     const currentCompanies = companiesRef.current;
-    const existing = currentCompanies[companyName] || { employees: [], mapping: {}, periods: [] };
+    const existing = currentCompanies[companyName] || { employees: [], mapping: {}, periods: [], materialCosts: [] };
     const mapping = { ...existing.mapping };
     
     console.log(`[Salarize] Import: existing employees = ${existing.employees?.length || 0}, incoming = ${data.employees?.length || 0}`);
@@ -3449,12 +3977,14 @@ function AppContent() {
     const name = newCompanyName.trim();
     const newCompanies = {
       ...companies,
-      [name]: { employees: [], mapping: {}, periods: [], logo: null }
+      [name]: { employees: [], mapping: {}, periods: [], materialCosts: [], logo: null }
     };
     setCompanies(newCompanies);
     saveAll(newCompanies, name);
     setActiveCompany(name);
     setEmployees([]);
+    setMaterialCosts([]);
+    setShowMaterialsPanel(false);
     setDepartmentMapping({});
     setPeriods([]);
     setShowNewCompanyModal(false);
@@ -4307,9 +4837,10 @@ L'équipe Salarize`;
     const companyId = companies[activeCompany]?.id;
 
     // Créer un backup avant suppression
-    if (companies[activeCompany]?.employees?.length > 0) {
+    if ((companies[activeCompany]?.employees?.length || 0) > 0 || (companies[activeCompany]?.materialCosts?.length || 0) > 0) {
       createLocalBackup(activeCompany, {
         employees: companies[activeCompany].employees,
+        materialCosts: companies[activeCompany].materialCosts || [],
         periods: companies[activeCompany].periods,
         mapping: companies[activeCompany].mapping
       });
@@ -4322,12 +4853,15 @@ L'équipe Salarize`;
         ...companies[activeCompany],
         employees: [],
         periods: [],
-        mapping: {}
+        mapping: {},
+        materialCosts: []
       }
     };
     setCompanies(newCompanies);
     companiesRef.current = newCompanies;
     setEmployees([]);
+    setMaterialCosts([]);
+    setShowMaterialsPanel(false);
     setPeriods([]);
     setDepartmentMapping({});
 
@@ -4337,6 +4871,7 @@ L'équipe Salarize`;
         console.log('[Salarize] Suppression explicite des employés pour', activeCompany);
         await supabase.from('employees').delete().eq('company_id', companyId);
         await supabase.from('department_mappings').delete().eq('company_id', companyId);
+        await supabase.from('material_costs').delete().eq('company_id', companyId);
         toast.success('Données supprimées');
       } catch (e) {
         console.error('[Salarize] Erreur suppression:', e);
@@ -4365,6 +4900,8 @@ L'équipe Salarize`;
         await supabase.from('employees').delete().eq('company_id', companyId);
         // Supprimer les mappings
         await supabase.from('department_mappings').delete().eq('company_id', companyId);
+        // Supprimer les coûts matière première (si table disponible)
+        await supabase.from('material_costs').delete().eq('company_id', companyId);
         // Supprimer la société
         await supabase.from('companies').delete().eq('id', companyId);
       } catch (e) {
@@ -4378,6 +4915,8 @@ L'équipe Salarize`;
     } else {
       setActiveCompany(null);
       setEmployees([]);
+      setMaterialCosts([]);
+      setShowMaterialsPanel(false);
       setPeriods([]);
       setDepartmentMapping({});
       setView('upload');
@@ -4395,12 +4934,14 @@ L'équipe Salarize`;
     // Créer un backup avant suppression
     createLocalBackup(activeCompany, {
       employees: companies[activeCompany].employees,
+      materialCosts: companies[activeCompany].materialCosts || [],
       periods: companies[activeCompany].periods,
       mapping: companies[activeCompany].mapping
     });
     console.log(`[Salarize] Backup créé avant suppression période ${periodToDelete}`);
 
     const newEmployees = employees.filter(e => e.period !== periodToDelete);
+    const newMaterialCosts = materialCosts.filter(e => e.period !== periodToDelete);
     const newPeriods = periods.filter(p => p !== periodToDelete);
 
     const newCompanies = {
@@ -4408,6 +4949,7 @@ L'équipe Salarize`;
       [activeCompany]: {
         ...companies[activeCompany],
         employees: newEmployees,
+        materialCosts: newMaterialCosts,
         periods: newPeriods
       }
     };
@@ -4415,6 +4957,7 @@ L'équipe Salarize`;
     setCompanies(newCompanies);
     companiesRef.current = newCompanies;
     setEmployees(newEmployees);
+    setMaterialCosts(newMaterialCosts);
     setPeriods(newPeriods);
 
     // Suppression DIRECTE dans Supabase (action explicite)
@@ -4423,6 +4966,12 @@ L'équipe Salarize`;
         console.log(`[Salarize] Suppression explicite période ${periodToDelete}`);
         const { error } = await supabase
           .from('employees')
+          .delete()
+          .eq('company_id', companyId)
+          .eq('period', periodToDelete);
+
+        await supabase
+          .from('material_costs')
           .delete()
           .eq('company_id', companyId)
           .eq('period', periodToDelete);
@@ -4809,6 +5358,90 @@ L'équipe Salarize`;
     filteredSortedDepts.reduce((sum, [_, d]) => sum + d.total, 0),
     [filteredSortedDepts]
   );
+
+  const materialPeriods = useMemo(
+    () => [...new Set((materialCosts || []).map((row) => row.period).filter(Boolean))].sort(),
+    [materialCosts]
+  );
+
+  const materialSuppliers = useMemo(
+    () => [...new Set((materialCosts || []).map((row) => row.supplier || 'Non renseigné'))].sort((a, b) => a.localeCompare(b)),
+    [materialCosts]
+  );
+
+  const filteredMaterialCosts = useMemo(() => {
+    const q = normalizeLabelToken(materialSearch);
+    return (materialCosts || []).filter((row) => {
+      if (materialPeriodFilter !== 'all' && row.period !== materialPeriodFilter) return false;
+      if (materialSupplierFilter !== 'all' && (row.supplier || 'Non renseigné') !== materialSupplierFilter) return false;
+      if (!q) return true;
+      const haystack = normalizeLabelToken(`${row.article || ''} ${row.sku || ''} ${row.barcode || ''} ${row.supplier || ''} ${row.category || ''}`);
+      return haystack.includes(q);
+    });
+  }, [materialCosts, materialPeriodFilter, materialSearch, materialSupplierFilter]);
+
+  const materialKpis = useMemo(() => {
+    const totalCostValue = filteredMaterialCosts.reduce((sum, row) => sum + parseLocaleNumber(row.totalCost), 0);
+    const totalQty = filteredMaterialCosts.reduce((sum, row) => sum + parseLocaleNumber(row.quantity), 0);
+    const articles = new Set(filteredMaterialCosts.map((row) => row.sku || row.barcode || row.article).filter(Boolean));
+    const suppliers = new Set(filteredMaterialCosts.map((row) => row.supplier || 'Non renseigné'));
+    const weightedUnitCost = totalQty > 0 ? totalCostValue / totalQty : 0;
+    return {
+      totalCost: totalCostValue,
+      totalQty,
+      articleCount: articles.size,
+      supplierCount: suppliers.size,
+      weightedUnitCost
+    };
+  }, [filteredMaterialCosts]);
+
+  const materialSupplierRows = useMemo(() => {
+    const grouped = {};
+    filteredMaterialCosts.forEach((row) => {
+      const supplier = row.supplier || 'Non renseigné';
+      if (!grouped[supplier]) {
+        grouped[supplier] = { supplier, totalCost: 0, totalQty: 0, articles: new Set() };
+      }
+      grouped[supplier].totalCost += parseLocaleNumber(row.totalCost);
+      grouped[supplier].totalQty += parseLocaleNumber(row.quantity);
+      grouped[supplier].articles.add(row.sku || row.barcode || row.article);
+    });
+    return Object.values(grouped)
+      .map((entry) => ({
+        supplier: entry.supplier,
+        totalCost: Math.round(entry.totalCost * 100) / 100,
+        totalQty: Math.round(entry.totalQty * 1000) / 1000,
+        articleCount: entry.articles.size
+      }))
+      .sort((a, b) => b.totalCost - a.totalCost);
+  }, [filteredMaterialCosts]);
+
+  const materialArticleRows = useMemo(() => {
+    const grouped = {};
+    filteredMaterialCosts.forEach((row) => {
+      const key = row.sku || row.barcode || row.article || 'Article inconnu';
+      if (!grouped[key]) {
+        grouped[key] = {
+          article: row.article || key,
+          sku: row.sku || '',
+          barcode: row.barcode || '',
+          totalCost: 0,
+          totalQty: 0,
+          suppliers: new Set()
+        };
+      }
+      grouped[key].totalCost += parseLocaleNumber(row.totalCost);
+      grouped[key].totalQty += parseLocaleNumber(row.quantity);
+      grouped[key].suppliers.add(row.supplier || 'Non renseigné');
+    });
+    return Object.values(grouped)
+      .map((entry) => ({
+        ...entry,
+        supplierCount: entry.suppliers.size,
+        avgUnitCost: entry.totalQty > 0 ? entry.totalCost / entry.totalQty : 0
+      }))
+      .sort((a, b) => b.totalCost - a.totalCost);
+  }, [filteredMaterialCosts]);
 
   const empAgg = useMemo(() => {
     const agg = {};
@@ -5739,7 +6372,7 @@ L'équipe Salarize`;
             />
           )}
           <div className="lg:ml-72 flex-1 flex items-center justify-center bg-slate-100 p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-lg w-full text-center shadow-xl">
+            <div className="bg-white rounded-2xl p-5 sm:p-8 max-w-lg w-full text-center shadow-xl">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <p className="font-semibold text-amber-800">🏷️ {pendingAssignments.length} employé(s) sans département</p>
               </div>
@@ -5750,7 +6383,7 @@ L'équipe Salarize`;
               {allDepartments.length > 0 && (
                 <div className="mb-4">
                   <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Départements existants</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {allDepartments.map(d => (
                       <button 
                         key={d} 
@@ -5769,7 +6402,7 @@ L'équipe Salarize`;
                 <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">
                   {allDepartments.length > 0 ? 'Ou créer un nouveau' : 'Choisir un département'}
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {DEFAULT_DEPARTMENTS.filter(d => !allDepartments.includes(d)).map(d => (
                     <button 
                       key={d} 
@@ -6044,6 +6677,56 @@ L'équipe Salarize`;
           </div>
         </div>
       )}
+
+      {showMaterialImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 max-w-xl w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">🥬 Import matière première</h2>
+              <button
+                onClick={() => setShowMaterialImportModal(false)}
+                className="p-1 hover:bg-slate-100 rounded"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-5 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
+              <p className="font-semibold mb-1">Colonnes attendues (flexible)</p>
+              <p>Article/SKU/code-barres, fournisseur, quantité, prix unitaire et/ou coût total, période.</p>
+            </div>
+
+            <label className="w-full border-2 border-dashed border-slate-200 hover:border-emerald-400 rounded-xl p-8 text-center cursor-pointer block transition-colors">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-100 flex items-center justify-center">
+                <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <p className="font-medium text-slate-700">Importer un fichier matière première</p>
+              <p className="text-slate-400 text-sm mt-1">.xlsx, .xls, .csv</p>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleMaterialFileChange}
+                disabled={materialImportBusy}
+                className="hidden"
+              />
+            </label>
+
+            {materialImportBusy && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-slate-500">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Analyse en cours...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Period Selection Modal - Redesigned */}
       {pendingPeriodSelection && (
@@ -6165,6 +6848,33 @@ L'équipe Salarize`;
                       })()}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {pendingPeriodSelection.detectedProvider === 'generic' && pendingPeriodSelection.aiMapping && (
+                <div className="mb-5 p-4 rounded-2xl border border-indigo-200 bg-indigo-50">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-indigo-900">IA Mapping (hors Securex/Acerta)</p>
+                      <p className="text-xs text-indigo-700 mt-1">
+                        Confiance: {Math.round((pendingPeriodSelection.aiMapping.confidence || 0) * 100)}% •
+                        Colonnes mappées: {pendingPeriodSelection.aiMapping.mappedColumns || 0} •
+                        Modèle entraîné sur {pendingPeriodSelection.aiMapping.trainedSamples || 0} import(s)
+                      </p>
+                    </div>
+                    <span className="px-2 py-1 rounded-full text-[11px] font-semibold bg-indigo-600 text-white">
+                      IA
+                    </span>
+                  </div>
+                  {Array.isArray(pendingPeriodSelection.aiMapping.categories) && pendingPeriodSelection.aiMapping.categories.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {pendingPeriodSelection.aiMapping.categories.map((cat) => (
+                        <span key={cat} className="px-2 py-1 text-[11px] rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                          {cat.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -6462,17 +7172,17 @@ L'équipe Salarize`;
       {/* Department Manager Modal - Design "Mes équipes" */}
       {showDeptManager && (
         <div
-          className="fixed inset-0 bg-slate-950/75 z-50 overflow-y-auto"
+          className="fixed inset-0 bg-slate-950/80 z-50 overflow-hidden"
           onClick={(e) => { if (e.target === e.currentTarget) { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}}
         >
-          <div className="min-h-full flex items-start justify-center p-4 pt-10 pb-8">
-            <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-700/50 ring-1 ring-white/5">
+          <div className="h-full flex items-center sm:items-start justify-center p-2 sm:p-4 pt-2 sm:pt-8 pb-2 sm:pb-6">
+            <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-2xl sm:rounded-3xl max-w-2xl w-full max-h-[95vh] shadow-2xl overflow-hidden border border-slate-700/50 ring-1 ring-white/5 flex flex-col">
               {/* Header - Team Theme */}
-              <div className="relative px-6 py-5 border-b border-slate-800/80 overflow-hidden">
-                <div className="relative flex items-center justify-between">
+              <div className="relative px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-800/80 overflow-hidden shrink-0">
+                <div className="relative flex items-start sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-4">
                     {/* Team Icon - Modern gradient */}
-                    <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/30 ring-2 ring-white/10">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/30 ring-2 ring-white/10">
                       <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                       </svg>
@@ -6493,7 +7203,7 @@ L'équipe Salarize`;
                 </div>
 
                 {/* Stats - Modern cards */}
-                <div className="relative flex gap-3 mt-5">
+                <div className="relative flex flex-wrap gap-2 sm:gap-3 mt-4 sm:mt-5">
                   <div className="flex items-center gap-2 px-4 py-2 bg-violet-500/10 border border-violet-500/20 rounded-xl">
                     <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></div>
                     <span className="text-sm font-semibold text-violet-300">{deptManagerStats.total}</span>
@@ -6514,8 +7224,9 @@ L'équipe Salarize`;
                 </div>
               </div>
               
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               {/* Actions & Search */}
-              <div className="px-6 py-5 border-b border-slate-800/50 bg-slate-900/50">
+              <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-800/50 bg-slate-900/50">
                 {/* Rename department UI */}
                 {showRenameDept && (
                   <div className="mb-4 p-4 bg-gradient-to-br from-slate-800/80 to-slate-800/40 border border-slate-700/50 rounded-2xl backdrop-blur-sm">
@@ -6525,7 +7236,7 @@ L'équipe Salarize`;
                       </svg>
                       Renommer une équipe
                     </p>
-                    <div className="flex gap-2 mb-3 items-center">
+                    <div className="flex flex-col sm:flex-row gap-2 mb-3 items-stretch sm:items-center">
                       <CustomSelect
                         value={renameDeptOld}
                         onChange={val => setRenameDeptOld(val)}
@@ -6534,7 +7245,7 @@ L'équipe Salarize`;
                         showIcons={true}
                         className="flex-1"
                       />
-                      <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="hidden sm:block w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                       </svg>
                       <input
@@ -6606,7 +7317,7 @@ L'équipe Salarize`;
                       Fusionner des équipes
                     </p>
                     <p className="text-xs text-slate-400 mb-3">Tous les membres de la première équipe seront déplacés vers la seconde.</p>
-                    <div className="flex gap-2 mb-3 items-center">
+                    <div className="flex flex-col sm:flex-row gap-2 mb-3 items-stretch sm:items-center">
                       <CustomSelect
                         value={mergeDeptFrom}
                         onChange={val => setMergeDeptFrom(val)}
@@ -6615,7 +7326,7 @@ L'équipe Salarize`;
                         showIcons={true}
                         className="flex-1"
                       />
-                      <span className="flex items-center text-slate-500">
+                      <span className="hidden sm:flex items-center text-slate-500">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
@@ -6682,7 +7393,7 @@ L'équipe Salarize`;
                 )}
 
                 {!showRenameDept && !showMergeDept && !showCreateDept && !isViewerOnly && (
-                  <div className="flex gap-2 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
                     <button
                       onClick={() => setShowCreateDept(true)}
                       className="flex-1 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 text-white rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20"
@@ -6790,7 +7501,7 @@ L'équipe Salarize`;
                 
                 {/* Bulk assign bar */}
                 {selectedEmployees.size > 0 && (
-                  <div className="mb-4 p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 rounded-2xl flex items-center gap-3">
+                  <div className="mb-4 p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="flex-1">
                       <span className="text-sm font-semibold text-white flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></div>
@@ -6803,7 +7514,7 @@ L'équipe Salarize`;
                       options={deptSelectOptions}
                       placeholder="Assigner à..."
                       showIcons={true}
-                      className="w-40"
+                      className="w-full sm:w-40"
                     />
                     <button
                       onClick={() => {
@@ -6838,7 +7549,7 @@ L'équipe Salarize`;
                         setBulkAssignDept('');
                       }}
                       disabled={!bulkAssignDept}
-                      className="px-4 py-2 bg-white text-slate-900 text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+                      className="w-full sm:w-auto px-4 py-2 bg-white text-slate-900 text-sm font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
                     >
                       Appliquer
                     </button>
@@ -6853,7 +7564,7 @@ L'équipe Salarize`;
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="relative flex-1">
                     <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -6879,7 +7590,7 @@ L'équipe Salarize`;
                     ]}
                     variant="violet"
                     showIcons={true}
-                    className="w-44"
+                    className="w-full sm:w-44"
                   />
                 </div>
               </div>
@@ -6887,7 +7598,7 @@ L'équipe Salarize`;
               {/* Employee list - Optimisé avec useMemo */}
               <div className="bg-gradient-to-b from-slate-800/20 to-slate-900/40">
                 {allFilteredEmployeesForDept.length === 0 ? (
-                  <div className="p-12 text-center">
+                  <div className="p-8 sm:p-12 text-center flex-1 flex flex-col items-center justify-center">
                     <div className="w-20 h-20 bg-gradient-to-br from-slate-800 to-slate-700 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl">
                       <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -6899,7 +7610,7 @@ L'équipe Salarize`;
                 ) : (
                   <>
                     {/* Select all header */}
-                    <div className="flex items-center gap-3 px-5 py-3 bg-slate-800/60 border-b border-slate-700/30 backdrop-blur-sm">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-4 sm:px-5 py-3 bg-slate-800/95 border-b border-slate-700/30">
                       <input
                         type="checkbox"
                         id="select-all-employees"
@@ -6927,60 +7638,62 @@ L'équipe Salarize`;
                       </span>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div>
                       {filteredEmployeesForDept.map((emp) => (
                         <div
                           key={emp.name}
-                          className={`flex items-center gap-4 px-5 py-3 border-b border-slate-800/30 transition-colors ${
+                          className={`px-4 sm:px-5 py-3 border-b border-slate-800/30 transition-colors ${
                             selectedEmployees.has(emp.name)
                               ? 'bg-violet-500/10 border-l-2 border-l-violet-500'
                               : 'hover:bg-slate-800/30 border-l-2 border-l-transparent'
                           }`}
                         >
-                          <input
-                            type="checkbox"
-                            checked={selectedEmployees.has(emp.name)}
-                            onChange={e => {
-                              setSelectedEmployees(prev => {
-                                const next = new Set(prev);
-                                if (e.target.checked) {
-                                  next.add(emp.name);
-                                } else {
-                                  next.delete(emp.name);
-                                }
-                                return next;
-                              });
-                            }}
-                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
-                          />
-                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                            emp.currentDept
-                              ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
-                              : 'bg-slate-700 text-slate-300 ring-2 ring-amber-500/30'
-                          }`}>
-                            {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                          <div className="flex flex-wrap items-start sm:items-center gap-3 sm:gap-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedEmployees.has(emp.name)}
+                              onChange={e => {
+                                setSelectedEmployees(prev => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) {
+                                    next.add(emp.name);
+                                  } else {
+                                    next.delete(emp.name);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              className="mt-1 sm:mt-0 w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
+                            />
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                              emp.currentDept
+                                ? 'bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white'
+                                : 'bg-slate-700 text-slate-300 ring-2 ring-amber-500/30'
+                            }`}>
+                              {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-[150px]">
+                              <p className="font-medium text-white truncate text-sm">{emp.name}</p>
+                            </div>
+                            <select
+                              value={emp.currentDept || ''}
+                              disabled={isViewerOnly}
+                              onChange={(e) => handleDeptRowChange(emp, e.target.value)}
+                              className="w-full sm:w-44 px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 disabled:opacity-60"
+                            >
+                              {deptSelectOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-white truncate text-sm">{emp.name}</p>
-                          </div>
-                          <select
-                            value={emp.currentDept || ''}
-                            disabled={isViewerOnly}
-                            onChange={(e) => handleDeptRowChange(emp, e.target.value)}
-                            className="w-44 px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 disabled:opacity-60"
-                          >
-                            {deptSelectOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
                         </div>
                       ))}
                     </div>
 
                     {deptTotalPages > 1 && (
-                      <div className="flex items-center justify-between gap-3 px-5 py-3 bg-slate-900/50 border-t border-slate-800/60">
+                      <div className="flex items-center justify-between gap-2 sm:gap-3 px-4 sm:px-5 py-3 bg-slate-900/80 border-t border-slate-800/60">
                         <button
                           onClick={() => setDeptPage(prev => Math.max(0, prev - 1))}
                           disabled={deptPage === 0}
@@ -6989,7 +7702,11 @@ L'équipe Salarize`;
                           Précédent
                         </button>
 
-                        <div className="flex items-center gap-1">
+                        <span className="sm:hidden text-xs text-slate-400 tabular-nums">
+                          Page {deptPage + 1}/{deptTotalPages}
+                        </span>
+
+                        <div className="hidden sm:flex items-center gap-1">
                           {deptPageNumbers[0] > 0 && (
                             <>
                               <button
@@ -7045,12 +7762,13 @@ L'équipe Salarize`;
                   </>
                 )}
               </div>
+              </div>
               
               {/* Footer */}
-              <div className="px-5 py-5 bg-gradient-to-t from-slate-950 to-transparent border-t border-slate-800/50">
+              <div className="px-4 sm:px-5 py-4 sm:py-5 bg-gradient-to-t from-slate-950 to-transparent border-t border-slate-800/50 shrink-0">
                 <button
                   onClick={() => { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); setSelectedEmployees(new Set()); setBulkAssignDept(''); setDeptPage(0); }}
-                  className="w-full py-3.5 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-violet-500 bg-[length:200%_100%] hover:bg-right text-white rounded-2xl font-bold text-base transition-all duration-500 shadow-xl shadow-violet-500/25 hover:shadow-fuchsia-500/25"
+                  className="w-full py-3.5 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-violet-500 bg-[length:200%_100%] hover:bg-right text-white rounded-2xl font-bold text-sm sm:text-base transition-all duration-500 shadow-xl shadow-violet-500/25 hover:shadow-fuchsia-500/25"
                 >
                   ✓ Terminé
                 </button>
@@ -7212,7 +7930,7 @@ L'équipe Salarize`;
         ) : (
         <>
         {/* Company Header Card */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 mb-6 relative">
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden">
           {/* Background decoration */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
@@ -7305,7 +8023,7 @@ L'équipe Salarize`;
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-3 text-sm text-white/60">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm text-white/60">
                 {companies[activeCompany]?.website && (
                   <>
                     <a 
@@ -7374,54 +8092,92 @@ L'équipe Salarize`;
             </div>
             
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex w-full sm:w-auto items-center gap-2 flex-wrap sm:flex-nowrap sm:justify-end">
               {/* Export Dropdown */}
-              <div className="relative group">
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-sm font-medium text-white border border-white/10">
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => {
+                    setShowExportMenu((prev) => !prev);
+                    setShowActionsMenu(false);
+                  }}
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-sm font-medium text-white border border-white/10"
+                  aria-expanded={showExportMenu}
+                >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  <span className="hidden sm:inline">Exporter</span>
+                  <span>Exporter</span>
                 </button>
-                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 w-48 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                  <div className="p-1.5">
-                    <button
-                      onClick={exportToExcel}
-                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                    >
-                      <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                {showExportMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                    <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 w-52">
+                      <div className="p-1.5">
+                        <button
+                          onClick={() => {
+                            setShowExportMenu(false);
+                            exportToExcel();
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-700 text-sm">Excel</p>
+                            <p className="text-slate-400 text-xs">Donnees completes</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowExportMenu(false);
+                            handleExportPDF();
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                        >
+                          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-700 text-sm">PDF</p>
+                            <p className="text-slate-400 text-xs">Rapport imprimable</p>
+                          </div>
+                        </button>
                       </div>
-                      <div>
-                        <p className="font-medium text-slate-700 text-sm">Excel</p>
-                        <p className="text-slate-400 text-xs">Données complètes</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={handleExportPDF}
-                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                    >
-                      <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-700 text-sm">PDF</p>
-                        <p className="text-slate-400 text-xs">Rapport imprimable</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
+                    </div>
+                  </>
+                )}
               </div>
               
+              {!isViewerOnly && (
+                <button
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowActionsMenu(false);
+                    setShowMaterialImportModal(true);
+                  }}
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 backdrop-blur rounded-xl transition-all text-sm font-medium text-emerald-100 border border-emerald-400/30"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V7a2 2 0 00-2-2h-3l-2-2H8a2 2 0 00-2 2v2m14 6v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-6m14 0h-3m-8 0H6m3 0v-3m0 3v3m6-6v3m0 3v-3" />
+                  </svg>
+                  <span className="hidden sm:inline">Matières</span>
+                </button>
+              )}
+
               {/* Share Button - masqué pour les viewers */}
               {!isViewerOnly && (
                 <button
-                  onClick={() => setShowShareModal(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-all text-sm font-medium text-white border border-white/20"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowActionsMenu(false);
+                    setShowShareModal(true);
+                  }}
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-all text-sm font-medium text-white border border-white/20"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -7433,8 +8189,12 @@ L'équipe Salarize`;
               {/* Invite CEO Button - masqué pour les viewers */}
               {!isViewerOnly && (
                 <button
-                  onClick={() => setShowInviteModal(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    setShowActionsMenu(false);
+                    setShowInviteModal(true);
+                  }}
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -7444,44 +8204,62 @@ L'équipe Salarize`;
               )}
               
               {/* Settings Menu */}
-              <div className="relative group">
-                <button className="flex items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-white border border-white/10">
+              <div className="relative" ref={actionsMenuRef}>
+                <button
+                  onClick={() => {
+                    setShowActionsMenu((prev) => !prev);
+                    setShowExportMenu(false);
+                  }}
+                  className="flex items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-white border border-white/10"
+                  aria-expanded={showActionsMenu}
+                >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
                   </svg>
                 </button>
-                <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60] w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                  <div className="p-1.5">
-                    {!isViewerOnly && (
-                      <button
-                        onClick={openManageAccessModal}
-                        className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                      >
-                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <span className="text-sm text-slate-700">Gerer les acces</span>
-                      </button>
-                    )}
-                    <div className="border-t border-slate-100 my-1"></div>
-                    <button
-                      onClick={() => setShowOnboarding(true)}
-                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                    >
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span className="text-sm text-slate-700">Aide / Tutorial</span>
-                    </button>
-                  </div>
-                </div>
+                {showActionsMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} />
+                    <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-[60] w-56">
+                      <div className="p-1.5">
+                        {!isViewerOnly && (
+                          <button
+                            onClick={() => {
+                              setShowActionsMenu(false);
+                              openManageAccessModal();
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                          >
+                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <span className="text-sm text-slate-700">Gerer les acces</span>
+                          </button>
+                        )}
+                        <div className="border-t border-slate-100 my-1"></div>
+                        <button
+                          onClick={() => {
+                            setShowActionsMenu(false);
+                            setShowOnboarding(true);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                        >
+                          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-sm text-slate-700">Aide / Tutorial</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
         </div>
         
         {/* KPI Cards - Responsive grid */}
-        <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
           <div className="bg-white rounded-xl md:rounded-2xl p-3 md:p-5 shadow-sm border border-slate-100">
             <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
               <div className="w-8 h-8 md:w-11 md:h-11 rounded-lg md:rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
@@ -7529,6 +8307,130 @@ L'équipe Salarize`;
             <p className="text-base md:text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
             <p className="text-[10px] md:text-xs text-slate-400 mt-0.5 md:mt-1">actifs</p>
           </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base">🥬 Dashboard coût matière première</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Analyse par article (SKU / code-barres) et par fournisseur
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {!isViewerOnly && (
+                <button
+                  onClick={() => setShowMaterialImportModal(true)}
+                  className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                >
+                  Importer matières
+                </button>
+              )}
+              <button
+                onClick={() => setShowMaterialsPanel((prev) => !prev)}
+                className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                {showMaterialsPanel ? 'Masquer' : 'Afficher'}
+              </button>
+            </div>
+          </div>
+
+          {showMaterialsPanel && (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-xs text-slate-500">Coût total matière</p>
+                  <p className="text-lg font-bold text-slate-800">€{materialKpis.totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-xs text-slate-500">Articles</p>
+                  <p className="text-lg font-bold text-slate-800">{materialKpis.articleCount}</p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-xs text-slate-500">Fournisseurs</p>
+                  <p className="text-lg font-bold text-slate-800">{materialKpis.supplierCount}</p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-xs text-slate-500">Coût unitaire moyen</p>
+                  <p className="text-lg font-bold text-slate-800">€{materialKpis.weightedUnitCost.toLocaleString('fr-BE', { maximumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col lg:flex-row gap-2 mb-4">
+                <input
+                  type="text"
+                  placeholder="Rechercher article / SKU / fournisseur"
+                  value={materialSearch}
+                  onChange={(e) => setMaterialSearch(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
+                />
+                <select
+                  value={materialPeriodFilter}
+                  onChange={(e) => setMaterialPeriodFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                >
+                  <option value="all">Toutes les périodes</option>
+                  {materialPeriods.map((period) => (
+                    <option key={period} value={period}>{formatPeriod(period)}</option>
+                  ))}
+                </select>
+                <select
+                  value={materialSupplierFilter}
+                  onChange={(e) => setMaterialSupplierFilter(e.target.value)}
+                  className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                >
+                  <option value="all">Tous les fournisseurs</option>
+                  {materialSuppliers.map((supplier) => (
+                    <option key={supplier} value={supplier}>{supplier}</option>
+                  ))}
+                </select>
+              </div>
+
+              {filteredMaterialCosts.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-slate-500 text-sm">
+                  Aucune donnée matière première. Importez un fichier pour activer cette vue.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-slate-100 p-4">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Top fournisseurs par coût</h3>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={materialSupplierRows.slice(0, 8)} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
+                          <YAxis type="category" dataKey="supplier" width={130} tick={{ fontSize: 11, fill: '#475569' }} />
+                          <Tooltip formatter={(value) => `€${Number(value).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`} />
+                          <Bar dataKey="totalCost" fill="#10b981" radius={[4, 4, 4, 4]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-100 p-4">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Articles (SKU / code-barres)</h3>
+                    <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                      {materialArticleRows.slice(0, 12).map((row) => (
+                        <div key={`${row.sku}-${row.barcode}-${row.article}`} className="py-2.5 flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">{row.article}</p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {row.sku ? `SKU: ${row.sku}` : row.barcode ? `Code-barres: ${row.barcode}` : 'SKU non renseigné'}
+                            </p>
+                            <p className="text-xs text-slate-400">{row.supplierCount} fournisseur(s)</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-sm font-semibold text-slate-800">€{row.totalCost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}</p>
+                            <p className="text-xs text-slate-500">{row.totalQty.toLocaleString('fr-BE', { maximumFractionDigits: 2 })} unités</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Data Manager Modal */}
@@ -7744,7 +8646,7 @@ L'équipe Salarize`;
                                   {date.toLocaleDateString('fr-FR')} à {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                  {backup?.employeeCount || 0} employés • {backup?.periodCount || 0} périodes
+                                  {backup?.employeeCount || 0} employés • {backup?.materialCount || 0} lignes matières • {backup?.periodCount || 0} périodes
                                 </p>
                               </div>
                               <button
@@ -7762,6 +8664,18 @@ L'équipe Salarize`;
                                     paidHours: parseFloat(e.paid_hours || e.paidHours) || 0,
                                     period: e.period
                                   }));
+                                  const restoredMaterialCosts = (backup.materialCosts || []).map((entry) => ({
+                                    article: entry.article || '',
+                                    sku: entry.sku || '',
+                                    barcode: entry.barcode || '',
+                                    supplier: entry.supplier || 'Non renseigné',
+                                    category: entry.category || '',
+                                    unit: entry.unit || '',
+                                    quantity: parseLocaleNumber(entry.quantity),
+                                    unitCost: parseLocaleNumber(entry.unitCost),
+                                    totalCost: parseLocaleNumber(entry.totalCost),
+                                    period: entry.period || 'Unknown'
+                                  }));
 
                                   const restoredPeriods = [...new Set(restoredEmployees.map(e => e.period).filter(Boolean))].sort();
 
@@ -7770,6 +8684,7 @@ L'équipe Salarize`;
                                     [activeCompany]: {
                                       ...companies[activeCompany],
                                       employees: restoredEmployees,
+                                      materialCosts: restoredMaterialCosts,
                                       periods: restoredPeriods,
                                       mapping: backup.mapping || {}
                                     }
@@ -7778,6 +8693,8 @@ L'équipe Salarize`;
                                   setCompanies(newCompanies);
                                   companiesRef.current = newCompanies;
                                   setEmployees(restoredEmployees);
+                                  setMaterialCosts(restoredMaterialCosts);
+                                  setShowMaterialsPanel(restoredMaterialCosts.length > 0);
                                   setPeriods(restoredPeriods);
                                   setDepartmentMapping(backup.mapping || {});
 
@@ -7817,14 +8734,46 @@ L'équipe Salarize`;
                                         }
                                       }
 
-                                      toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés`);
+                                      // Restaurer les coûts matière première (table optionnelle)
+                                      await supabase.from('material_costs').delete().eq('company_id', companyId);
+                                      if (restoredMaterialCosts.length > 0) {
+                                        const materialToInsert = restoredMaterialCosts.map((entry) => ({
+                                          company_id: companyId,
+                                          period: entry.period || null,
+                                          sku: entry.sku || null,
+                                          barcode: entry.barcode || null,
+                                          article_name: entry.article || null,
+                                          supplier: entry.supplier || null,
+                                          category: entry.category || null,
+                                          unit: entry.unit || null,
+                                          quantity: parseLocaleNumber(entry.quantity),
+                                          unit_cost: parseLocaleNumber(entry.unitCost),
+                                          total_cost: parseLocaleNumber(entry.totalCost)
+                                        }));
+                                        const batchSize = 500;
+                                        for (let i = 0; i < materialToInsert.length; i += batchSize) {
+                                          const batch = materialToInsert.slice(i, i + batchSize);
+                                          const { error: materialRestoreError } = await supabase.from('material_costs').insert(batch);
+                                          if (materialRestoreError) {
+                                            const msg = String(materialRestoreError.message || '').toLowerCase();
+                                            if (msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation'))) {
+                                              console.warn('[Salarize] Table material_costs absente pendant restauration, restauration locale uniquement.');
+                                            } else {
+                                              throw materialRestoreError;
+                                            }
+                                            break;
+                                          }
+                                        }
+                                      }
+
+                                      toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés, ${restoredMaterialCosts.length} lignes matières`);
                                     } catch (e) {
                                       console.error('[Salarize] Erreur restauration:', e);
                                       toast.error('Erreur lors de la restauration');
                                     }
                                   } else {
                                     saveToLocalStorage(newCompanies, activeCompany);
-                                    toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés`);
+                                    toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés, ${restoredMaterialCosts.length} lignes matières`);
                                   }
 
                                   setShowDataManager(false);
