@@ -2,11 +2,14 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import App from './App.jsx'
+import { initMonitoring } from './monitoring'
 import './index.css'
 
 const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   'TON_GOOGLE_CLIENT_ID.apps.googleusercontent.com'
+
+initMonitoring()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -11,7 +11,6 @@ export default defineConfig({
           if (id.includes('xlsx')) return 'vendor-xlsx'
           if (id.includes('recharts')) return 'vendor-recharts'
           if (id.includes('@supabase')) return 'vendor-supabase'
-          if (id.includes('react-window')) return 'vendor-react-window'
           return
         },
       },

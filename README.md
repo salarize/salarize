@@ -93,3 +93,27 @@ Tu peux déployer sur:
 - **Vercel**: `npx vercel`
 - **Netlify**: drag & drop le dossier `dist/`
 - **Railway**: connecte ton repo GitHub
+
+## Qualite Code
+
+```bash
+npm run lint
+npm run lint:fix
+npm run format
+npm run format:check
+```
+
+## Tests
+
+```bash
+npm run test
+npm run test:run
+```
+
+## Monitoring (optionnel)
+
+Le monitoring erreurs + web vitals est active automatiquement si `VITE_MONITORING_ENDPOINT` est configure dans `.env`.
+Voir `.env.example` pour les variables:
+- `VITE_MONITORING_ENDPOINT`
+- `VITE_MONITORING_APP`
+- `VITE_MONITORING_DEBUG`

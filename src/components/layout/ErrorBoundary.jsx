@@ -1,4 +1,5 @@
 import React from 'react';
+import { reportError } from '../../monitoring';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -13,6 +14,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    reportError(error, { source: 'error-boundary', componentStack: errorInfo?.componentStack });
   }
 
   render() {

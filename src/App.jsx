@@ -36,7 +36,7 @@
  * ╚═══════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
 
 // ============================================
@@ -54,7 +54,18 @@ import { DEFAULT_DEPARTMENTS, ONBOARDING_MESSAGES } from './constants/defaults';
 import { DESIGN, CHART_COLORS } from './constants/design';
 
 // Utils
-import { formatCurrency, formatPercent, formatNumber } from './utils';
+import {
+  buildEmailCandidates,
+  buildPageWindow,
+  canonicalizeInvitationEmail,
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+  getSelectionState,
+  normalizeEmail,
+  paginateItems,
+  toggleSelectionForNames,
+} from './utils';
 
 // Hooks
 import { useDebounce, useDebouncedCallback } from './hooks';
@@ -72,19 +83,6 @@ import { Footer, PageTransition, ErrorBoundary } from './components/layout';
 // Components - Landing
 import { LandingHeader } from './components/landing';
 
-// Pages
-import {
-  LandingPage,
-  FeaturesPage,
-  PricingPage,
-  LegalPage,
-  PrivacyPage,
-  TermsPage,
-  CookiesPage,
-  DemoPage,
-  ProfilePage
-} from './pages';
-
 // Components - Dashboard
 import {
   AuthModal,
@@ -94,11 +92,19 @@ import {
   CompanySettingsModal
 } from './components/dashboard';
 
-// Components - Timesheet
-import TimesheetPage from './components/timesheet/TimesheetPage';
-
 // Styles
 import './styles/animations.css';
+
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const FeaturesPage = lazy(() => import('./pages/FeaturesPage'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
+const LegalPage = lazy(() => import('./pages/LegalPage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+const CookiesPage = lazy(() => import('./pages/CookiesPage'));
+const DemoPage = lazy(() => import('./pages/DemoPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const TimesheetPage = lazy(() => import('./components/timesheet/TimesheetPage'));
 
 let xlsxLoader = null;
 const loadXLSX = async () => {
@@ -135,44 +141,6 @@ function AppContent() {
       return `${(num / 1000).toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k h`;
     }
     return `${num.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h`;
-  };
-
-  const normalizeEmail = (value) => (value || '').trim().toLowerCase();
-
-  const canonicalizeInvitationEmail = (value) => {
-    const normalized = normalizeEmail(value);
-    if (!normalized.includes('@')) return normalized;
-
-    const [localRaw, domainRaw] = normalized.split('@');
-    const domain = domainRaw.toLowerCase();
-
-    // Gmail aliases: dots and +tag should map to the same mailbox.
-    if (domain === 'gmail.com' || domain === 'googlemail.com') {
-      const local = localRaw.split('+')[0].replace(/\./g, '');
-      return `${local}@gmail.com`;
-    }
-
-    return normalized;
-  };
-
-  const buildEmailCandidates = (value) => {
-    const normalized = normalizeEmail(value);
-    if (!normalized.includes('@')) return [];
-
-    const [localRaw, domainRaw] = normalized.split('@');
-    const domain = domainRaw.toLowerCase();
-    const candidates = new Set([normalized]);
-
-    if (domain === 'gmail.com' || domain === 'googlemail.com') {
-      const local = localRaw.split('+')[0];
-      const compact = local.replace(/\./g, '');
-      candidates.add(`${local}@gmail.com`);
-      candidates.add(`${local}@googlemail.com`);
-      candidates.add(`${compact}@gmail.com`);
-      candidates.add(`${compact}@googlemail.com`);
-    }
-
-    return [...candidates];
   };
 
   const [companies, setCompanies] = useState({});
@@ -5126,8 +5094,7 @@ L'équipe Salarize`;
 
   // Liste paginée pour l'affichage (PERF: évite de render 500+ éléments)
   const filteredEmployeesForDept = useMemo(() => {
-    const start = deptPage * DEPT_PAGE_SIZE;
-    return allFilteredEmployeesForDept.slice(start, start + DEPT_PAGE_SIZE);
+    return paginateItems(allFilteredEmployeesForDept, deptPage, DEPT_PAGE_SIZE);
   }, [allFilteredEmployeesForDept, deptPage]);
 
   // Nombre total de pages
@@ -5141,31 +5108,47 @@ L'équipe Salarize`;
     [allFilteredEmployeesForDept]
   );
 
-  const selectedFilteredCount = useMemo(
-    () => allFilteredEmployeeNames.reduce((count, name) => count + (selectedEmployees.has(name) ? 1 : 0), 0),
+  const selectionState = useMemo(
+    () => getSelectionState(allFilteredEmployeeNames, selectedEmployees),
     [allFilteredEmployeeNames, selectedEmployees]
   );
 
-  const isAllFilteredSelected = allFilteredEmployeeNames.length > 0 && selectedFilteredCount === allFilteredEmployeeNames.length;
-  const isSomeFilteredSelected = selectedFilteredCount > 0 && !isAllFilteredSelected;
+  const selectedFilteredCount = selectionState.selectedCount;
+  const isAllFilteredSelected = selectionState.allSelected;
+  const isSomeFilteredSelected = selectionState.someSelected;
 
   const deptStartIndex = allFilteredEmployeesForDept.length === 0 ? 0 : (deptPage * DEPT_PAGE_SIZE) + 1;
   const deptEndIndex = Math.min((deptPage + 1) * DEPT_PAGE_SIZE, allFilteredEmployeesForDept.length);
 
-  const deptPageNumbers = useMemo(() => {
-    if (deptTotalPages <= 1) return [];
-    const windowSize = 5;
-    const start = Math.max(0, deptPage - Math.floor(windowSize / 2));
-    const end = Math.min(deptTotalPages - 1, start + windowSize - 1);
-    const normalizedStart = Math.max(0, end - windowSize + 1);
-    return Array.from({ length: end - normalizedStart + 1 }, (_, index) => normalizedStart + index);
-  }, [deptPage, deptTotalPages]);
+  const deptPageNumbers = useMemo(() => buildPageWindow(deptPage, deptTotalPages, 5), [deptPage, deptTotalPages]);
 
   // Options mémoïsées pour le dropdown des départements (évite recréation à chaque render)
   const deptSelectOptions = useMemo(() => [
     { value: '', label: 'Non assigné' },
     ...allDepartments.map(dept => ({ value: dept, label: dept }))
   ], [allDepartments]);
+
+  const employeeCostByName = useMemo(() => {
+    const costMap = new Map();
+    filtered.forEach((employee) => {
+      const current = costMap.get(employee.name) || 0;
+      costMap.set(employee.name, current + (employee.totalCost || 0));
+    });
+    return costMap;
+  }, [filtered]);
+
+  const handleDeptRowChange = useCallback((employee, nextValue) => {
+    if (isViewerOnly) return;
+    const newDept = nextValue || null;
+    if (newDept === employee.currentDept) return;
+
+    setPendingDeptChange({
+      empName: employee.name,
+      oldDept: employee.currentDept,
+      newDept,
+      empCost: employeeCostByName.get(employee.name) || 0,
+    });
+  }, [employeeCostByName, isViewerOnly]);
 
   // Reset page quand les filtres changent
   useEffect(() => {
@@ -5276,6 +5259,18 @@ L'équipe Salarize`;
     );
   }
 
+  const renderLazyContent = (content, light = false) => (
+    <Suspense
+      fallback={
+        <div className={`py-16 flex items-center justify-center ${light ? 'bg-white' : 'bg-slate-950'}`}>
+          <LoadingSpinner size="md" text="Chargement..." light={light} />
+        </div>
+      }
+    >
+      {content}
+    </Suspense>
+  );
+
   // Loading screen
   if (isLoading) {
     return <LoadingSpinner size="lg" text="Salarize" subtext="Chargement de votre espace..." fullScreen />;
@@ -5297,13 +5292,15 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <LandingPage 
-          onLogin={handleLogin} 
-          user={user} 
-          onGoToDashboard={() => setCurrentPage('dashboard')}
-          onViewDemo={() => setCurrentPage('demo')}
-          setCurrentPage={setCurrentPage}
-        />
+        {renderLazyContent(
+          <LandingPage
+            onLogin={handleLogin}
+            user={user}
+            onGoToDashboard={() => setCurrentPage('dashboard')}
+            onViewDemo={() => setCurrentPage('demo')}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
         <AuthModal
           isOpen={showAuthModal}
           onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
@@ -5325,12 +5322,14 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <FeaturesPage 
-          onLogin={handleLogin} 
-          user={user} 
-          onGoToDashboard={() => setCurrentPage('dashboard')}
-          setCurrentPage={setCurrentPage}
-        />
+        {renderLazyContent(
+          <FeaturesPage
+            onLogin={handleLogin}
+            user={user}
+            onGoToDashboard={() => setCurrentPage('dashboard')}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
         <AuthModal
           isOpen={showAuthModal}
           onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
@@ -5352,12 +5351,14 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <PricingPage 
-          onLogin={handleLogin} 
-          user={user} 
-          onGoToDashboard={() => setCurrentPage('dashboard')}
-          setCurrentPage={setCurrentPage}
-        />
+        {renderLazyContent(
+          <PricingPage
+            onLogin={handleLogin}
+            user={user}
+            onGoToDashboard={() => setCurrentPage('dashboard')}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
         <AuthModal
           isOpen={showAuthModal}
           onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
@@ -5379,12 +5380,14 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <DemoPage 
-          onLogin={handleLogin} 
-          user={user} 
-          onGoToDashboard={() => setCurrentPage('dashboard')}
-          setCurrentPage={setCurrentPage}
-        />
+        {renderLazyContent(
+          <DemoPage
+            onLogin={handleLogin}
+            user={user}
+            onGoToDashboard={() => setCurrentPage('dashboard')}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
         <AuthModal
           isOpen={showAuthModal}
           onClose={() => { setShowAuthModal(false); setPendingInviteInfo(null); }}
@@ -5406,7 +5409,7 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <LegalPage setCurrentPage={setCurrentPage} />
+        {renderLazyContent(<LegalPage setCurrentPage={setCurrentPage} />)}
       </PageTransition>
     );
   }
@@ -5421,7 +5424,7 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <PrivacyPage setCurrentPage={setCurrentPage} />
+        {renderLazyContent(<PrivacyPage setCurrentPage={setCurrentPage} />)}
       </PageTransition>
     );
   }
@@ -5436,7 +5439,7 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <TermsPage setCurrentPage={setCurrentPage} />
+        {renderLazyContent(<TermsPage setCurrentPage={setCurrentPage} />)}
       </PageTransition>
     );
   }
@@ -5451,7 +5454,7 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <CookiesPage setCurrentPage={setCurrentPage} />
+        {renderLazyContent(<CookiesPage setCurrentPage={setCurrentPage} />)}
       </PageTransition>
     );
   }
@@ -5473,12 +5476,14 @@ L'équipe Salarize`;
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
         />
-        <ProfilePage 
-          user={user} 
-          onLogout={handleLogout} 
-          companies={companies}
-          setCurrentPage={setCurrentPage}
-        />
+        {renderLazyContent(
+          <ProfilePage
+            user={user}
+            onLogout={handleLogout}
+            companies={companies}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
       </PageTransition>
     );
   }
@@ -5811,11 +5816,9 @@ L'équipe Salarize`;
 
   // Timesheet page
   if (showTimesheet) {
-    return (
-      <TimesheetPage
-        user={user}
-        onBack={() => setShowTimesheet(false)}
-      />
+    return renderLazyContent(
+      <TimesheetPage user={user} onBack={() => setShowTimesheet(false)} />,
+      true
     );
   }
 
@@ -6459,17 +6462,13 @@ L'équipe Salarize`;
       {/* Department Manager Modal - Design "Mes équipes" */}
       {showDeptManager && (
         <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 overflow-y-auto"
+          className="fixed inset-0 bg-slate-950/75 z-50 overflow-y-auto"
           onClick={(e) => { if (e.target === e.currentTarget) { setShowDeptManager(false); setDeptSearchTerm(''); setDeptFilter('all'); }}}
         >
           <div className="min-h-full flex items-start justify-center p-4 pt-10 pb-8">
             <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-700/50 ring-1 ring-white/5">
               {/* Header - Team Theme */}
               <div className="relative px-6 py-5 border-b border-slate-800/80 overflow-hidden">
-                {/* Background decoration */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-cyan-500/10 to-blue-500/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
-
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     {/* Team Icon - Modern gradient */}
@@ -6913,13 +6912,7 @@ L'équipe Salarize`;
                         }}
                         onChange={e => {
                           setSelectedEmployees(prev => {
-                            const next = new Set(prev);
-                            if (e.target.checked) {
-                              allFilteredEmployeeNames.forEach(name => next.add(name));
-                            } else {
-                              allFilteredEmployeeNames.forEach(name => next.delete(name));
-                            }
-                            return next;
+                            return toggleSelectionForNames(prev, allFilteredEmployeeNames, e.target.checked);
                           });
                         }}
                         className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900 cursor-pointer"
@@ -6934,14 +6927,14 @@ L'équipe Salarize`;
                       </span>
                     </div>
 
-                    <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    <div className="overflow-x-auto">
                       {filteredEmployeesForDept.map((emp) => (
                         <div
                           key={emp.name}
-                          className={`flex items-center gap-4 px-5 py-3 border-b border-slate-800/30 ${
+                          className={`flex items-center gap-4 px-5 py-3 border-b border-slate-800/30 transition-colors ${
                             selectedEmployees.has(emp.name)
-                              ? 'bg-gradient-to-r from-violet-500/15 to-fuchsia-500/10 border-l-2 border-l-violet-500'
-                              : 'hover:bg-white/[0.02] border-l-2 border-l-transparent'
+                              ? 'bg-violet-500/10 border-l-2 border-l-violet-500'
+                              : 'hover:bg-slate-800/30 border-l-2 border-l-transparent'
                           }`}
                         >
                           <input
@@ -6970,29 +6963,18 @@ L'équipe Salarize`;
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-white truncate text-sm">{emp.name}</p>
                           </div>
-                          <CustomSelect
+                          <select
                             value={emp.currentDept || ''}
                             disabled={isViewerOnly}
-                            onChange={val => {
-                              if (isViewerOnly) return;
-                              const newDept = val || null;
-                              if (newDept === emp.currentDept) return;
-                              const empCost = filtered
-                                .filter(em => em.name === emp.name)
-                                .reduce((sum, em) => sum + (em.totalCost || 0), 0);
-                              setPendingDeptChange({
-                                empName: emp.name,
-                                oldDept: emp.currentDept,
-                                newDept: newDept,
-                                empCost: empCost
-                              });
-                            }}
-                            options={deptSelectOptions}
-                            variant={emp.currentDept ? 'default' : 'warning'}
-                            dropdownPosition="auto"
-                            showIcons={true}
-                            className="w-36"
-                          />
+                            onChange={(e) => handleDeptRowChange(emp, e.target.value)}
+                            className="w-44 px-3 py-2 rounded-lg border border-slate-700 bg-slate-900 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-violet-500/40 disabled:opacity-60"
+                          >
+                            {deptSelectOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       ))}
                     </div>
