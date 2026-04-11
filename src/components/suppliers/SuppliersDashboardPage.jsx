@@ -1,6 +1,22 @@
 import React, { useMemo, useState } from 'react';
 import { SvgHBarChart } from '../layout/SvgBarChart';
 
+const MATERIAL_SETUP_SQL = `CREATE TABLE IF NOT EXISTS material_costs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  period TEXT,
+  sku TEXT,
+  barcode TEXT,
+  article_name TEXT,
+  supplier TEXT,
+  category TEXT,
+  unit TEXT,
+  quantity NUMERIC DEFAULT 0,
+  unit_cost NUMERIC DEFAULT 0,
+  total_cost NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);`;
+
 const parseLocaleNumber = (value) => {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -35,14 +51,22 @@ const formatPeriod = (period) => {
   return period;
 };
 
+const toSafeText = (value, fallback = '') => {
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  return text || fallback;
+};
+
 function SuppliersDashboardPage({
   activeCompany,
   materialCosts = [],
   isViewerOnly,
   onBack,
   onBackToPayroll = onBack,
+  setupIssue = null,
   onInvite,
-  onImportFile
+  onImportFile,
+  onRetrySetup = () => {}
 }) {
   const [search, setSearch] = useState('');
   const [periodFilter, setPeriodFilter] = useState('all');
@@ -54,12 +78,12 @@ function SuppliersDashboardPage({
       .filter((row) => row && typeof row === 'object')
       .map((row) => ({
         ...row,
-        period: row.period || '',
-        supplier: row.supplier || 'Non renseigne',
-        article: row.article || '',
-        sku: row.sku || '',
-        barcode: row.barcode || '',
-        category: row.category || '',
+        period: toSafeText(row.period, ''),
+        supplier: toSafeText(row.supplier, 'Non renseigne'),
+        article: toSafeText(row.article, ''),
+        sku: toSafeText(row.sku, ''),
+        barcode: toSafeText(row.barcode, ''),
+        category: toSafeText(row.category, ''),
         quantity: parseLocaleNumber(row.quantity),
         totalCost: parseLocaleNumber(row.totalCost)
       }));
@@ -71,7 +95,7 @@ function SuppliersDashboardPage({
   );
 
   const suppliers = useMemo(
-    () => [...new Set(normalizedRows.map((row) => row.supplier))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(normalizedRows.map((row) => row.supplier))].sort((a, b) => String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' })),
     [normalizedRows]
   );
 
@@ -197,6 +221,37 @@ function SuppliersDashboardPage({
           </div>
         </div>
       </div>
+
+      {setupIssue?.isMissingSchema && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 mb-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Setup requis</p>
+              <h2 className="text-base sm:text-lg font-bold text-amber-900 mt-1">{setupIssue.title || 'Configuration module fournisseurs requise'}</h2>
+              <p className="text-sm text-amber-800 mt-1">
+                {setupIssue.description || 'La table `material_costs` est absente sur Supabase. Executez la migration SQL ci-dessous puis reessayez.'}
+              </p>
+              {(setupIssue.code || setupIssue.hint) && (
+                <p className="text-xs text-amber-700 mt-2">
+                  {setupIssue.code ? `Code: ${setupIssue.code}` : ''}{setupIssue.code && setupIssue.hint ? ' - ' : ''}{setupIssue.hint || ''}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onRetrySetup}
+              className="px-3 py-2 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+            >
+              Reessayer
+            </button>
+          </div>
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-semibold text-amber-900">Afficher SQL de configuration</summary>
+            <pre className="mt-2 text-[11px] leading-5 bg-amber-100/60 border border-amber-200 rounded-lg p-3 overflow-x-auto text-amber-900">
+{setupIssue.sql || MATERIAL_SETUP_SQL}
+            </pre>
+          </details>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <div className="bg-white rounded-xl border border-slate-200 p-4">

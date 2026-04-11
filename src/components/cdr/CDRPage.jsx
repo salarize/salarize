@@ -1,11 +1,24 @@
 import React, { useState } from 'react';
 import { supabase } from '../../config/supabase';
+import { normalizePostgrestError } from '../../utils';
 import { useCDRData } from './hooks/useCDRData';
 import CDRTable from './CDRTable';
 import CDRImportModal from './CDRImportModal';
 import CDRInvoiceInjector from './CDRInvoiceInjector';
 import InvoiceReviewPanel from './InvoiceReviewPanel';
 import ClosersDashboard from './closers/ClosersDashboard';
+
+const CDR_SETUP_SQL = `-- Executer le script:
+-- supabase_cdr_migration.sql
+
+-- Verification rapide:
+SELECT to_regclass('public.cdr_categories') AS cdr_categories,
+       to_regclass('public.cdr_entries') AS cdr_entries,
+       to_regclass('public.cdr_budget') AS cdr_budget,
+       to_regclass('public.invoices') AS invoices,
+       to_regclass('public.closing_records') AS closing_records,
+       to_regclass('public.invoice_lines') AS invoice_lines,
+       to_regclass('public.supplier_category_hints') AS supplier_category_hints;`;
 
 const TABS = [
   { key: 'cdr', label: 'Compte de résultat', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
@@ -31,12 +44,30 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
 
   // Closing records from invoices (validated closer invoices)
   const [closingRecords, setClosingRecords] = useState([]);
+  const [closingRecordsIssue, setClosingRecordsIssue] = useState(null);
   React.useEffect(() => {
     if (!companyId) return;
-    supabase.from('closing_records').select('*').eq('company_id', companyId).then(({ data }) => {
+    supabase.from('closing_records').select('*').eq('company_id', companyId).then(({ data, error: closingError }) => {
+      if (closingError) {
+        const normalizedError = normalizePostgrestError(closingError, { target: 'closing_records' });
+        if (normalizedError.isMissingSchema) {
+          setClosingRecordsIssue({
+            ...normalizedError,
+            isSetupRequired: true,
+            userMessage: 'La table `closing_records` est absente. Executez la migration SQL puis reessayez.',
+            sql: CDR_SETUP_SQL,
+          });
+          setClosingRecords([]);
+          return;
+        }
+        console.error('[Salarize] Erreur chargement closing_records:', closingError);
+      }
+      setClosingRecordsIssue(null);
       setClosingRecords(data || []);
     });
   }, [companyId, invoices]);
+
+  const setupIssue = (error && error.isSetupRequired ? error : null) || closingRecordsIssue;
 
   const invoicesPending = invoices.filter(i => i.status === 'pending').length;
 
@@ -170,10 +201,27 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
             <p className="text-sm text-slate-400">Chargement du CDR...</p>
           </div>
         </div>
+      ) : setupIssue ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-sm text-amber-800">
+          <p className="font-semibold text-amber-900">Configuration CDR requise</p>
+          <p className="mt-1">{setupIssue.userMessage || setupIssue.message || 'Une ressource Supabase du module CDR est absente.'}</p>
+          {(setupIssue.code || setupIssue.hint) && (
+            <p className="mt-1 text-xs text-amber-700">
+              {setupIssue.code ? `Code: ${setupIssue.code}` : ''}{setupIssue.code && setupIssue.hint ? ' - ' : ''}{setupIssue.hint || ''}
+            </p>
+          )}
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-semibold text-amber-900">Afficher SQL de setup</summary>
+            <pre className="mt-2 text-[11px] leading-5 bg-amber-100/70 border border-amber-200 rounded-lg p-3 overflow-x-auto text-amber-900">
+{setupIssue.sql || CDR_SETUP_SQL}
+            </pre>
+          </details>
+          <button onClick={reload} className="mt-3 px-3 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors text-xs font-semibold">Reessayer</button>
+        </div>
       ) : error ? (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
-          Erreur : {error}
-          <button onClick={reload} className="ml-3 underline font-medium">Réessayer</button>
+          Erreur : {error.userMessage || error.message || String(error)}
+          <button onClick={reload} className="ml-3 underline font-medium">Reessayer</button>
         </div>
       ) : (
         <>
@@ -333,3 +381,4 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
     </div>
   );
 }
+

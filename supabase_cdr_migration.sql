@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS cdr_categories (
 
 ALTER TABLE cdr_categories ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "cdr_categories_owner" ON cdr_categories;
 CREATE POLICY "cdr_categories_owner" ON cdr_categories
   USING (
     company_id IN (
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS invoices (
 
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "invoices_owner" ON invoices;
 CREATE POLICY "invoices_owner" ON invoices
   USING (
     company_id IN (
@@ -78,6 +80,7 @@ CREATE TABLE IF NOT EXISTS invoice_lines (
 
 ALTER TABLE invoice_lines ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "invoice_lines_owner" ON invoice_lines;
 CREATE POLICY "invoice_lines_owner" ON invoice_lines
   USING (
     invoice_id IN (
@@ -104,6 +107,7 @@ CREATE TABLE IF NOT EXISTS closing_records (
 
 ALTER TABLE closing_records ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "closing_records_owner" ON closing_records;
 CREATE POLICY "closing_records_owner" ON closing_records
   USING (
     company_id IN (
@@ -131,6 +135,7 @@ CREATE TABLE IF NOT EXISTS cdr_entries (
 
 ALTER TABLE cdr_entries ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "cdr_entries_owner" ON cdr_entries;
 CREATE POLICY "cdr_entries_owner" ON cdr_entries
   USING (
     company_id IN (
@@ -154,6 +159,7 @@ CREATE TABLE IF NOT EXISTS cdr_budget (
 
 ALTER TABLE cdr_budget ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "cdr_budget_owner" ON cdr_budget;
 CREATE POLICY "cdr_budget_owner" ON cdr_budget
   USING (
     company_id IN (
@@ -175,10 +181,39 @@ CREATE TABLE IF NOT EXISTS supplier_category_hints (
 
 ALTER TABLE supplier_category_hints ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "supplier_hints_owner" ON supplier_category_hints;
 CREATE POLICY "supplier_hints_owner" ON supplier_category_hints
   USING (
     company_id IN (
       SELECT id FROM companies WHERE user_id = auth.uid()
+    )
+  );
+-- --- 8. material_costs (module fournisseurs) ---
+CREATE TABLE IF NOT EXISTS material_costs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  period TEXT,
+  sku TEXT,
+  barcode TEXT,
+  article_name TEXT,
+  supplier TEXT,
+  category TEXT,
+  unit TEXT,
+  quantity NUMERIC DEFAULT 0,
+  unit_cost NUMERIC DEFAULT 0,
+  total_cost NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE material_costs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "material_costs_owner" ON material_costs;
+CREATE POLICY "material_costs_owner" ON material_costs
+  USING (
+    company_id IN (
+      SELECT id FROM companies WHERE user_id = auth.uid()
+      UNION
+      SELECT company_id FROM invitations WHERE invited_email = auth.email() AND status = 'accepted'
     )
   );
 
@@ -190,6 +225,7 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('invoices', 'invoices', false)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "invoices_storage_owner" ON storage.objects;
 CREATE POLICY "invoices_storage_owner" ON storage.objects
   FOR ALL USING (
     bucket_id = 'invoices' AND auth.uid() IS NOT NULL
@@ -275,3 +311,15 @@ BEGIN
 
 END;
 $$;
+
+
+-- --- Verification schema cache ---
+SELECT
+  to_regclass('public.cdr_categories') AS cdr_categories,
+  to_regclass('public.cdr_entries') AS cdr_entries,
+  to_regclass('public.cdr_budget') AS cdr_budget,
+  to_regclass('public.invoices') AS invoices,
+  to_regclass('public.closing_records') AS closing_records,
+  to_regclass('public.invoice_lines') AS invoice_lines,
+  to_regclass('public.supplier_category_hints') AS supplier_category_hints,
+  to_regclass('public.material_costs') AS material_costs;

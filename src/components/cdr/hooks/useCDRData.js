@@ -1,5 +1,32 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../config/supabase';
+import { normalizePostgrestError } from '../../../utils';
+
+const CDR_SETUP_SQL = `-- Executer le script complet:
+-- supabase_cdr_migration.sql
+
+-- Verification rapide:
+SELECT to_regclass('public.cdr_categories') AS cdr_categories,
+       to_regclass('public.cdr_entries') AS cdr_entries,
+       to_regclass('public.cdr_budget') AS cdr_budget,
+       to_regclass('public.invoices') AS invoices,
+       to_regclass('public.closing_records') AS closing_records,
+       to_regclass('public.invoice_lines') AS invoice_lines,
+       to_regclass('public.supplier_category_hints') AS supplier_category_hints,
+       to_regclass('public.material_costs') AS material_costs;`;
+
+const toCDRStructuredError = (error, target = 'cdr') => {
+  const normalized = normalizePostgrestError(error, { target });
+  return {
+    ...normalized,
+    target,
+    isSetupRequired: normalized.isMissingSchema,
+    sql: CDR_SETUP_SQL,
+    userMessage: normalized.isMissingSchema
+      ? `La ressource Supabase \`${target}\` est absente. Lancez la migration SQL puis reessayez.`
+      : (normalized.message || 'Erreur lors du chargement du module CDR.'),
+  };
+};
 
 export function useCDRData(companyId) {
   const [categories, setCategories] = useState([]);
@@ -15,7 +42,14 @@ export function useCDRData(companyId) {
     setError(null);
     try {
       // Seed categories if none exist
-      await supabase.rpc('seed_cdr_categories', { p_company_id: companyId });
+      const { error: seedError } = await supabase.rpc('seed_cdr_categories', { p_company_id: companyId });
+      if (seedError) {
+        const normalizedSeedError = toCDRStructuredError(seedError, 'seed_cdr_categories');
+        if (normalizedSeedError.isSetupRequired) {
+          throw normalizedSeedError;
+        }
+        console.warn('[Salarize] Seed categories warning:', seedError);
+      }
 
       const [catRes, entRes, budRes, invRes] = await Promise.all([
         supabase.from('cdr_categories').select('*').eq('company_id', companyId).order('sort_order'),
@@ -24,16 +58,17 @@ export function useCDRData(companyId) {
         supabase.from('invoices').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
       ]);
 
-      if (catRes.error) throw catRes.error;
-      if (entRes.error) throw entRes.error;
-      if (budRes.error) throw budRes.error;
+      if (catRes.error) throw toCDRStructuredError(catRes.error, 'cdr_categories');
+      if (entRes.error) throw toCDRStructuredError(entRes.error, 'cdr_entries');
+      if (budRes.error) throw toCDRStructuredError(budRes.error, 'cdr_budget');
+      if (invRes.error) throw toCDRStructuredError(invRes.error, 'invoices');
 
       setCategories(catRes.data || []);
       setEntries(entRes.data || []);
       setBudget(budRes.data || []);
       setInvoices(invRes.data || []);
     } catch (e) {
-      setError(e.message);
+      setError(toCDRStructuredError(e, e?.target || 'cdr'));
     } finally {
       setLoading(false);
     }

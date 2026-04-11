@@ -36,7 +36,7 @@
  * ╚═══════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // ============================================
 // IMPORTS FROM MODULAR STRUCTURE
@@ -62,6 +62,7 @@ import {
   formatPercent,
   getSelectionState,
   normalizeEmail,
+  normalizePostgrestError,
   paginateItems,
   toggleSelectionForNames,
 } from './utils';
@@ -108,6 +109,22 @@ const TimesheetPage = lazy(() => import('./components/timesheet/TimesheetPage'))
 const SuppliersDashboardPage = lazy(() => import('./components/suppliers/SuppliersDashboardPage'));
 const OverviewPage = lazy(() => import('./components/dashboard/OverviewPage'));
 const CDRPage = lazy(() => import('./components/cdr/CDRPage'));
+
+const MATERIAL_COSTS_SETUP_SQL = `CREATE TABLE IF NOT EXISTS material_costs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  period TEXT,
+  sku TEXT,
+  barcode TEXT,
+  article_name TEXT,
+  supplier TEXT,
+  category TEXT,
+  unit TEXT,
+  quantity NUMERIC DEFAULT 0,
+  unit_cost NUMERIC DEFAULT 0,
+  total_cost NUMERIC DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);`;
 
 let xlsxLoader = null;
 const loadXLSX = async () => {
@@ -208,6 +225,7 @@ function AppContent() {
   const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
   // 'overview' | 'payroll' | 'suppliers' | 'cdr'
   const [currentModule, setCurrentModule] = useState('overview');
+  const [materialCostsSetupIssue, setMaterialCostsSetupIssue] = useState(null);
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
   const isRecoveryModeRef = useRef(
     typeof window !== 'undefined' && 
@@ -231,6 +249,22 @@ function AppContent() {
   const [fileQueue, setFileQueue] = useState([]); // File d'attente pour import multi-fichiers
   const [currentFileIndex, setCurrentFileIndex] = useState(0); // Index du fichier en cours
   const [importReady, setImportReady] = useState(false); // Délai avant de pouvoir importer
+
+  const switchModule = useCallback((nextModule) => {
+    startTransition(() => {
+      setCurrentModule(nextModule);
+    });
+  }, []);
+
+  const buildMaterialCostsSetupIssue = useCallback((error) => {
+    const normalized = normalizePostgrestError(error, { target: 'material_costs' });
+    return {
+      ...normalized,
+      title: 'Configuration fournisseurs requise',
+      description: 'La table Supabase `material_costs` est absente. Executez la migration SQL puis cliquez sur reessayer.',
+      sql: MATERIAL_COSTS_SETUP_SQL,
+    };
+  }, []);
   
   // === NOUVEAUX ÉTATS PRIORITÉ HAUTE ===
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -965,7 +999,8 @@ function AppContent() {
         setActiveCompany(null);
         setEmployees([]);
         setMaterialCosts([]);
-        setCurrentModule('overview');
+        setMaterialCostsSetupIssue(null);
+        switchModule('overview');
         setShowMaterialsPanel(false);
         setView('upload');
         setCurrentPage('home');
@@ -990,6 +1025,7 @@ function AppContent() {
         }
       }
     } catch (e) { console.error(e); }
+    setMaterialCostsSetupIssue(null);
     setIsLoading(false);
     setIsLoadingData(false);
   };
@@ -1217,6 +1253,7 @@ function AppContent() {
 
       const loadedCompanies = {};
       let materialCostsTableAvailable = true;
+      let materialCostsSetupIssueNext = null;
 
       for (const company of allCompanies) {
         console.log(`[Salarize] Loading data for company: ${company.name} (ID: ${company.id})`);
@@ -1278,11 +1315,10 @@ function AppContent() {
             .limit(20000);
 
           if (materialsError) {
-            const msg = String(materialsError.message || '').toLowerCase();
-            const missingTable = materialsError.code === 'PGRST205' || materialsError.code === '42P01' ||
-              (msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache') || msg.includes('could not find')));
-            if (missingTable) {
+            const normalizedError = normalizePostgrestError(materialsError, { target: 'material_costs' });
+            if (normalizedError.isMissingSchema) {
               materialCostsTableAvailable = false;
+              materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(materialsError);
               console.warn('[Salarize] Table material_costs absente: module matière première en mode local.');
             } else {
               console.error('[Salarize] Error loading material_costs:', materialsError);
@@ -1337,6 +1373,8 @@ function AppContent() {
           sharedRole: company.sharedRole || null // 'viewer' ou 'editor' si partagée
         };
       }
+
+      setMaterialCostsSetupIssue(materialCostsSetupIssueNext);
 
       setCompanies(loadedCompanies);
       companiesRef.current = loadedCompanies; // Synchroniser la ref
@@ -1686,6 +1724,7 @@ function AppContent() {
     try {
       const latestCompanies = companiesRef.current;
       let materialCostsTableAvailable = true;
+      let materialCostsSetupIssueNext = null;
 
       for (const [companyName, companyData] of Object.entries(latestCompanies)) {
         // Skip shared companies (viewer can't modify)
@@ -1990,11 +2029,10 @@ function AppContent() {
             .eq('company_id', companyId);
 
           if (materialDeleteError) {
-            const msg = String(materialDeleteError.message || '').toLowerCase();
-            const missingTable = materialDeleteError.code === 'PGRST205' || materialDeleteError.code === '42P01' ||
-              (msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache') || msg.includes('could not find')));
-            if (missingTable) {
+            const normalizedError = normalizePostgrestError(materialDeleteError, { target: 'material_costs' });
+            if (normalizedError.isMissingSchema) {
               materialCostsTableAvailable = false;
+              materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(materialDeleteError);
               console.warn('[Salarize] Table material_costs absente: sync matière première ignorée.');
             } else {
               console.error('[Salarize] Erreur suppression material_costs:', materialDeleteError);
@@ -2022,6 +2060,13 @@ function AppContent() {
                 .insert(batch);
 
               if (materialInsertError) {
+                const normalizedError = normalizePostgrestError(materialInsertError, { target: 'material_costs' });
+                if (normalizedError.isMissingSchema) {
+                  materialCostsTableAvailable = false;
+                  materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(materialInsertError);
+                  console.warn('[Salarize] Table material_costs absente: insertion ignorée.');
+                  break;
+                }
                 console.error('[Salarize] Erreur insertion material_costs:', materialInsertError);
                 break;
               }
@@ -2055,6 +2100,7 @@ function AppContent() {
         console.log(`[Salarize] --- Fin traitement: ${companyName} ---`);
       }
 
+      setMaterialCostsSetupIssue(materialCostsSetupIssueNext);
       console.log('[Salarize] ========== FIN SAUVEGARDE SUPABASE ==========');
       setLastSaved(new Date());
       setSaveStatus('saved');
@@ -2433,7 +2479,8 @@ function AppContent() {
     setActiveCompany(null);
     setEmployees([]);
     setMaterialCosts([]);
-    setCurrentModule('overview');
+    setMaterialCostsSetupIssue(null);
+    switchModule('overview');
     setShowMaterialsPanel(false);
     setView('upload');
   };
@@ -2452,7 +2499,7 @@ function AppContent() {
     setShowMaterialsPanel((c.materialCosts || []).length > 0);
     setCreatedDepartments(c.createdDepartments || []);
     setSelectedPeriods([]);
-    setCurrentModule('overview');
+    switchModule('overview');
     setView('dashboard');
   };
 
@@ -3994,7 +4041,7 @@ function AppContent() {
     setActiveCompany(name);
     setEmployees([]);
     setMaterialCosts([]);
-    setCurrentModule('overview');
+    switchModule('overview');
     setShowMaterialsPanel(false);
     setDepartmentMapping({});
     setPeriods([]);
@@ -4872,7 +4919,7 @@ L'équipe Salarize`;
     companiesRef.current = newCompanies;
     setEmployees([]);
     setMaterialCosts([]);
-    setCurrentModule('overview');
+    switchModule('overview');
     setShowMaterialsPanel(false);
     setPeriods([]);
     setDepartmentMapping({});
@@ -4883,7 +4930,16 @@ L'équipe Salarize`;
         console.log('[Salarize] Suppression explicite des employés pour', activeCompany);
         await supabase.from('employees').delete().eq('company_id', companyId);
         await supabase.from('department_mappings').delete().eq('company_id', companyId);
-        await supabase.from('material_costs').delete().eq('company_id', companyId);
+        const { error: materialDeleteError } = await supabase.from('material_costs').delete().eq('company_id', companyId);
+        if (materialDeleteError) {
+          const normalizedError = normalizePostgrestError(materialDeleteError, { target: 'material_costs' });
+          if (normalizedError.isMissingSchema) {
+            setMaterialCostsSetupIssue(buildMaterialCostsSetupIssue(materialDeleteError));
+            console.warn('[Salarize] Table material_costs absente: suppression locale uniquement.');
+          } else {
+            throw materialDeleteError;
+          }
+        }
         toast.success('Données supprimées');
       } catch (e) {
         console.error('[Salarize] Erreur suppression:', e);
@@ -4913,7 +4969,16 @@ L'équipe Salarize`;
         // Supprimer les mappings
         await supabase.from('department_mappings').delete().eq('company_id', companyId);
         // Supprimer les coûts matière première (si table disponible)
-        await supabase.from('material_costs').delete().eq('company_id', companyId);
+        const { error: materialDeleteError } = await supabase.from('material_costs').delete().eq('company_id', companyId);
+        if (materialDeleteError) {
+          const normalizedError = normalizePostgrestError(materialDeleteError, { target: 'material_costs' });
+          if (normalizedError.isMissingSchema) {
+            setMaterialCostsSetupIssue(buildMaterialCostsSetupIssue(materialDeleteError));
+            console.warn('[Salarize] Table material_costs absente: suppression partielle côté DB.');
+          } else {
+            throw materialDeleteError;
+          }
+        }
         // Supprimer la société
         await supabase.from('companies').delete().eq('id', companyId);
       } catch (e) {
@@ -4928,7 +4993,7 @@ L'équipe Salarize`;
       setActiveCompany(null);
       setEmployees([]);
       setMaterialCosts([]);
-      setCurrentModule('overview');
+      switchModule('overview');
       setShowMaterialsPanel(false);
       setPeriods([]);
       setDepartmentMapping({});
@@ -6375,10 +6440,10 @@ L'équipe Salarize`;
             departmentMapping={departmentMapping}
             employees={employees}
             currentModule={currentModule}
-            onOverviewClick={() => { setView('dashboard'); setCurrentModule('overview'); setSidebarOpen(false); }}
-            onPayrollClick={() => { setView('dashboard'); setCurrentModule('payroll'); setSidebarOpen(false); }}
-            onSuppliersClick={() => { setView('dashboard'); setCurrentModule('suppliers'); setSidebarOpen(false); }}
-            onCDRClick={() => { setView('dashboard'); setCurrentModule('cdr'); setSidebarOpen(false); }}
+          onOverviewClick={() => { setView('dashboard'); switchModule('overview'); setSidebarOpen(false); }}
+          onPayrollClick={() => { setView('dashboard'); switchModule('payroll'); setSidebarOpen(false); }}
+          onSuppliersClick={() => { setView('dashboard'); switchModule('suppliers'); setSidebarOpen(false); }}
+          onCDRClick={() => { setView('dashboard'); switchModule('cdr'); setSidebarOpen(false); }}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -6503,10 +6568,10 @@ L'équipe Salarize`;
           departmentMapping={departmentMapping}
           employees={employees}
           currentModule={currentModule}
-          onOverviewClick={() => { setCurrentModule('overview'); setSidebarOpen(false); }}
-          onPayrollClick={() => { setCurrentModule('payroll'); setSidebarOpen(false); }}
-          onSuppliersClick={() => { setCurrentModule('suppliers'); setSidebarOpen(false); }}
-          onCDRClick={() => { setCurrentModule('cdr'); setSidebarOpen(false); }}
+          onOverviewClick={() => { switchModule('overview'); setSidebarOpen(false); }}
+          onPayrollClick={() => { switchModule('payroll'); setSidebarOpen(false); }}
+          onSuppliersClick={() => { switchModule('suppliers'); setSidebarOpen(false); }}
+          onCDRClick={() => { switchModule('cdr'); setSidebarOpen(false); }}
         />
         <DashboardHeader 
           user={user} 
@@ -7957,38 +8022,45 @@ L'équipe Salarize`;
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <LoadingSpinner size="lg" text="Chargement des données" subtext="Veuillez patienter..." />
           </div>
-        ) : currentModule === 'overview' ? (
-          <OverviewPage
-            user={user}
-            activeCompany={activeCompany}
-            companies={companies}
-            companyOrder={companyOrder}
-            onSelectCompany={(name) => { loadCompany(name); }}
-            onOpenPayroll={() => setCurrentModule('payroll')}
-            onOpenSuppliers={() => setCurrentModule('suppliers')}
-            onOpenCDR={() => setCurrentModule('cdr')}
-            onOpenPayrollWithImport={() => { setCurrentModule('payroll'); setShowImportModal(true); }}
-            onOpenSuppliersWithImport={() => { setCurrentModule('suppliers'); setShowMaterialImportModal(true); }}
-            onOpenCDRWithImport={() => setCurrentModule('cdr')}
-          />
-        ) : currentModule === 'suppliers' ? (
-          <SuppliersDashboardPage
-            activeCompany={activeCompany}
-            materialCosts={materialCosts}
-            isViewerOnly={isViewerOnly}
-            onBack={() => setCurrentModule('overview')}
-            onInvite={() => setShowInviteModal(true)}
-            onImportFile={handleMaterialFileChange}
-          />
-        ) : currentModule === 'cdr' ? (
-          <CDRPage
-            activeCompany={activeCompany}
-            companies={companies}
-            user={user}
-            isViewerOnly={isViewerOnly}
-            onBack={() => setCurrentModule('overview')}
-          />
-        ) : (
+        ) : renderLazyContent(
+          currentModule === 'overview' ? (
+            <OverviewPage
+              user={user}
+              activeCompany={activeCompany}
+              companies={companies}
+              companyOrder={companyOrder}
+              onSelectCompany={(name) => { loadCompany(name); }}
+              onOpenPayroll={() => switchModule('payroll')}
+              onOpenSuppliers={() => switchModule('suppliers')}
+              onOpenCDR={() => switchModule('cdr')}
+              onOpenPayrollWithImport={() => { switchModule('payroll'); setShowImportModal(true); }}
+              onOpenSuppliersWithImport={() => { switchModule('suppliers'); setShowMaterialImportModal(true); }}
+              onOpenCDRWithImport={() => switchModule('cdr')}
+            />
+          ) : currentModule === 'suppliers' ? (
+            <SuppliersDashboardPage
+              activeCompany={activeCompany}
+              materialCosts={materialCosts}
+              isViewerOnly={isViewerOnly}
+              setupIssue={materialCostsSetupIssue}
+              onBack={() => switchModule('overview')}
+              onInvite={() => setShowInviteModal(true)}
+              onImportFile={handleMaterialFileChange}
+              onRetrySetup={() => {
+                if (!user?.id) return;
+                setIsLoadingData(true);
+                loadFromSupabase(user.id, user.email);
+              }}
+            />
+          ) : currentModule === 'cdr' ? (
+            <CDRPage
+              activeCompany={activeCompany}
+              companies={companies}
+              user={user}
+              isViewerOnly={isViewerOnly}
+              onBack={() => switchModule('overview')}
+            />
+          ) : (
         <>
         {/* Company Header Card */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden">
@@ -8219,7 +8291,7 @@ L'équipe Salarize`;
                   onClick={() => {
                     setShowExportMenu(false);
                     setShowActionsMenu(false);
-                    setCurrentModule('suppliers');
+                    switchModule('suppliers');
                   }}
                   className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 backdrop-blur rounded-xl transition-all text-sm font-medium text-emerald-100 border border-emerald-400/30"
                 >
@@ -8381,7 +8453,7 @@ L'équipe Salarize`;
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setCurrentModule('suppliers')}
+                onClick={() => switchModule('suppliers')}
                 className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
               >
                 Ouvrir dashboard fournisseurs
@@ -10796,6 +10868,8 @@ L'équipe Salarize`;
         </section>
         )}
         </>
+          ),
+          true
         )}
       </main>
     </div>
