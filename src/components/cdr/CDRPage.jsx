@@ -7,7 +7,6 @@ import CDRImportModal from './CDRImportModal';
 import CDRInvoiceInjector from './CDRInvoiceInjector';
 import InvoiceReviewPanel from './InvoiceReviewPanel';
 import ClosersDashboard from './closers/ClosersDashboard';
-import { Sparkline, WaterfallChart } from '../layout/PowerCharts';
 
 const CDR_SETUP_SQL = `-- Executer le script:
 -- supabase_cdr_migration.sql
@@ -40,7 +39,6 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
   const [year, setYear] = useState(new Date().getFullYear());
   const [showImport, setShowImport] = useState(false);
   const [reviewingInvoice, setReviewingInvoice] = useState(null); // invoice row being manually validated
-  const [selectedCategoryDrill, setSelectedCategoryDrill] = useState(null);
 
   const { categories, entries, budget, invoices, loading, error, reload, upsertEntry, upsertBudget, updateCategoryStatus } = useCDRData(companyId);
 
@@ -99,79 +97,6 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
       return real > Number(b.budget_amount);
     }).length;
   }, [entries, budget, year]);
-
-  const categoryById = React.useMemo(
-    () => Object.fromEntries((categories || []).map((cat) => [cat.id, cat])),
-    [categories]
-  );
-
-  const cdrWaterfallData = React.useMemo(() => {
-    const grouped = {};
-    entries
-      .filter((entry) => entry.year === year)
-      .forEach((entry) => {
-        const category = categoryById[entry.category_id];
-        if (!category) return;
-        const label = category.name || 'Categorie';
-        const rawAmount = Number(entry.amount || 0);
-        const signedAmount = category.type === 'expense' ? -Math.abs(rawAmount) : Math.abs(rawAmount);
-        grouped[label] = (grouped[label] || 0) + signedAmount;
-      });
-
-    return Object.entries(grouped)
-      .map(([label, value]) => ({ key: label, label, value }))
-      .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
-      .slice(0, 14);
-  }, [entries, year, categoryById]);
-
-  const cdrActualYearTotal = React.useMemo(
-    () => cdrWaterfallData.reduce((sum, row) => sum + Number(row.value || 0), 0),
-    [cdrWaterfallData]
-  );
-
-  const cdrBudgetYearTotal = React.useMemo(() => {
-    return (budget || [])
-      .filter((item) => item.year === year)
-      .reduce((sum, item) => {
-        const category = categoryById[item.category_id];
-        const amount = Number(item.budget_amount || 0);
-        if (!category) return sum;
-        return sum + (category.type === 'expense' ? -Math.abs(amount) : Math.abs(amount));
-      }, 0);
-  }, [budget, year, categoryById]);
-
-  const cdrMonthlyTrend = React.useMemo(() => {
-    const monthly = {};
-    entries
-      .filter((entry) => entry.year === year)
-      .forEach((entry) => {
-        const category = categoryById[entry.category_id];
-        if (!category) return;
-        const month = Number(entry.month);
-        if (!month || month < 1 || month > 12) return;
-        const amount = Number(entry.amount || 0);
-        const signedAmount = category.type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
-        monthly[month] = (monthly[month] || 0) + signedAmount;
-      });
-
-    return Array.from({ length: 12 }, (_, index) => {
-      const month = index + 1;
-      return { month, value: monthly[month] || 0 };
-    });
-  }, [entries, year, categoryById]);
-
-  const categoryDrillRows = React.useMemo(() => {
-    if (!selectedCategoryDrill) return [];
-    const selectedCategory = (categories || []).find((cat) => cat.name === selectedCategoryDrill);
-    if (!selectedCategory) return [];
-    return entries
-      .filter((entry) => entry.year === year && entry.category_id === selectedCategory.id)
-      .sort((a, b) => Number(a.month || 0) - Number(b.month || 0))
-      .map((entry) => ({
-        month: Number(entry.month || 0),
-        amount: Number(entry.amount || 0),
-      }));
-  }, [selectedCategoryDrill, categories, entries, year]);
 
   if (!companyId) {
     return (
@@ -301,106 +226,18 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
       ) : (
         <>
           {tab === 'cdr' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="bg-white border border-slate-200 rounded-xl p-4">
-                  <p className="text-xs text-slate-500">Resultat annuel (net)</p>
-                  <p className={`text-lg font-bold ${cdrActualYearTotal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                    {cdrActualYearTotal >= 0 ? '+' : '-'}{Math.abs(cdrActualYearTotal).toLocaleString('fr-BE', { maximumFractionDigits: 0 })} EUR
-                  </p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4">
-                  <p className="text-xs text-slate-500">Vs budget annuel</p>
-                  <p className={`text-lg font-bold ${(cdrActualYearTotal - cdrBudgetYearTotal) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
-                    {(cdrActualYearTotal - cdrBudgetYearTotal) >= 0 ? '+' : '-'}
-                    {Math.abs(cdrActualYearTotal - cdrBudgetYearTotal).toLocaleString('fr-BE', { maximumFractionDigits: 0 })} EUR
-                  </p>
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl p-4">
-                  <p className="text-xs text-slate-500">Trend mensuel</p>
-                  <div className="mt-1">
-                    <Sparkline
-                      data={cdrMonthlyTrend}
-                      valueKey="value"
-                      width={130}
-                      height={34}
-                      color="#7c3aed"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-slate-800">Waterfall CDR par categorie</h3>
-                  {selectedCategoryDrill && (
-                    <button
-                      onClick={() => setSelectedCategoryDrill(null)}
-                      className="text-xs text-slate-500 hover:text-slate-700 underline"
-                    >
-                      Reset drill-through
-                    </button>
-                  )}
-                </div>
-                {cdrWaterfallData.length > 0 ? (
-                  <WaterfallChart
-                    data={cdrWaterfallData}
-                    labelKey="label"
-                    valueKey="value"
-                    height={300}
-                    selectedKey={selectedCategoryDrill}
-                    onBarClick={(row) => {
-                      if (row.key === '__total__') return;
-                      setSelectedCategoryDrill(row.label);
-                    }}
-                    formatValue={(value) => `${Number(value).toLocaleString('fr-BE', { maximumFractionDigits: 0 })} EUR`}
-                  />
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-sm text-slate-400">
-                    Aucune donnee disponible pour le waterfall.
-                  </div>
-                )}
-
-                {selectedCategoryDrill && (
-                  <div className="mt-4 rounded-lg border border-slate-100">
-                    <div className="px-3 py-2 border-b border-slate-100 text-sm font-semibold text-slate-700">
-                      Drill-through: {selectedCategoryDrill}
-                    </div>
-                    <table className="w-full text-xs">
-                      <thead className="bg-slate-50">
-                        <tr className="text-slate-500">
-                          <th className="px-3 py-2 text-left font-semibold">Mois</th>
-                          <th className="px-3 py-2 text-right font-semibold">Montant</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {categoryDrillRows.map((row, idx) => (
-                          <tr key={`${row.month}-${idx}`} className="border-t border-slate-100">
-                            <td className="px-3 py-2 text-slate-600">{row.month}</td>
-                            <td className="px-3 py-2 text-right font-semibold text-slate-800">
-                              {row.amount.toLocaleString('fr-BE', { maximumFractionDigits: 2 })} EUR
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              <CDRTable
-                companyId={companyId}
-                categories={categories}
-                entries={entries}
-                budget={budget}
-                viewMode={viewMode}
-                year={year}
-                onUpsertEntry={upsertEntry}
-                onUpsertBudget={upsertBudget}
-                onUpdateCategoryStatus={updateCategoryStatus}
-                isViewerOnly={isViewerOnly}
-              />
-            </div>
+            <CDRTable
+              companyId={companyId}
+              categories={categories}
+              entries={entries}
+              budget={budget}
+              viewMode={viewMode}
+              year={year}
+              onUpsertEntry={upsertEntry}
+              onUpsertBudget={upsertBudget}
+              onUpdateCategoryStatus={updateCategoryStatus}
+              isViewerOnly={isViewerOnly}
+            />
           )}
 
           {tab === 'closers' && (
@@ -409,15 +246,15 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Factures closers</p>
                   <p className="text-sm text-slate-600 mt-1 mb-3">
-                    Déposez ici les factures de commissions/closing pour alimenter le dashboard closers.
+                    Deposez ici les factures de commissions/closing pour alimenter le dashboard closers.
                   </p>
                   <CDRInvoiceInjector
                     companyId={companyId}
                     categories={categories}
                     onUploadComplete={reload}
                     isViewerOnly={isViewerOnly}
-                    title="Glisser-déposer vos factures closers ici"
-                    subtitle="PDF, PNG, JPG, HEIC — commissions, closing, apporteurs"
+                    title="Glisser-deposer vos factures closers ici"
+                    subtitle="PDF, PNG, JPG, HEIC - commissions, closing, apporteurs"
                   />
                 </div>
               )}
