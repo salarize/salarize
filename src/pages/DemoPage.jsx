@@ -2,6 +2,7 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DEMO_COMPANY, DEMO_EMPLOYEES } from '../constants';
 import Footer from '../components/layout/Footer';
+import DeferredChart from '../components/layout/DeferredChart';
 
 function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
   const demoTotalCost = DEMO_EMPLOYEES.filter(e => e.period === '2024-04').reduce((sum, e) => sum + e.totalCost, 0);
@@ -95,6 +96,7 @@ function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
           <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-200 mb-6">
             <h3 className="font-bold text-slate-800 mb-4">Evolution des Couts</h3>
             <div className="h-64">
+              <DeferredChart height={256}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={demoChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -117,6 +119,7 @@ function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
                   <Bar dataKey="total" isAnimationActive={false} fill="#8B5CF6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              </DeferredChart>
             </div>
           </div>
 

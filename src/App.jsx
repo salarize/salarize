@@ -78,7 +78,7 @@ import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, Char
 import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
-import { Footer, PageTransition, ErrorBoundary, ChartErrorBoundary } from './components/layout';
+import { Footer, PageTransition, ErrorBoundary, ChartErrorBoundary, DeferredChart } from './components/layout';
 
 // Components - Landing
 import { LandingHeader } from './components/landing';
@@ -8929,6 +8929,7 @@ L'équipe Salarize`;
                       €{avgTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
                     </div>
                   </div>
+                  <DeferredChart height={384}>
                   <ChartErrorBoundary>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={enrichedData} margin={{ top: 25, right: 30, left: 20, bottom: 10 }}>
@@ -9026,6 +9027,7 @@ L'équipe Salarize`;
                     </BarChart>
                   </ResponsiveContainer>
                   </ChartErrorBoundary>
+                  </DeferredChart>
                 </div>
                 );
               })() : (
@@ -9060,6 +9062,7 @@ L'équipe Salarize`;
 
           <div className="h-[380px]">
             {hoursByDeptChart.data.length > 0 && hoursByDeptChart.departments.length > 0 ? (
+              <DeferredChart height={380}>
               <ChartErrorBoundary>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hoursByDeptChart.data} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
@@ -9133,6 +9136,7 @@ L'équipe Salarize`;
                 </BarChart>
               </ResponsiveContainer>
               </ChartErrorBoundary>
+              </DeferredChart>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-slate-400">
                 <p className="font-medium text-slate-500">Aucune heure prestée disponible</p>
@@ -9658,6 +9662,7 @@ L'équipe Salarize`;
                         {/* Chart */}
                         {chartData.length > 1 ? (
                           <div className="h-64 mb-6">
+                            <DeferredChart height={256}>
                             <ChartErrorBoundary>
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart data={chartData}>
@@ -9680,6 +9685,7 @@ L'équipe Salarize`;
                               </BarChart>
                             </ResponsiveContainer>
                             </ChartErrorBoundary>
+                            </DeferredChart>
                           </div>
                         ) : (
                           <div className="bg-slate-50 rounded-xl p-8 text-center mb-6">

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ChartErrorBoundary } from '../layout';
+import { ChartErrorBoundary, DeferredChart } from '../layout';
 
 const parseLocaleNumber = (value) => {
   if (value === null || value === undefined || value === '') return 0;
@@ -259,6 +259,7 @@ function SuppliersDashboardPage({
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">Top fournisseurs par cout</h3>
             <div className="h-72">
+              <DeferredChart height={288}>
               <ChartErrorBoundary>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={bySupplier.slice(0, 10)} layout="vertical" margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
@@ -270,6 +271,7 @@ function SuppliersDashboardPage({
                   </BarChart>
                 </ResponsiveContainer>
               </ChartErrorBoundary>
+              </DeferredChart>
             </div>
           </div>
 
