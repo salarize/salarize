@@ -106,6 +106,8 @@ const DemoPage = lazy(() => import('./pages/DemoPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const TimesheetPage = lazy(() => import('./components/timesheet/TimesheetPage'));
 const SuppliersDashboardPage = lazy(() => import('./components/suppliers/SuppliersDashboardPage'));
+const OverviewPage = lazy(() => import('./components/dashboard/OverviewPage'));
+const CDRPage = lazy(() => import('./components/cdr/CDRPage'));
 
 let xlsxLoader = null;
 const loadXLSX = async () => {
@@ -204,7 +206,8 @@ function AppContent() {
   const actionsMenuRef = useRef(null);
   const [companyOrder, setCompanyOrder] = useState([]); // Ordre des sociétés dans la sidebar (drag & drop)
   const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
-  const [showSuppliersDashboard, setShowSuppliersDashboard] = useState(false);
+  // 'overview' | 'payroll' | 'suppliers' | 'cdr'
+  const [currentModule, setCurrentModule] = useState('overview');
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
   const isRecoveryModeRef = useRef(
     typeof window !== 'undefined' && 
@@ -962,7 +965,7 @@ function AppContent() {
         setActiveCompany(null);
         setEmployees([]);
         setMaterialCosts([]);
-        setShowSuppliersDashboard(false);
+        setCurrentModule('overview');
         setShowMaterialsPanel(false);
         setView('upload');
         setCurrentPage('home');
@@ -2428,7 +2431,7 @@ function AppContent() {
     setActiveCompany(null);
     setEmployees([]);
     setMaterialCosts([]);
-    setShowSuppliersDashboard(false);
+    setCurrentModule('overview');
     setShowMaterialsPanel(false);
     setView('upload');
   };
@@ -2447,6 +2450,7 @@ function AppContent() {
     setShowMaterialsPanel((c.materialCosts || []).length > 0);
     setCreatedDepartments(c.createdDepartments || []);
     setSelectedPeriods([]);
+    setCurrentModule('overview');
     setView('dashboard');
   };
 
@@ -3988,7 +3992,7 @@ function AppContent() {
     setActiveCompany(name);
     setEmployees([]);
     setMaterialCosts([]);
-    setShowSuppliersDashboard(false);
+    setCurrentModule('overview');
     setShowMaterialsPanel(false);
     setDepartmentMapping({});
     setPeriods([]);
@@ -4866,7 +4870,7 @@ L'équipe Salarize`;
     companiesRef.current = newCompanies;
     setEmployees([]);
     setMaterialCosts([]);
-    setShowSuppliersDashboard(false);
+    setCurrentModule('overview');
     setShowMaterialsPanel(false);
     setPeriods([]);
     setDepartmentMapping({});
@@ -4922,7 +4926,7 @@ L'équipe Salarize`;
       setActiveCompany(null);
       setEmployees([]);
       setMaterialCosts([]);
-      setShowSuppliersDashboard(false);
+      setCurrentModule('overview');
       setShowMaterialsPanel(false);
       setPeriods([]);
       setDepartmentMapping({});
@@ -6368,16 +6372,11 @@ L'équipe Salarize`;
             onTimesheetClick={() => setShowTimesheet(true)}
             departmentMapping={departmentMapping}
             employees={employees}
-            currentModule="payroll"
-            onPayrollClick={() => {
-              setShowSuppliersDashboard(false);
-              setSidebarOpen(false);
-            }}
-            onSuppliersClick={() => {
-              setView('dashboard');
-              setShowSuppliersDashboard(true);
-              setSidebarOpen(false);
-            }}
+            currentModule={currentModule}
+            onOverviewClick={() => { setView('dashboard'); setCurrentModule('overview'); setSidebarOpen(false); }}
+            onPayrollClick={() => { setView('dashboard'); setCurrentModule('payroll'); setSidebarOpen(false); }}
+            onSuppliersClick={() => { setView('dashboard'); setCurrentModule('suppliers'); setSidebarOpen(false); }}
+            onCDRClick={() => { setView('dashboard'); setCurrentModule('cdr'); setSidebarOpen(false); }}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -6481,7 +6480,7 @@ L'équipe Salarize`;
           activeCompany={activeCompany}
           onSelectCompany={(name) => { loadCompany(name); setSidebarOpen(false); }}
           onImportClick={() => {
-            if (showSuppliersDashboard) {
+            if (currentModule === 'suppliers') {
               setShowMaterialImportModal(true);
             } else {
               setShowImportModal(true);
@@ -6501,9 +6500,11 @@ L'équipe Salarize`;
           onTimesheetClick={() => { setShowTimesheet(true); setSidebarOpen(false); }}
           departmentMapping={departmentMapping}
           employees={employees}
-          currentModule={showSuppliersDashboard ? 'suppliers' : 'payroll'}
-          onPayrollClick={() => { setShowSuppliersDashboard(false); setSidebarOpen(false); }}
-          onSuppliersClick={() => { setShowSuppliersDashboard(true); setSidebarOpen(false); }}
+          currentModule={currentModule}
+          onOverviewClick={() => { setCurrentModule('overview'); setSidebarOpen(false); }}
+          onPayrollClick={() => { setCurrentModule('payroll'); setSidebarOpen(false); }}
+          onSuppliersClick={() => { setCurrentModule('suppliers'); setSidebarOpen(false); }}
+          onCDRClick={() => { setCurrentModule('cdr'); setSidebarOpen(false); }}
         />
         <DashboardHeader 
           user={user} 
@@ -7954,14 +7955,36 @@ L'équipe Salarize`;
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <LoadingSpinner size="lg" text="Chargement des données" subtext="Veuillez patienter..." />
           </div>
-        ) : showSuppliersDashboard ? (
+        ) : currentModule === 'overview' ? (
+          <OverviewPage
+            user={user}
+            activeCompany={activeCompany}
+            companies={companies}
+            companyOrder={companyOrder}
+            onSelectCompany={(name) => { loadCompany(name); }}
+            onOpenPayroll={() => setCurrentModule('payroll')}
+            onOpenSuppliers={() => setCurrentModule('suppliers')}
+            onOpenCDR={() => setCurrentModule('cdr')}
+            onOpenPayrollWithImport={() => { setCurrentModule('payroll'); setShowImportModal(true); }}
+            onOpenSuppliersWithImport={() => { setCurrentModule('suppliers'); setShowMaterialImportModal(true); }}
+            onOpenCDRWithImport={() => setCurrentModule('cdr')}
+          />
+        ) : currentModule === 'suppliers' ? (
           <SuppliersDashboardPage
             activeCompany={activeCompany}
             materialCosts={materialCosts}
             isViewerOnly={isViewerOnly}
-            onBackToPayroll={() => setShowSuppliersDashboard(false)}
+            onBack={() => setCurrentModule('overview')}
             onInvite={() => setShowInviteModal(true)}
             onImportFile={handleMaterialFileChange}
+          />
+        ) : currentModule === 'cdr' ? (
+          <CDRPage
+            activeCompany={activeCompany}
+            companies={companies}
+            user={user}
+            isViewerOnly={isViewerOnly}
+            onBack={() => setCurrentModule('overview')}
           />
         ) : (
         <>
@@ -8194,7 +8217,7 @@ L'équipe Salarize`;
                   onClick={() => {
                     setShowExportMenu(false);
                     setShowActionsMenu(false);
-                    setShowSuppliersDashboard(true);
+                    setCurrentModule('suppliers');
                   }}
                   className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 backdrop-blur rounded-xl transition-all text-sm font-medium text-emerald-100 border border-emerald-400/30"
                 >
@@ -8356,7 +8379,7 @@ L'équipe Salarize`;
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setShowSuppliersDashboard(true)}
+                onClick={() => setCurrentModule('suppliers')}
                 className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
               >
                 Ouvrir dashboard fournisseurs

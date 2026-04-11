@@ -39,7 +39,8 @@ function SuppliersDashboardPage({
   activeCompany,
   materialCosts = [],
   isViewerOnly,
-  onBackToPayroll,
+  onBack,
+  onBackToPayroll = onBack,
   onInvite,
   onImportFile
 }) {
