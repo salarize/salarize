@@ -114,7 +114,7 @@ function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
                     formatter={(value) => [`EUR${value.toLocaleString('fr-BE')}`, 'Cout total']}
                     contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
                   />
-                  <Bar dataKey="total" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="total" isAnimationActive={false} fill="#8B5CF6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -9007,6 +9007,7 @@ L'équipe Salarize`;
                     />
                     <Bar
                       dataKey="total"
+                      isAnimationActive={false}
                       radius={[4, 4, 0, 0]}
                       label={chartData.length <= 12 ? {
                         position: 'top',
@@ -9114,6 +9115,7 @@ L'équipe Salarize`;
                     <Bar
                       key={dept}
                       dataKey={dept}
+                      isAnimationActive={false}
                       fill={HOURS_BAR_COLORS[index % HOURS_BAR_COLORS.length]}
                       radius={[3, 3, 0, 0]}
                       maxBarSize={42}
@@ -9674,7 +9676,7 @@ L'équipe Salarize`;
                                   formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût']}
                                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                 />
-                                <Bar dataKey="cost" fill="#8B5CF6" radius={[6, 6, 0, 0]} />
+                                <Bar dataKey="cost" isAnimationActive={false} fill="#8B5CF6" radius={[6, 6, 0, 0]} />
                               </BarChart>
                             </ResponsiveContainer>
                             </ChartErrorBoundary>

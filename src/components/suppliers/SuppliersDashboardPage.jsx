@@ -266,7 +266,7 @@ function SuppliersDashboardPage({
                     <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `EUR ${(v / 1000).toFixed(0)}k`} />
                     <YAxis type="category" dataKey="supplier" width={140} tick={{ fontSize: 11, fill: '#334155' }} />
                     <Tooltip formatter={(v) => `EUR ${Number(v).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`} />
-                    <Bar dataKey="totalCost" fill="#16a34a" radius={[4, 4, 4, 4]} />
+                    <Bar dataKey="totalCost" isAnimationActive={false} fill="#16a34a" radius={[4, 4, 4, 4]} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartErrorBoundary>
