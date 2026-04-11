@@ -78,7 +78,7 @@ import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, Char
 import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
-import { Footer, PageTransition, ErrorBoundary } from './components/layout';
+import { Footer, PageTransition, ErrorBoundary, ChartErrorBoundary } from './components/layout';
 
 // Components - Landing
 import { LandingHeader } from './components/landing';
@@ -1279,7 +1279,8 @@ function AppContent() {
 
           if (materialsError) {
             const msg = String(materialsError.message || '').toLowerCase();
-            const missingTable = msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation'));
+            const missingTable = materialsError.code === 'PGRST205' || materialsError.code === '42P01' ||
+              (msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache') || msg.includes('could not find')));
             if (missingTable) {
               materialCostsTableAvailable = false;
               console.warn('[Salarize] Table material_costs absente: module matière première en mode local.');
@@ -1990,7 +1991,8 @@ function AppContent() {
 
           if (materialDeleteError) {
             const msg = String(materialDeleteError.message || '').toLowerCase();
-            const missingTable = msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation'));
+            const missingTable = materialDeleteError.code === 'PGRST205' || materialDeleteError.code === '42P01' ||
+              (msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache') || msg.includes('could not find')));
             if (missingTable) {
               materialCostsTableAvailable = false;
               console.warn('[Salarize] Table material_costs absente: sync matière première ignorée.');
@@ -8927,6 +8929,7 @@ L'équipe Salarize`;
                       €{avgTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
                     </div>
                   </div>
+                  <ChartErrorBoundary>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={enrichedData} margin={{ top: 25, right: 30, left: 20, bottom: 10 }}>
                     <defs>
@@ -9021,6 +9024,7 @@ L'équipe Salarize`;
                     </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+                  </ChartErrorBoundary>
                 </div>
                 );
               })() : (
@@ -9055,6 +9059,7 @@ L'équipe Salarize`;
 
           <div className="h-[380px]">
             {hoursByDeptChart.data.length > 0 && hoursByDeptChart.departments.length > 0 ? (
+              <ChartErrorBoundary>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hoursByDeptChart.data} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -9125,6 +9130,7 @@ L'équipe Salarize`;
                   ))}
                 </BarChart>
               </ResponsiveContainer>
+              </ChartErrorBoundary>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-slate-400">
                 <p className="font-medium text-slate-500">Aucune heure prestée disponible</p>
@@ -9650,6 +9656,7 @@ L'équipe Salarize`;
                         {/* Chart */}
                         {chartData.length > 1 ? (
                           <div className="h-64 mb-6">
+                            <ChartErrorBoundary>
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -9670,6 +9677,7 @@ L'équipe Salarize`;
                                 <Bar dataKey="cost" fill="#8B5CF6" radius={[6, 6, 0, 0]} />
                               </BarChart>
                             </ResponsiveContainer>
+                            </ChartErrorBoundary>
                           </div>
                         ) : (
                           <div className="bg-slate-50 rounded-xl p-8 text-center mb-6">
