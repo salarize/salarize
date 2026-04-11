@@ -194,8 +194,8 @@ function Sidebar({
           </div>
         )}
 
-        {/* Alerte employés non assignés */}
-        {unassignedCount > 0 && (
+        {/* Alerte employés non assignés — uniquement en module RH */}
+        {unassignedCount > 0 && isPayrollModule && (
           <div className="px-4 py-2">
             <button
               onClick={onManageDepts}
