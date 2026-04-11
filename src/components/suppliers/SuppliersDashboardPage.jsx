@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ChartErrorBoundary, DeferredChart } from '../layout';
+import { SvgHBarChart } from '../layout/SvgBarChart';
 
 const parseLocaleNumber = (value) => {
   if (value === null || value === undefined || value === '') return 0;
@@ -258,21 +257,14 @@ function SuppliersDashboardPage({
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">Top fournisseurs par cout</h3>
-            <div className="h-72">
-              <DeferredChart height={288}>
-              <ChartErrorBoundary>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={bySupplier.slice(0, 10)} layout="vertical" margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `EUR ${(v / 1000).toFixed(0)}k`} />
-                    <YAxis type="category" dataKey="supplier" width={140} tick={{ fontSize: 11, fill: '#334155' }} />
-                    <Tooltip formatter={(v) => `EUR ${Number(v).toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`} />
-                    <Bar dataKey="totalCost" isAnimationActive={false} fill="#16a34a" radius={[4, 4, 4, 4]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartErrorBoundary>
-              </DeferredChart>
-            </div>
+            <SvgHBarChart
+              data={bySupplier.slice(0, 10)}
+              labelKey="supplier"
+              valueKey="totalCost"
+              height={288}
+              color="#16a34a"
+              formatValue={(v) => `EUR ${Number(v).toLocaleString('fr-BE', { maximumFractionDigits: 0 })}`}
+            />
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-4">

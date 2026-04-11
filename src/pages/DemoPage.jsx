@@ -1,8 +1,9 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { DEMO_COMPANY, DEMO_EMPLOYEES } from '../constants';
 import Footer from '../components/layout/Footer';
-import DeferredChart from '../components/layout/DeferredChart';
+import { SvgBarChart } from '../components/layout/SvgBarChart';
+
+const MONTHS = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
   const demoTotalCost = DEMO_EMPLOYEES.filter(e => e.period === '2024-04').reduce((sum, e) => sum + e.totalCost, 0);
@@ -95,32 +96,19 @@ function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
           {/* Chart */}
           <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm border border-slate-200 mb-6">
             <h3 className="font-bold text-slate-800 mb-4">Evolution des Couts</h3>
-            <div className="h-64">
-              <DeferredChart height={256}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={demoChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis
-                    dataKey="period"
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickFormatter={(value) => {
-                      const months = ['Jan', 'Fev', 'Mar', 'Avr'];
-                      return months[parseInt(value.split('-')[1]) - 1] + " '24";
-                    }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickFormatter={(value) => `EUR${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(value) => [`EUR${value.toLocaleString('fr-BE')}`, 'Cout total']}
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-                  />
-                  <Bar dataKey="total" isAnimationActive={false} fill="#8B5CF6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-              </DeferredChart>
-            </div>
+            <SvgBarChart
+              data={demoChartData}
+              xKey="period"
+              yKey="total"
+              height={256}
+              color="#8B5CF6"
+              formatX={(v) => {
+                const m = parseInt(v.split('-')[1], 10) - 1;
+                return `${MONTHS[m]} '24`;
+              }}
+              formatY={(v) => `EUR${(v / 1000).toFixed(0)}k`}
+              formatTooltip={(d) => `EUR${d.total.toLocaleString('fr-BE')}`}
+            />
           </div>
 
           {/* Departments */}

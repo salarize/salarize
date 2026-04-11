@@ -37,7 +37,6 @@
  */
 
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine, PieChart, Pie, Cell, Legend, LabelList } from 'recharts';
 
 // ============================================
 // IMPORTS FROM MODULAR STRUCTURE
@@ -78,7 +77,8 @@ import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, Char
 import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
-import { Footer, PageTransition, ErrorBoundary, ChartErrorBoundary, DeferredChart } from './components/layout';
+import { Footer, PageTransition, ErrorBoundary } from './components/layout';
+import { SvgBarChart, SvgStackedBarChart } from './components/layout/SvgBarChart';
 
 // Components - Landing
 import { LandingHeader } from './components/landing';
@@ -8929,105 +8929,27 @@ L'équipe Salarize`;
                       €{avgTotal.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
                     </div>
                   </div>
-                  <DeferredChart height={384}>
-                  <ChartErrorBoundary>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={enrichedData} margin={{ top: 25, right: 30, left: 20, bottom: 10 }}>
-                    <defs>
-                      <linearGradient id="barGradientNormal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={`rgb(${getBrandColor()})`} stopOpacity={1}/>
-                        <stop offset="100%" stopColor={`rgb(${getBrandColor()})`} stopOpacity={0.7}/>
-                      </linearGradient>
-                      <linearGradient id="barGradientHigh" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
-                        <stop offset="100%" stopColor="#dc2626" stopOpacity={0.7}/>
-                      </linearGradient>
-                      <linearGradient id="barGradientLow" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={1}/>
-                        <stop offset="100%" stopColor="#059669" stopOpacity={0.7}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis
-                      dataKey="period"
-                      tick={{ fontSize: 11, fill: '#64748b' }}
-                      tickLine={false}
-                      axisLine={{ stroke: '#e2e8f0' }}
-                      tickFormatter={(value) => {
-                        const month = parseInt(value.substring(5), 10);
-                        const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-                        const year = value.substring(2, 4);
-                        return `${monthNames[month - 1]} '${year}`;
-                      }}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 12, fill: '#64748b' }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip
-                      cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-slate-900 p-3 rounded-lg shadow-xl border border-slate-700">
-                              <p className="text-slate-400 text-xs mb-1">{formatPeriod(label)}</p>
-                              <p className="text-white font-bold text-lg">€{data.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}</p>
-                              {data.variation !== null && (
-                                <p className={`text-sm mt-1 ${data.variation >= 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                  {data.variation >= 0 ? '↑' : '↓'} {Math.abs(data.variation).toFixed(1)}% vs mois préc.
-                                </p>
-                              )}
-                              <div className="mt-2 pt-2 border-t border-slate-700 text-xs">
-                                <p className="text-slate-400">
-                                  {data.isAboveAvg ? '⚠️ Au-dessus' : '✅ En-dessous'} de la moyenne
-                                </p>
-                                {data.isMax && <p className="text-red-400 mt-1">📈 Mois le plus coûteux</p>}
-                                {data.isMin && <p className="text-emerald-400 mt-1">📉 Mois le moins coûteux</p>}
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <ReferenceLine
-                      y={avgTotal}
-                      stroke="#6366f1"
-                      strokeDasharray="5 5"
-                      strokeWidth={2}
-                      label={{
-                        value: `Moy: €${(avgTotal / 1000).toFixed(1)}k`,
-                        position: 'right',
-                        fill: '#6366f1',
-                        fontSize: 11,
-                        fontWeight: 600
-                      }}
-                    />
-                    <Bar
-                      dataKey="total"
-                      isAnimationActive={false}
-                      radius={[4, 4, 0, 0]}
-                      label={chartData.length <= 12 ? {
-                        position: 'top',
-                        fill: '#64748b',
-                        fontSize: 10,
-                        formatter: (value) => `€${(value / 1000).toFixed(0)}k`
-                      } : false}
-                    >
-                      {enrichedData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.isAboveAvg ? 'url(#barGradientHigh)' : 'url(#barGradientLow)'}
-                        />
-                      ))}
-                    </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                  </ChartErrorBoundary>
-                  </DeferredChart>
+                  <SvgBarChart
+                    data={enrichedData}
+                    xKey="period"
+                    yKey="total"
+                    height={384}
+                    colorFn={(d) => d.isAboveAvg ? '#ef4444' : '#10b981'}
+                    formatX={(v) => {
+                      const month = parseInt(v.substring(5), 10);
+                      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                      return `${monthNames[month - 1]} '${v.substring(2, 4)}`;
+                    }}
+                    formatY={(v) => `€${(v / 1000).toFixed(0)}k`}
+                    formatTooltip={(d) => [
+                      formatPeriod(d.period),
+                      `€${d.total.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`,
+                      d.variation !== null ? `${d.variation >= 0 ? '↑' : '↓'} ${Math.abs(d.variation).toFixed(1)}% vs préc.` : null,
+                      d.isAboveAvg ? '⚠ Au-dessus moyenne' : '✓ En-dessous moyenne',
+                      d.isMax ? '↑ Mois le plus coûteux' : d.isMin ? '↓ Mois le moins coûteux' : null,
+                    ].filter(Boolean).join('\n')}
+                    referenceLine={{ value: avgTotal, label: `Moy: €${(avgTotal / 1000).toFixed(1)}k` }}
+                  />
                 </div>
                 );
               })() : (
@@ -9062,81 +8984,28 @@ L'équipe Salarize`;
 
           <div className="h-[380px]">
             {hoursByDeptChart.data.length > 0 && hoursByDeptChart.departments.length > 0 ? (
-              <DeferredChart height={380}>
-              <ChartErrorBoundary>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={hoursByDeptChart.data} margin={{ top: 20, right: 20, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis
-                    dataKey="period"
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    tickLine={false}
-                    axisLine={{ stroke: '#e2e8f0' }}
-                    tickFormatter={(value) => {
-                      const month = parseInt(value.substring(5), 10);
-                      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-                      const year = value.substring(2, 4);
-                      return `${monthNames[month - 1]} '${year}`;
-                    }}
-                  />
-                  <YAxis
-                    width={74}
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => formatHoursValue(value, true)}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(15, 23, 42, 0.04)' }}
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload || payload.length === 0) return null;
-
-                      const rows = payload
-                        .filter(item => Number(item?.value) > 0)
-                        .sort((a, b) => Number(b.value) - Number(a.value));
-
-                      const total = Number(payload[0]?.payload?.__totalHours) || 0;
-
-                      return (
-                        <div className="bg-slate-900 p-3 rounded-lg shadow-xl border border-slate-700 min-w-[240px]">
-                          <p className="text-slate-400 text-xs mb-1">{formatPeriod(label)}</p>
-                          <p className="text-white font-bold text-lg mb-2">{formatHoursValue(total)}</p>
-                          <div className="border-t border-slate-700 pt-2 space-y-1 max-h-44 overflow-y-auto">
-                            {rows.map((row) => (
-                              <div key={row.name} className="flex items-center justify-between gap-3 text-xs">
-                                <span className="text-slate-300 truncate">{row.name}</span>
-                                <span className="text-white font-medium">{formatHoursValue(row.value)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Legend />
-                  {hoursByDeptChart.departments.map((dept, index) => (
-                    <Bar
-                      key={dept}
-                      dataKey={dept}
-                      isAnimationActive={false}
-                      fill={HOURS_BAR_COLORS[index % HOURS_BAR_COLORS.length]}
-                      radius={[3, 3, 0, 0]}
-                      maxBarSize={42}
-                    >
-                      {showHoursLabels && (
-                        <LabelList
-                          dataKey={dept}
-                          position="top"
-                          formatter={(v) => (Number(v) > 0 ? Number(v).toLocaleString('fr-BE', { maximumFractionDigits: 0 }) : '')}
-                          style={{ fill: '#334155', fontSize: 10, fontWeight: 600 }}
-                        />
-                      )}
-                    </Bar>
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-              </ChartErrorBoundary>
-              </DeferredChart>
+              <SvgStackedBarChart
+                data={hoursByDeptChart.data}
+                xKey="period"
+                keys={hoursByDeptChart.departments}
+                colors={hoursByDeptChart.departments.map((_, i) => HOURS_BAR_COLORS[i % HOURS_BAR_COLORS.length])}
+                height={380}
+                formatX={(v) => {
+                  const month = parseInt(v.substring(5), 10);
+                  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                  return `${monthNames[month - 1]} '${v.substring(2, 4)}`;
+                }}
+                formatY={(v) => formatHoursValue(v, true)}
+                formatTooltip={(d, total) => [
+                  formatPeriod(d.period),
+                  `Total: ${formatHoursValue(total)}`,
+                  ...hoursByDeptChart.departments
+                    .filter(dept => Number(d[dept]) > 0)
+                    .sort((a, b) => Number(d[b]) - Number(d[a]))
+                    .map(dept => `${dept}: ${formatHoursValue(d[dept])}`)
+                ].join('\n')}
+                legendLabels={Object.fromEntries(hoursByDeptChart.departments.map(d => [d, d]))}
+              />
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-slate-400">
                 <p className="font-medium text-slate-500">Aucune heure prestée disponible</p>
@@ -9661,31 +9530,21 @@ L'équipe Salarize`;
                         
                         {/* Chart */}
                         {chartData.length > 1 ? (
-                          <div className="h-64 mb-6">
-                            <DeferredChart height={256}>
-                            <ChartErrorBoundary>
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                                <XAxis 
-                                  dataKey="period" 
-                                  tick={{ fontSize: 11, fill: '#64748B' }}
-                                  axisLine={{ stroke: '#E2E8F0' }}
-                                />
-                                <YAxis 
-                                  tick={{ fontSize: 11, fill: '#64748B' }}
-                                  axisLine={{ stroke: '#E2E8F0' }}
-                                  tickFormatter={v => `€${(v/1000).toFixed(0)}k`}
-                                />
-                                <Tooltip 
-                                  formatter={(value) => [`€${value.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`, 'Coût']}
-                                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                />
-                                <Bar dataKey="cost" isAnimationActive={false} fill="#8B5CF6" radius={[6, 6, 0, 0]} />
-                              </BarChart>
-                            </ResponsiveContainer>
-                            </ChartErrorBoundary>
-                            </DeferredChart>
+                          <div className="mb-6">
+                            <SvgBarChart
+                              data={chartData}
+                              xKey="period"
+                              yKey="cost"
+                              height={256}
+                              color="#8B5CF6"
+                              formatX={(v) => {
+                                const month = parseInt(v.substring(5), 10);
+                                const mn = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+                                return `${mn[month-1]} '${v.substring(2,4)}`;
+                              }}
+                              formatY={(v) => `€${(v/1000).toFixed(0)}k`}
+                              formatTooltip={(d) => `€${d.cost.toLocaleString('fr-BE', { minimumFractionDigits: 2 })}`}
+                            />
                           </div>
                         ) : (
                           <div className="bg-slate-50 rounded-xl p-8 text-center mb-6">
