@@ -140,7 +140,7 @@ function OverviewPage({
 
   const hasPayrollData = employees.length > 0;
   const hasSuppliersData = materialCosts.length > 0;
-  const hasCDRData = false; // CDR phase future — toujours grisé pour l'instant
+  const hasCDRData = true;
 
   const lastPayrollPeriod = getLastPeriod(employees);
   const lastSupplierPeriod = getLastMaterialMonth(materialCosts);

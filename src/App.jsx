@@ -78,7 +78,7 @@ import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, Char
 import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
-import { Footer, PageTransition, ErrorBoundary } from './components/layout';
+import { Footer, PageTransition, ErrorBoundary, Sparkline, WaterfallChart, HeatmapMatrix } from './components/layout';
 import { SvgBarChart, SvgStackedBarChart } from './components/layout/SvgBarChart';
 
 // Components - Landing
@@ -161,6 +161,15 @@ function AppContent() {
       return `${(num / 1000).toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}k h`;
     }
     return `${num.toLocaleString('fr-BE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} h`;
+  };
+
+  const parsePeriodToDate = (period) => {
+    if (!period || typeof period !== 'string') return null;
+    const [year, month] = period.split('-');
+    const y = Number(year);
+    const m = Number(month);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return null;
+    return new Date(y, m - 1, 1);
   };
 
   const [companies, setCompanies] = useState({});
@@ -277,6 +286,7 @@ function AppContent() {
   const [drillDownDept, setDrillDownDept] = useState(null); // Département sélectionné pour drill-down
   const [showYearComparison, setShowYearComparison] = useState(false); // Toggle graphique comparatif
   const [showKpiSettings, setShowKpiSettings] = useState(false); // Modal KPIs
+  const [payrollHeatCell, setPayrollHeatCell] = useState(null);
   const [visibleKpis, setVisibleKpis] = useState({
     totalCost: true,
     employees: true,
@@ -3257,7 +3267,7 @@ function AppContent() {
     };
   };
 
-  const importMaterialCostsToCompany = async (companyName, rows, sourceFileName = '') => {
+  const importMaterialCostsToCompany = async (companyName, rows, sourceFileName = '', showToast = true) => {
     if (!companyName || !Array.isArray(rows) || rows.length === 0) return;
 
     const currentCompanies = companiesRef.current;
@@ -3298,32 +3308,64 @@ function AppContent() {
     // Backup local immédiat, même si l'utilisateur est connecté (fallback si table manquante)
     saveToLocalStorage(newCompanies, companyName);
     await saveAll(newCompanies, companyName);
-    toast.success(`Matière première importée: ${rows.length} lignes (${sourceFileName || 'fichier'})`);
+    if (showToast) {
+      toast.success(`Matière première importée: ${rows.length} lignes (${sourceFileName || 'fichier'})`);
+    }
   };
 
   const handleMaterialFileChange = async (event) => {
-    const file = event?.target?.files?.[0];
-    if (!file || !activeCompany) return;
+    const selectedFiles = Array.from(event?.target?.files || []).filter(Boolean);
+    if (!selectedFiles.length || !activeCompany) return;
 
     setMaterialImportBusy(true);
     try {
-      const data = await file.arrayBuffer();
       const XLSX = await loadXLSX();
-      const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
-      const sheetName = wb.SheetNames?.[0];
-      if (!sheetName) {
-        toast.error('Fichier matière première invalide');
-        return;
+      let importedFiles = 0;
+      let importedRows = 0;
+      let skippedFiles = 0;
+
+      for (const file of selectedFiles) {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+        const sheetName = wb.SheetNames?.find((name) => {
+          const lower = String(name || '').toLowerCase();
+          return (
+            lower.includes('achat') ||
+            lower.includes('fournisseur') ||
+            lower.includes('supplier') ||
+            lower.includes('matiere') ||
+            lower.includes('material') ||
+            lower.includes('purchase') ||
+            lower.includes('data')
+          );
+        }) || wb.SheetNames?.[0];
+        if (!sheetName) {
+          skippedFiles++;
+          continue;
+        }
+        const sheet = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const parsed = parseMaterialCosts(rows, file.name, XLSX);
+        if (!parsed || !parsed.rows?.length) {
+          skippedFiles++;
+          continue;
+        }
+        await importMaterialCostsToCompany(activeCompany, parsed.rows, file.name, false);
+        importedFiles++;
+        importedRows += parsed.rows.length;
       }
-      const sheet = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-      const parsed = parseMaterialCosts(rows, file.name, XLSX);
-      if (!parsed || !parsed.rows?.length) {
-        toast.error('Format non reconnu. Vérifiez les colonnes SKU/article/fournisseur/coût.');
-        return;
+
+      if (importedFiles > 0) {
+        setShowMaterialImportModal(false);
       }
-      await importMaterialCostsToCompany(activeCompany, parsed.rows, file.name);
-      setShowMaterialImportModal(false);
+
+      if (importedFiles === 0) {
+        toast.error('Aucun fichier valide. Vérifiez les colonnes SKU/article/fournisseur/coût.');
+      } else if (skippedFiles > 0) {
+        toast.warning(`Import partiel: ${importedFiles}/${selectedFiles.length} fichiers, ${importedRows} lignes importées.`);
+      } else {
+        toast.success(`Import terminé: ${importedFiles} fichier${importedFiles > 1 ? 's' : ''}, ${importedRows} lignes.`);
+      }
     } catch (err) {
       console.error('[Salarize] Erreur import matière première:', err);
       toast.error('Erreur pendant l’import matière première');
@@ -5293,6 +5335,118 @@ L'équipe Salarize`;
     };
   }, [periods, employees]);
 
+  const latestPayrollPoint = chartData.length > 0 ? chartData[chartData.length - 1] : null;
+  const previousPayrollPoint = chartData.length > 1 ? chartData[chartData.length - 2] : null;
+  const payrollBudgetMonthly = Number(budgets?.[activeCompany]?.monthly) || null;
+
+  const payrollDeltaVsPrev = latestPayrollPoint && previousPayrollPoint
+    ? latestPayrollPoint.total - previousPayrollPoint.total
+    : null;
+  const payrollDeltaVsPrevPct = latestPayrollPoint && previousPayrollPoint && previousPayrollPoint.total > 0
+    ? ((latestPayrollPoint.total - previousPayrollPoint.total) / previousPayrollPoint.total) * 100
+    : null;
+  const payrollDeltaVsBudget = latestPayrollPoint && payrollBudgetMonthly
+    ? latestPayrollPoint.total - payrollBudgetMonthly
+    : null;
+  const payrollDeltaVsBudgetPct = latestPayrollPoint && payrollBudgetMonthly && payrollBudgetMonthly > 0
+    ? ((latestPayrollPoint.total - payrollBudgetMonthly) / payrollBudgetMonthly) * 100
+    : null;
+
+  const payrollFreshnessDays = useMemo(() => {
+    if (!latestPayrollPoint?.period) return null;
+    const pointDate = parsePeriodToDate(latestPayrollPoint.period);
+    if (!pointDate) return null;
+    const now = new Date();
+    return Math.max(0, Math.floor((now.getTime() - pointDate.getTime()) / (1000 * 60 * 60 * 24)));
+  }, [latestPayrollPoint]);
+
+  const payrollTrendSeries = useMemo(
+    () => chartData.map((item) => ({ period: item.period, total: Number(item.total) || 0 })),
+    [chartData]
+  );
+
+  const payrollDuplicateRows = useMemo(() => {
+    const seen = new Set();
+    let duplicateCount = 0;
+    employees.forEach((emp) => {
+      const key = [
+        emp.name || '',
+        emp.period || '',
+        Number(emp.totalCost || 0).toFixed(2),
+        Number(emp.paidHours || emp.paid_hours || 0).toFixed(2),
+      ].join('|');
+      if (seen.has(key)) duplicateCount += 1;
+      else seen.add(key);
+    });
+    return duplicateCount;
+  }, [employees]);
+
+  const payrollWaterfallData = useMemo(() => {
+    if (!latestPayrollPoint || !previousPayrollPoint) return [];
+    const byDeptCurrent = {};
+    const byDeptPrevious = {};
+
+    filtered.forEach((emp) => {
+      const dept = emp.department || departmentMapping[emp.name] || 'Non assigne';
+      if (emp.period === latestPayrollPoint.period) {
+        byDeptCurrent[dept] = (byDeptCurrent[dept] || 0) + Number(emp.totalCost || 0);
+      }
+      if (emp.period === previousPayrollPoint.period) {
+        byDeptPrevious[dept] = (byDeptPrevious[dept] || 0) + Number(emp.totalCost || 0);
+      }
+    });
+
+    const allDepts = [...new Set([...Object.keys(byDeptCurrent), ...Object.keys(byDeptPrevious)])];
+    return allDepts
+      .map((dept) => ({
+        key: dept,
+        label: dept,
+        value: (byDeptCurrent[dept] || 0) - (byDeptPrevious[dept] || 0),
+      }))
+      .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+      .slice(0, 12);
+  }, [latestPayrollPoint, previousPayrollPoint, filtered, departmentMapping]);
+
+  const payrollHeatPeriods = useMemo(
+    () => chartData.slice(-8).map((item) => item.period),
+    [chartData]
+  );
+
+  const payrollHeatRows = useMemo(() => {
+    const totals = {};
+    filtered.forEach((emp) => {
+      const dept = emp.department || departmentMapping[emp.name] || 'Non assigne';
+      totals[dept] = (totals[dept] || 0) + Number(emp.totalCost || 0);
+    });
+    return Object.entries(totals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([dept]) => dept);
+  }, [filtered, departmentMapping]);
+
+  const payrollHeatValues = useMemo(() => {
+    const map = {};
+    payrollHeatRows.forEach((dept) => {
+      map[dept] = {};
+      payrollHeatPeriods.forEach((period) => {
+        map[dept][period] = 0;
+      });
+    });
+    filtered.forEach((emp) => {
+      const dept = emp.department || departmentMapping[emp.name] || 'Non assigne';
+      if (!map[dept] || !Object.prototype.hasOwnProperty.call(map[dept], emp.period)) return;
+      map[dept][emp.period] += Number(emp.totalCost || 0);
+    });
+    return map;
+  }, [filtered, departmentMapping, payrollHeatRows, payrollHeatPeriods]);
+
+  const payrollDrillRows = useMemo(() => {
+    if (!drillDownDept) return [];
+    return filtered
+      .filter((emp) => (emp.department || departmentMapping[emp.name] || 'Non assigne') === drillDownDept)
+      .sort((a, b) => (b.totalCost || 0) - (a.totalCost || 0));
+  }, [drillDownDept, filtered, departmentMapping]);
+
   // Stats par département avec comparaisons
   const deptStatsWithComparison = useMemo(() => {
     if (!chartData || chartData.length === 0 || !employees || employees.length === 0) return {};
@@ -6799,11 +6953,12 @@ L'équipe Salarize`;
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              <p className="font-medium text-slate-700">Importer un fichier matière première</p>
+              <p className="font-medium text-slate-700">Importer un ou plusieurs fichiers matière première</p>
               <p className="text-slate-400 text-sm mt-1">.xlsx, .xls, .csv</p>
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv"
+                multiple
                 onChange={handleMaterialFileChange}
                 disabled={materialImportBusy}
                 className="hidden"
@@ -8043,6 +8198,7 @@ L'équipe Salarize`;
               materialCosts={materialCosts}
               isViewerOnly={isViewerOnly}
               setupIssue={materialCostsSetupIssue}
+              monthlyBudget={budgets?.[activeCompany]?.monthly || null}
               onBack={() => switchModule('overview')}
               onInvite={() => setShowInviteModal(true)}
               onImportFile={handleMaterialFileChange}
@@ -8440,6 +8596,180 @@ L'équipe Salarize`;
             <p className="text-base md:text-2xl font-bold text-slate-800">{[...new Set(filtered.map(e => e.department).filter(Boolean))].length}</p>
             <p className="text-[10px] md:text-xs text-slate-400 mt-0.5 md:mt-1">actifs</p>
           </div>
+        </div>
+
+        {(payrollDuplicateRows > 0 || (payrollFreshnessDays !== null && payrollFreshnessDays > 62)) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            {payrollDuplicateRows > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-sm font-semibold text-amber-800">Doublons potentiels detectes</p>
+                <p className="text-xs text-amber-700 mt-1">{payrollDuplicateRows} ligne(s) employee/periode identiques.</p>
+              </div>
+            )}
+            {payrollFreshnessDays !== null && payrollFreshnessDays > 62 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <p className="text-sm font-semibold text-red-700">Donnees RH possiblement obsoletes</p>
+                <p className="text-xs text-red-700 mt-1">Dernier mois charge il y a {payrollFreshnessDays} jours.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Executive overview</p>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base mt-1">Suivi decisionnel RH</h2>
+            </div>
+            {(drillDownDept || payrollHeatCell) && (
+              <button
+                onClick={() => {
+                  setDrillDownDept(null);
+                  setPayrollHeatCell(null);
+                  setSelectedPeriods([]);
+                }}
+                className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Reset cross-filter
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="text-xs text-slate-500">Current</p>
+              <p className="text-lg font-bold text-slate-900">
+                {latestPayrollPoint ? formatCurrency(latestPayrollPoint.total) : formatCurrency(totalCost)}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">{latestPayrollPoint ? formatPeriod(latestPayrollPoint.period) : 'Periode courante'}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="text-xs text-slate-500">Vs derniere periode</p>
+              <p className={`text-lg font-bold ${payrollDeltaVsPrev !== null && payrollDeltaVsPrev >= 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {payrollDeltaVsPrev === null ? 'N/A' : `${payrollDeltaVsPrev >= 0 ? '+' : '-'}${formatCurrency(Math.abs(payrollDeltaVsPrev))}`}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {payrollDeltaVsPrevPct === null ? 'Historique insuffisant' : `${payrollDeltaVsPrevPct >= 0 ? '+' : '-'}${Math.abs(payrollDeltaVsPrevPct).toFixed(1)}%`}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="text-xs text-slate-500">Vs budget</p>
+              <p className={`text-lg font-bold ${payrollDeltaVsBudget !== null && payrollDeltaVsBudget >= 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {payrollDeltaVsBudget === null ? 'N/A' : `${payrollDeltaVsBudget >= 0 ? '+' : '-'}${formatCurrency(Math.abs(payrollDeltaVsBudget))}`}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {payrollBudgetMonthly ? `Budget: ${formatCurrency(payrollBudgetMonthly)}` : 'Budget non defini'}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 p-4">
+              <p className="text-xs text-slate-500">Trend</p>
+              <div className="mt-1">
+                <Sparkline
+                  data={payrollTrendSeries}
+                  valueKey="total"
+                  width={130}
+                  height={34}
+                  color="#6366f1"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">{payrollTrendSeries.length} point(s)</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-800">Waterfall variation par departement</h3>
+                <span className="text-xs text-slate-400">Click barre = drill-through</span>
+              </div>
+              {payrollWaterfallData.length > 0 ? (
+                <WaterfallChart
+                  data={payrollWaterfallData}
+                  labelKey="label"
+                  valueKey="value"
+                  height={300}
+                  selectedKey={drillDownDept}
+                  onBarClick={(row) => {
+                    if (row.key === '__total__') return;
+                    setDrillDownDept(row.label);
+                    setPayrollHeatCell(null);
+                  }}
+                  formatValue={(v) => formatCurrency(v)}
+                />
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-sm text-slate-400">
+                  Pas assez de periodes pour calculer les variations.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-800">Heatmap cout RH (Departement x Periode)</h3>
+                <span className="text-xs text-slate-400">Click cellule = filtrer</span>
+              </div>
+              {payrollHeatRows.length > 0 && payrollHeatPeriods.length > 0 ? (
+                <HeatmapMatrix
+                  rows={payrollHeatRows}
+                  cols={payrollHeatPeriods.map((period) => formatPeriod(period))}
+                  values={Object.fromEntries(
+                    payrollHeatRows.map((dept) => [
+                      dept,
+                      Object.fromEntries(
+                        payrollHeatPeriods.map((period) => [formatPeriod(period), payrollHeatValues?.[dept]?.[period] || 0])
+                      ),
+                    ])
+                  )}
+                  selectedCell={payrollHeatCell}
+                  onCellClick={(cell) => {
+                    const sourcePeriod = payrollHeatPeriods.find((period) => formatPeriod(period) === cell.col);
+                    if (!sourcePeriod) return;
+                    setSelectedPeriods([sourcePeriod]);
+                    setPeriodFilter('all');
+                    setDrillDownDept(cell.row);
+                    setPayrollHeatCell({ row: cell.row, col: cell.col });
+                  }}
+                  height={300}
+                  formatValue={(v) => `EUR ${Math.round(v / 1000)}k`}
+                />
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-sm text-slate-400">
+                  Donnees insuffisantes pour la heatmap.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {drillDownDept && (
+            <div className="mt-4 rounded-xl border border-slate-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-slate-800">Drill-through: {drillDownDept}</h3>
+                <span className="text-xs text-slate-400">{payrollDrillRows.length} ligne(s)</span>
+              </div>
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 sticky top-0">
+                    <tr className="text-slate-500">
+                      <th className="px-2 py-2 text-left font-semibold">Periode</th>
+                      <th className="px-2 py-2 text-left font-semibold">Employe</th>
+                      <th className="px-2 py-2 text-right font-semibold">Heures</th>
+                      <th className="px-2 py-2 text-right font-semibold">Cout</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payrollDrillRows.slice(0, 120).map((row, idx) => (
+                      <tr key={`${row.name}-${row.period}-${idx}`} className="border-t border-slate-100">
+                        <td className="px-2 py-2 text-slate-600">{formatPeriod(row.period)}</td>
+                        <td className="px-2 py-2 text-slate-700">{row.name}</td>
+                        <td className="px-2 py-2 text-right text-slate-600">{Number(row.paidHours || row.paid_hours || 0).toLocaleString('fr-BE', { maximumFractionDigits: 2 })}</td>
+                        <td className="px-2 py-2 text-right font-semibold text-slate-800">{formatCurrency(Number(row.totalCost || 0))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">

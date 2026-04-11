@@ -4,6 +4,8 @@ import { useInvoiceExtraction } from './hooks/useInvoiceExtraction';
 import InvoiceReviewPanel from './InvoiceReviewPanel';
 
 const ACCEPTED = '.pdf,.png,.jpg,.jpeg,.heic,.webp';
+const ACCEPTED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.heic', '.webp'];
+const MAX_FILES = 50;
 
 function FileRow({ file, status, progress, extracting }) {
   const icon = status === 'done' ? '✓' : status === 'error' ? '✗' : '⟳';
@@ -28,15 +30,55 @@ function FileRow({ file, status, progress, extracting }) {
   );
 }
 
-export default function CDRInvoiceInjector({ companyId, categories, onUploadComplete, isViewerOnly }) {
+export default function CDRInvoiceInjector({
+  companyId,
+  categories,
+  onUploadComplete,
+  isViewerOnly,
+  title = 'Glisser-déposer vos factures ici',
+  subtitle = "PDF, PNG, JPG, HEIC — jusqu'à 50 fichiers simultanément",
+}) {
   const [files, setFiles] = useState([]); // { file, status, progress, url, id, invoiceId, extracting }
   const [pendingReview, setPendingReview] = useState([]); // { invoiceId, file, extracted }
   const [dragging, setDragging] = useState(false);
+  const [dropNotice, setDropNotice] = useState('');
   const inputRef = useRef(null);
   const { extract, canExtract } = useInvoiceExtraction();
 
+  const isAcceptedFile = (file) => {
+    const name = String(file?.name || '').toLowerCase();
+    return ACCEPTED_EXTENSIONS.some(ext => name.endsWith(ext));
+  };
+
   const addFiles = (newFiles) => {
-    const list = Array.from(newFiles).map(f => ({ file: f, status: 'pending', progress: 0, url: null, id: Math.random(), invoiceId: null, extracting: false }));
+    const incoming = Array.from(newFiles || []);
+    if (incoming.length === 0) return;
+
+    const acceptedFiles = incoming.filter(isAcceptedFile);
+    const remainingSlots = Math.max(0, MAX_FILES - files.length);
+    const selectedFiles = acceptedFiles.slice(0, remainingSlots);
+    const ignoredByType = incoming.length - acceptedFiles.length;
+    const ignoredByLimit = acceptedFiles.length - selectedFiles.length;
+
+    if (selectedFiles.length === 0) {
+      if (files.length >= MAX_FILES) {
+        setDropNotice(`Limite atteinte: ${MAX_FILES} fichiers maximum.`);
+      } else {
+        setDropNotice('Aucun fichier valide. Formats acceptés: PDF, PNG, JPG, JPEG, HEIC, WEBP.');
+      }
+      return;
+    }
+
+    if (ignoredByType > 0 || ignoredByLimit > 0) {
+      const parts = [];
+      if (ignoredByType > 0) parts.push(`${ignoredByType} fichier(s) ignoré(s) (format non supporté)`);
+      if (ignoredByLimit > 0) parts.push(`${ignoredByLimit} fichier(s) ignoré(s) (limite ${MAX_FILES})`);
+      setDropNotice(parts.join(' - '));
+    } else {
+      setDropNotice('');
+    }
+
+    const list = selectedFiles.map(f => ({ file: f, status: 'pending', progress: 0, url: null, id: Math.random(), invoiceId: null, extracting: false }));
     setFiles(prev => [...prev, ...list]);
     uploadAll(list);
   };
@@ -129,8 +171,11 @@ export default function CDRInvoiceInjector({ companyId, categories, onUploadComp
             </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-700">Glisser-déposer vos factures ici</p>
-            <p className="text-xs text-slate-400 mt-1">PDF, PNG, JPG, HEIC — jusqu'à 50 fichiers simultanément</p>
+            <p className="text-sm font-semibold text-slate-700">{title}</p>
+            <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+            {dropNotice && (
+              <p className="text-xs text-amber-600 font-medium mt-1">{dropNotice}</p>
+            )}
             {canExtract && (
               <p className="text-xs text-violet-500 font-medium mt-1">✦ Extraction automatique par IA activée</p>
             )}
