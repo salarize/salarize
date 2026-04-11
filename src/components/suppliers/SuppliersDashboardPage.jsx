@@ -47,32 +47,49 @@ function SuppliersDashboardPage({
   const [periodFilter, setPeriodFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
 
+  const normalizedRows = useMemo(() => {
+    const source = Array.isArray(materialCosts) ? materialCosts : [];
+    return source
+      .filter((row) => row && typeof row === 'object')
+      .map((row) => ({
+        ...row,
+        period: row.period || '',
+        supplier: row.supplier || 'Non renseigne',
+        article: row.article || '',
+        sku: row.sku || '',
+        barcode: row.barcode || '',
+        category: row.category || '',
+        quantity: parseLocaleNumber(row.quantity),
+        totalCost: parseLocaleNumber(row.totalCost)
+      }));
+  }, [materialCosts]);
+
   const periods = useMemo(
-    () => [...new Set(materialCosts.map((row) => row.period).filter(Boolean))].sort(),
-    [materialCosts]
+    () => [...new Set(normalizedRows.map((row) => row.period).filter(Boolean))].sort(),
+    [normalizedRows]
   );
 
   const suppliers = useMemo(
-    () => [...new Set(materialCosts.map((row) => row.supplier || 'Non renseigne'))].sort((a, b) => a.localeCompare(b)),
-    [materialCosts]
+    () => [...new Set(normalizedRows.map((row) => row.supplier))].sort((a, b) => a.localeCompare(b)),
+    [normalizedRows]
   );
 
   const filteredRows = useMemo(() => {
     const q = normalizeToken(search);
-    return materialCosts.filter((row) => {
+    return normalizedRows.filter((row) => {
       if (periodFilter !== 'all' && row.period !== periodFilter) return false;
-      if (supplierFilter !== 'all' && (row.supplier || 'Non renseigne') !== supplierFilter) return false;
+      if (supplierFilter !== 'all' && row.supplier !== supplierFilter) return false;
       if (!q) return true;
-      const text = normalizeToken(`${row.article || ''} ${row.sku || ''} ${row.barcode || ''} ${row.supplier || ''} ${row.category || ''}`);
+      const text = normalizeToken(`${row.article} ${row.sku} ${row.barcode} ${row.supplier} ${row.category}`);
       return text.includes(q);
     });
-  }, [materialCosts, periodFilter, supplierFilter, search]);
+  }, [normalizedRows, periodFilter, supplierFilter, search]);
 
   const kpis = useMemo(() => {
-    const totalCost = filteredRows.reduce((sum, row) => sum + parseLocaleNumber(row.totalCost), 0);
-    const totalQty = filteredRows.reduce((sum, row) => sum + parseLocaleNumber(row.quantity), 0);
+    const totalCost = filteredRows.reduce((sum, row) => sum + row.totalCost, 0);
+    const totalQty = filteredRows.reduce((sum, row) => sum + row.quantity, 0);
     const articleCount = new Set(filteredRows.map((row) => row.sku || row.barcode || row.article).filter(Boolean)).size;
-    const supplierCount = new Set(filteredRows.map((row) => row.supplier || 'Non renseigne')).size;
+    const supplierCount = new Set(filteredRows.map((row) => row.supplier)).size;
     return {
       totalCost,
       totalQty,
@@ -85,12 +102,12 @@ function SuppliersDashboardPage({
   const bySupplier = useMemo(() => {
     const grouped = {};
     filteredRows.forEach((row) => {
-      const supplier = row.supplier || 'Non renseigne';
+      const supplier = row.supplier;
       if (!grouped[supplier]) {
         grouped[supplier] = { supplier, totalCost: 0, totalQty: 0, articles: new Set() };
       }
-      grouped[supplier].totalCost += parseLocaleNumber(row.totalCost);
-      grouped[supplier].totalQty += parseLocaleNumber(row.quantity);
+      grouped[supplier].totalCost += row.totalCost;
+      grouped[supplier].totalQty += row.quantity;
       grouped[supplier].articles.add(row.sku || row.barcode || row.article);
     });
     return Object.values(grouped)
@@ -111,16 +128,16 @@ function SuppliersDashboardPage({
         grouped[key] = {
           key,
           article: row.article || key,
-          sku: row.sku || '',
-          barcode: row.barcode || '',
+          sku: row.sku,
+          barcode: row.barcode,
           totalCost: 0,
           totalQty: 0,
           suppliers: new Set()
         };
       }
-      grouped[key].totalCost += parseLocaleNumber(row.totalCost);
-      grouped[key].totalQty += parseLocaleNumber(row.quantity);
-      grouped[key].suppliers.add(row.supplier || 'Non renseigne');
+      grouped[key].totalCost += row.totalCost;
+      grouped[key].totalQty += row.quantity;
+      grouped[key].suppliers.add(row.supplier);
     });
     return Object.values(grouped)
       .map((entry) => ({
