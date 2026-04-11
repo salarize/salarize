@@ -218,17 +218,17 @@ function Sidebar({
         {activeCompany && (
           <div className="px-4 py-3 border-b border-slate-800/50">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 mb-2">Navigation</p>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-0.5">
               {/* Vue d'ensemble */}
               <button
                 onClick={onOverviewClick}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
                   isOverviewModule
-                    ? 'bg-slate-600/50 border border-slate-500/50 text-white'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    ? 'bg-slate-700/60 border border-slate-600/50 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
                 Vue d'ensemble
@@ -236,13 +236,13 @@ function Sidebar({
               {/* Coûts salariaux */}
               <button
                 onClick={onPayrollClick}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
                   isPayrollModule
                     ? 'bg-violet-500/20 border border-violet-400/40 text-violet-200'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Coûts salariaux
@@ -250,13 +250,13 @@ function Sidebar({
               {/* Coûts fournisseurs */}
               <button
                 onClick={onSuppliersClick}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
                   isSuppliersModule
                     ? 'bg-emerald-500/20 border border-emerald-400/40 text-emerald-200'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
                 Coûts fournisseurs
@@ -264,13 +264,13 @@ function Sidebar({
               {/* CDR & Closers */}
               <button
                 onClick={onCDRClick}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
                   isCDRModule
                     ? 'bg-amber-500/20 border border-amber-400/40 text-amber-200'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 CDR & Closers
@@ -362,71 +362,79 @@ function Sidebar({
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3 px-1">
                 <div className="w-1.5 h-5 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full"></div>
-                <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase">Partagées</p>
+                <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase">Partagées avec moi</p>
                 <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent"></div>
+                <span className="text-[10px] font-bold text-emerald-500/70 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">{sharedCompanies.length}</span>
               </div>
 
-              <div className="space-y-1">
-                {sharedCompanies.map(([name, company]) => (
-                  <div
-                    key={name}
-                    draggable={!isViewerOnly}
-                    onDragStart={(e) => handleDragStart(e, name)}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={(e) => handleDragOver(e, name)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, name, true)}
-                    className={`relative transition-all duration-200 ${
-                      dragOverCompany === name ? 'transform translate-y-1' : ''
-                    }`}
-                  >
-                    {dragOverCompany === name && draggedCompany !== name && (
-                      <div className="absolute -top-0.5 left-2 right-2 h-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full shadow-lg shadow-emerald-500/50" />
-                    )}
-
-                    <button
-                      onClick={() => onSelectCompany(name)}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center gap-3 group ${
-                        activeCompany === name
-                          ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
-                          : 'hover:bg-slate-800/70 border border-transparent'
-                      } ${draggedCompany === name ? 'opacity-50' : ''} ${!isViewerOnly ? 'cursor-grab active:cursor-grabbing' : ''}`}
+              <div className="space-y-2">
+                {sharedCompanies.map(([name, company]) => {
+                  const isActive = activeCompany === name;
+                  const isEditor = company.sharedRole === 'editor';
+                  return (
+                    <div
+                      key={name}
+                      onDragOver={(e) => handleDragOver(e, name)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, name, true)}
+                      className={`relative transition-all duration-200 ${dragOverCompany === name ? 'transform translate-y-1' : ''}`}
                     >
-                      {!isViewerOnly && (
-                        <div className="w-4 flex flex-col gap-0.5 opacity-30 group-hover:opacity-60 transition-opacity flex-shrink-0">
-                          <div className="w-full h-0.5 bg-current rounded-full"></div>
-                          <div className="w-full h-0.5 bg-current rounded-full"></div>
-                          <div className="w-full h-0.5 bg-current rounded-full"></div>
-                        </div>
+                      {dragOverCompany === name && draggedCompany !== name && (
+                        <div className="absolute -top-0.5 left-2 right-2 h-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full" />
                       )}
-
-                      {company?.logo ? (
-                        <img src={company.logo} alt="" className="w-8 h-8 rounded-lg object-cover ring-2 ring-slate-700/50" />
-                      ) : (
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                          activeCompany === name
-                            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white'
-                            : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {name.charAt(0)}
+                      <button
+                        onClick={() => onSelectCompany(name)}
+                        className={`w-full text-left rounded-xl transition-all group overflow-hidden ${
+                          isActive
+                            ? 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
+                            : 'bg-slate-800/30 border border-slate-700/30 hover:border-slate-600/50 hover:bg-slate-800/60'
+                        }`}
+                      >
+                        {/* Top strip accent */}
+                        <div className={`h-0.5 w-full ${isActive ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-slate-700 to-slate-700'} group-hover:from-emerald-600 group-hover:to-teal-500 transition-all`} />
+                        <div className="px-3 py-2.5 flex items-center gap-3">
+                          {/* Logo */}
+                          {company?.logo ? (
+                            <img src={company.logo} alt="" className="w-8 h-8 rounded-lg object-cover ring-1 ring-white/10 flex-shrink-0" />
+                          ) : (
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black flex-shrink-0 ${
+                              isActive
+                                ? 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white'
+                                : 'bg-slate-700 text-slate-300'
+                            }`}>
+                              {name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-slate-200'}`}>{name}</p>
+                            {company.invitedBy && (
+                              <p className="text-[10px] text-slate-500 truncate">via {company.invitedBy}</p>
+                            )}
+                          </div>
+                          {/* Role badge */}
+                          <span className={`flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isEditor
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-slate-700/60 text-slate-400 border border-slate-600/30'
+                          }`}>
+                            {isEditor ? (
+                              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                            {isEditor ? 'EDIT' : 'LECTURE'}
+                          </span>
                         </div>
-                      )}
-
-                      <span className={`truncate font-medium flex-1 ${
-                        activeCompany === name ? 'text-white' : 'text-slate-300'
-                      }`}>{name}</span>
-
-                      {/* Role badge */}
-                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
-                        company.sharedRole === 'editor'
-                          ? 'bg-emerald-500/30 text-emerald-300'
-                          : 'bg-slate-700 text-slate-400'
-                      }`}>
-                        {company.sharedRole === 'editor' ? 'EDIT' : 'VIEW'}
-                      </span>
-                    </button>
-                  </div>
-                ))}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -486,17 +494,19 @@ function Sidebar({
         {activeCompany && hasCompanies && (
           <div className="p-4 border-t border-slate-800/50 bg-slate-950/50">
             <div className="flex items-center gap-2">
-              {/* Mes équipes */}
-              <button
-                onClick={onManageDepts}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 border border-violet-500/20 rounded-xl transition-all group"
-                title="Gérer mes équipes"
-              >
-                <svg className="w-4 h-4 text-violet-400 group-hover:text-violet-300 group-hover:scale-110 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span className="text-xs font-semibold text-violet-300 group-hover:text-violet-200">Équipes</span>
-              </button>
+              {/* Équipes — uniquement en module RH */}
+              {isPayrollModule && (
+                <button
+                  onClick={onManageDepts}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 border border-violet-500/20 rounded-xl transition-all group"
+                  title="Gérer mes équipes"
+                >
+                  <svg className="w-4 h-4 text-violet-400 group-hover:text-violet-300 group-hover:scale-110 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span className="text-xs font-semibold text-violet-300 group-hover:text-violet-200">Équipes</span>
+                </button>
+              )}
 
               {/* Paramètres société */}
               {!isViewerOnly && (
