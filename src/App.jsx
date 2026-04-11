@@ -8772,34 +8772,6 @@ L'équipe Salarize`;
           )}
         </div>
 
-        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Plateforme unifiée</p>
-              <h2 className="font-bold text-slate-800 text-sm sm:text-base mt-1">Module coûts fournisseurs</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Tableau distinct du module salaires, inspiré d'un pilotage achats type ERP.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => switchModule('suppliers')}
-                className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-              >
-                Ouvrir dashboard fournisseurs
-              </button>
-              {!isViewerOnly && (
-                <button
-                  onClick={() => setShowMaterialImportModal(true)}
-                  className="px-3 py-2 text-xs sm:text-sm font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  Importer achats
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Data Manager Modal */}
         {showDataManager && (
           <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 pt-20 overflow-y-auto">

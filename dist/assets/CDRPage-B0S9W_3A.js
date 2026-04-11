@@ -1,4 +1,4 @@
-import{r as f,s as z,n as ce,j as e,R as H,a as ue,W as pe}from"./index-DZj-zLfX.js";import"./vendor-supabase-DfwcnzK-.js";const he=`-- Executer le script complet:
+import{r as f,s as z,n as ce,j as e,R as H,a as ue,W as pe}from"./index-D-nyx1X6.js";import"./vendor-supabase-DfwcnzK-.js";const he=`-- Executer le script complet:
 -- supabase_cdr_migration.sql
 
 -- Verification rapide:
