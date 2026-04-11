@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../config/supabase';
+import { useInvoiceExtraction } from './hooks/useInvoiceExtraction';
+import InvoiceReviewPanel from './InvoiceReviewPanel';
 
 const ACCEPTED = '.pdf,.png,.jpg,.jpeg,.heic,.webp';
 
-function FileRow({ file, status, progress }) {
+function FileRow({ file, status, progress, extracting }) {
   const icon = status === 'done' ? '✓' : status === 'error' ? '✗' : '⟳';
   const color = status === 'done' ? 'text-emerald-600' : status === 'error' ? 'text-red-500' : 'text-violet-500';
   return (
@@ -16,25 +18,31 @@ function FileRow({ file, status, progress }) {
           <div className="h-full bg-violet-500 transition-all rounded-full" style={{ width: `${progress}%` }} />
         </div>
       )}
+      {extracting && (
+        <div className="flex items-center gap-1 text-[10px] text-violet-500 font-medium">
+          <div className="w-2.5 h-2.5 border border-violet-400 border-t-transparent rounded-full animate-spin" />
+          IA...
+        </div>
+      )}
     </div>
   );
 }
 
 export default function CDRInvoiceInjector({ companyId, categories, onUploadComplete, isViewerOnly }) {
-  const [files, setFiles] = useState([]); // { file, status, progress, url }
+  const [files, setFiles] = useState([]); // { file, status, progress, url, id, invoiceId, extracting }
+  const [pendingReview, setPendingReview] = useState([]); // { invoiceId, file, extracted }
   const [dragging, setDragging] = useState(false);
-  const [manualForm, setManualForm] = useState(null); // invoice being manually filled
   const inputRef = useRef(null);
-  const leaves = categories.filter(c => !categories.some(p => p.parent_id === c.id));
+  const { extract, canExtract } = useInvoiceExtraction();
 
   const addFiles = (newFiles) => {
-    const list = Array.from(newFiles).map(f => ({ file: f, status: 'pending', progress: 0, url: null, id: Math.random() }));
+    const list = Array.from(newFiles).map(f => ({ file: f, status: 'pending', progress: 0, url: null, id: Math.random(), invoiceId: null, extracting: false }));
     setFiles(prev => [...prev, ...list]);
     uploadAll(list);
   };
 
   const uploadAll = async (list) => {
-    const CONCURRENCY = 5;
+    const CONCURRENCY = 3;
     let idx = 0;
     const next = async () => {
       if (idx >= list.length) return;
@@ -50,30 +58,54 @@ export default function CDRInvoiceInjector({ companyId, categories, onUploadComp
     setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'uploading', progress: 10 } : f));
     try {
       const path = `${companyId}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Date.now()}_${item.file.name}`;
-      const { data, error } = await supabase.storage.from('invoices').upload(path, item.file);
-      if (error) throw error;
+      const { error: storageErr } = await supabase.storage.from('invoices').upload(path, item.file);
+      if (storageErr) throw storageErr;
+
       const { data: { publicUrl } } = supabase.storage.from('invoices').getPublicUrl(path);
 
-      // Create invoice record
-      const { error: dbErr } = await supabase.from('invoices').insert({
+      const { data: inv, error: dbErr } = await supabase.from('invoices').insert({
         company_id: companyId,
         file_url: publicUrl,
         file_name: item.file.name,
         status: 'pending',
         extracted_by_ai: false,
-      });
+      }).select('id').single();
       if (dbErr) throw dbErr;
 
-      setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'done', progress: 100, url: publicUrl } : f));
+      const invoiceId = inv.id;
+      setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'done', progress: 100, url: publicUrl, invoiceId } : f));
+
+      // AI extraction (file still in memory)
+      if (canExtract) {
+        setFiles(prev => prev.map(f => f.id === item.id ? { ...f, extracting: true } : f));
+        try {
+          const extracted = await extract(item.file);
+          setPendingReview(prev => [...prev, { invoiceId, file: item.file, extracted }]);
+        } catch {
+          // Extraction failed — still queue for manual review
+          setPendingReview(prev => [...prev, { invoiceId, file: item.file, extracted: null }]);
+        } finally {
+          setFiles(prev => prev.map(f => f.id === item.id ? { ...f, extracting: false } : f));
+        }
+      } else {
+        // No API key — queue for manual entry
+        setPendingReview(prev => [...prev, { invoiceId, file: item.file, extracted: null }]);
+      }
     } catch (e) {
       setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error' } : f));
     }
+  };
+
+  const handleReviewDone = (invoiceId) => {
+    setPendingReview(prev => prev.filter(r => r.invoiceId !== invoiceId));
+    onUploadComplete?.();
   };
 
   if (isViewerOnly) return null;
 
   const done = files.filter(f => f.status === 'done').length;
   const total = files.length;
+  const anyExtracting = files.some(f => f.extracting);
 
   return (
     <div className="space-y-4">
@@ -95,6 +127,9 @@ export default function CDRInvoiceInjector({ companyId, categories, onUploadComp
           <div>
             <p className="text-sm font-semibold text-slate-700">Glisser-déposer vos factures ici</p>
             <p className="text-xs text-slate-400 mt-1">PDF, PNG, JPG, HEIC — jusqu'à 50 fichiers simultanément</p>
+            {canExtract && (
+              <p className="text-xs text-violet-500 font-medium mt-1">✦ Extraction automatique par IA activée</p>
+            )}
           </div>
           <span className="px-4 py-2 bg-violet-600 text-white text-xs font-semibold rounded-xl hover:bg-violet-700 transition-colors">
             Choisir des fichiers
@@ -107,7 +142,11 @@ export default function CDRInvoiceInjector({ companyId, categories, onUploadComp
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-semibold text-slate-600">
-              {done < total ? `Traitement : ${done}/${total} factures` : `${total} facture${total > 1 ? 's' : ''} uploadée${total > 1 ? 's' : ''}`}
+              {done < total
+                ? `Traitement : ${done}/${total} factures`
+                : anyExtracting
+                  ? `${total} facture${total > 1 ? 's' : ''} uploadée${total > 1 ? 's' : ''} — extraction IA en cours...`
+                  : `${total} facture${total > 1 ? 's' : ''} uploadée${total > 1 ? 's' : ''}`}
             </p>
             {done > 0 && done < total && (
               <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -117,14 +156,31 @@ export default function CDRInvoiceInjector({ companyId, categories, onUploadComp
           </div>
           <div className="max-h-40 overflow-y-auto">
             {files.map(item => (
-              <FileRow key={item.id} file={item.file} status={item.status} progress={item.progress} />
+              <FileRow key={item.id} file={item.file} status={item.status} progress={item.progress} extracting={item.extracting} />
             ))}
           </div>
-          {done === total && total > 0 && (
-            <p className="mt-3 text-xs text-emerald-600 font-medium text-center">
-              ✓ Toutes les factures ont été uploadées. Rendez-vous dans l'onglet "Factures" pour les valider.
+        </div>
+      )}
+
+      {/* Review panels */}
+      {pendingReview.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-slate-100" />
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              {pendingReview.length} facture{pendingReview.length > 1 ? 's' : ''} à valider
             </p>
-          )}
+            <div className="flex-1 h-px bg-slate-100" />
+          </div>
+          {pendingReview.map(item => (
+            <InvoiceReviewPanel
+              key={item.invoiceId}
+              item={item}
+              categories={categories}
+              companyId={companyId}
+              onDone={() => handleReviewDone(item.invoiceId)}
+            />
+          ))}
         </div>
       )}
     </div>

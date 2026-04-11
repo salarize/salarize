@@ -4,6 +4,7 @@ import { useCDRData } from './hooks/useCDRData';
 import CDRTable from './CDRTable';
 import CDRImportModal from './CDRImportModal';
 import CDRInvoiceInjector from './CDRInvoiceInjector';
+import InvoiceReviewPanel from './InvoiceReviewPanel';
 import ClosersDashboard from './closers/ClosersDashboard';
 
 const TABS = [
@@ -24,6 +25,7 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
   const [viewMode, setViewMode] = useState('real');
   const [year, setYear] = useState(new Date().getFullYear());
   const [showImport, setShowImport] = useState(false);
+  const [reviewingInvoice, setReviewingInvoice] = useState(null); // invoice row being manually validated
 
   const { categories, entries, budget, invoices, loading, error, reload, upsertEntry, upsertBudget, updateCategoryStatus } = useCDRData(companyId);
 
@@ -208,8 +210,43 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
                 />
               )}
 
+              {/* Inline review panel for manually validating a pending invoice */}
+              {reviewingInvoice && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setReviewingInvoice(null)}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Retour à la liste
+                  </button>
+                  <InvoiceReviewPanel
+                    item={{
+                      invoiceId: reviewingInvoice.id,
+                      file: null,
+                      fileName: reviewingInvoice.file_name,
+                      fileUrl: reviewingInvoice.file_url,
+                      extracted: {
+                        supplier_name: reviewingInvoice.supplier_name || '',
+                        invoice_date: reviewingInvoice.invoice_date || '',
+                        amount_ht: reviewingInvoice.amount_ht ?? '',
+                        amount_tva: reviewingInvoice.amount_tva ?? '',
+                        amount_ttc: reviewingInvoice.amount_ttc ?? '',
+                        is_closer_invoice: reviewingInvoice.is_closer_invoice || false,
+                        closer_lines: [],
+                      },
+                    }}
+                    categories={categories}
+                    companyId={companyId}
+                    onDone={() => { setReviewingInvoice(null); reload(); }}
+                  />
+                </div>
+              )}
+
               {/* Invoice list */}
-              {invoices.length > 0 ? (
+              {!reviewingInvoice && invoices.length > 0 ? (
                 <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
                   <table className="w-full border-collapse">
                     <thead>
@@ -249,18 +286,28 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            {inv.file_url && (
-                              <a href={inv.file_url} target="_blank" rel="noreferrer" className="text-xs text-violet-600 hover:underline font-medium">
-                                Voir
-                              </a>
-                            )}
+                            <div className="flex items-center gap-3 justify-end">
+                              {inv.status === 'pending' && !isViewerOnly && (
+                                <button
+                                  onClick={() => setReviewingInvoice(inv)}
+                                  className="text-xs text-amber-700 font-semibold hover:text-amber-900 transition-colors"
+                                >
+                                  Valider
+                                </button>
+                              )}
+                              {inv.file_url && (
+                                <a href={inv.file_url} target="_blank" rel="noreferrer" className="text-xs text-violet-600 hover:underline font-medium">
+                                  Voir
+                                </a>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              ) : (
+              ) : !reviewingInvoice ? (
                 <div className="text-center py-16 text-slate-400">
                   <svg className="w-10 h-10 text-slate-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -268,7 +315,7 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
                   <p className="text-sm font-medium text-slate-400">Aucune facture uploadée</p>
                   <p className="text-xs text-slate-300 mt-1">Utilisez la zone ci-dessus pour déposer vos factures</p>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
         </>
