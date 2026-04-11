@@ -144,7 +144,7 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
         {TABS.map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => { setTab(t.key); setReviewingInvoice(null); }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${
               tab === t.key
                 ? 'border-violet-600 text-violet-600'

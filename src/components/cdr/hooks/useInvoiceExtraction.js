@@ -1,9 +1,8 @@
-import { useState } from 'react';
-
 const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const SUPPORTED_PDF_TYPE = 'application/pdf';
+const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB — Anthropic API document limit
 
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -58,9 +57,6 @@ Règles:
 - Tous les montants sont en euros, valeurs numériques sans symbole`;
 
 export function useInvoiceExtraction() {
-  const [extracting, setExtracting] = useState(false);
-  const [error, setError] = useState(null);
-
   const canExtract = !!API_KEY;
 
   const extract = async (file) => {
@@ -73,8 +69,9 @@ export function useInvoiceExtraction() {
       throw new Error(`Format non supporté pour l'extraction IA: ${file.name}`);
     }
 
-    setExtracting(true);
-    setError(null);
+    if (file.size > MAX_FILE_BYTES) {
+      throw new Error(`Fichier trop volumineux (${(file.size / 1024 / 1024).toFixed(1)} Mo) — limite 5 Mo pour l'extraction IA`);
+    }
 
     try {
       const base64 = await fileToBase64(file);
@@ -125,12 +122,9 @@ export function useInvoiceExtraction() {
 
       return extracted;
     } catch (e) {
-      setError(e.message);
       throw e;
-    } finally {
-      setExtracting(false);
     }
   };
 
-  return { extract, extracting, error, canExtract };
+  return { extract, canExtract };
 }

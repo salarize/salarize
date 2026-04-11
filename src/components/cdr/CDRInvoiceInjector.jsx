@@ -57,7 +57,11 @@ export default function CDRInvoiceInjector({ companyId, categories, onUploadComp
   const uploadOne = async (item) => {
     setFiles(prev => prev.map(f => f.id === item.id ? { ...f, status: 'uploading', progress: 10 } : f));
     try {
-      const path = `${companyId}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Date.now()}_${item.file.name}`;
+      const safeName = item.file.name
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents
+        .replace(/[^a-zA-Z0-9._-]/g, '_')                // replace unsafe chars
+        .replace(/_+/g, '_');                             // collapse consecutive underscores
+      const path = `${companyId}/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Date.now()}_${safeName}`;
       const { error: storageErr } = await supabase.storage.from('invoices').upload(path, item.file);
       if (storageErr) throw storageErr;
 

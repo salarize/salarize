@@ -89,6 +89,14 @@ export default function InvoiceReviewPanel({ item, categories, companyId, onDone
     setSaving(true);
     setSaveError(null);
     try {
+      // Guard: re-fetch invoice status to prevent double-validation
+      const { data: current } = await supabase
+        .from('invoices').select('status').eq('id', invoiceId).single();
+      if (current?.status === 'validated') {
+        onDone('validated');
+        return;
+      }
+
       const updateData = {
         supplier_name: form.supplier_name || null,
         invoice_date: form.invoice_date || null,
@@ -149,15 +157,28 @@ export default function InvoiceReviewPanel({ item, categories, companyId, onDone
         });
         if (entryErr) throw entryErr;
 
-        // Update supplier category hint
+        // Update supplier category hint — increment times_confirmed
         if (form.supplier_name) {
           const normalized = form.supplier_name.toLowerCase().trim();
-          await supabase.from('supplier_category_hints').upsert({
-            company_id: companyId,
-            supplier_name_normalized: normalized,
-            category_id: form.category_id,
-            times_confirmed: 1,
-          }, { onConflict: 'company_id,supplier_name_normalized' });
+          const { data: existing } = await supabase
+            .from('supplier_category_hints')
+            .select('id, times_confirmed')
+            .eq('company_id', companyId)
+            .eq('supplier_name_normalized', normalized)
+            .maybeSingle();
+          if (existing) {
+            await supabase
+              .from('supplier_category_hints')
+              .update({ category_id: form.category_id, times_confirmed: (existing.times_confirmed || 0) + 1 })
+              .eq('id', existing.id);
+          } else {
+            await supabase.from('supplier_category_hints').insert({
+              company_id: companyId,
+              supplier_name_normalized: normalized,
+              category_id: form.category_id,
+              times_confirmed: 1,
+            });
+          }
         }
       }
 
