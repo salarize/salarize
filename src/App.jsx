@@ -219,6 +219,8 @@ function AppContent() {
   const [lastSaved, setLastSaved] = useState(null);
   const dataLoadedRef = useRef(false); // Track si les données ont déjà été chargées
   const companiesRef = useRef({}); // Ref pour tracker companies en temps réel (pour imports multiples)
+  const importAuditDisabledRef = useRef(false);
+  const importAuditWarningShownRef = useRef(false);
   const exportMenuRef = useRef(null);
   const actionsMenuRef = useRef(null);
   const [companyOrder, setCompanyOrder] = useState([]); // Ordre des sociétés dans la sidebar (drag & drop)
@@ -1645,6 +1647,27 @@ function AppContent() {
       });
     }
 
+    // Protéger aussi les coûts matière première
+    if (existingDbData && existingDbData.materialCount > 0) {
+      const newMaterialCount = newData.materialCosts?.length || 0;
+      const existingMaterialCount = existingDbData.materialCount;
+
+      if (newMaterialCount === 0) {
+        issues.push({
+          type: 'EMPTY_MATERIAL_DATA',
+          message: `Tentative de supprimer tous les coûts matière première (${existingMaterialCount} -> 0)`,
+          existingCount: existingMaterialCount
+        });
+      } else if (newMaterialCount < existingMaterialCount * 0.5) {
+        warnings.push({
+          type: 'MATERIAL_DATA_DROP',
+          message: `Baisse importante des coûts matière première: ${existingMaterialCount} -> ${newMaterialCount} lignes`,
+          existingCount: existingMaterialCount,
+          newCount: newMaterialCount
+        });
+      }
+    }
+
     return { issues, warnings, isValid: issues.length === 0 };
   };
 
@@ -1790,6 +1813,7 @@ function AppContent() {
         }
 
         let paidHoursColumnAvailable = true;
+        let currentDbMaterials = [];
 
         // Récupérer l'état actuel de la DB AVANT modification
         // Note: Supabase limite par défaut à 1000 lignes
@@ -1824,10 +1848,33 @@ function AppContent() {
           currentDbEmployees = [];
         }
 
+        // Lire aussi les coûts matière première DB pour protection anti-perte
+        if (materialCostsTableAvailable) {
+          const { data: dbMaterialsData, error: dbMaterialsError } = await supabase
+            .from('material_costs')
+            .select('period, sku, barcode, article_name, supplier, category, unit, quantity, unit_cost, total_cost')
+            .eq('company_id', companyId)
+            .limit(10000);
+
+          if (dbMaterialsError) {
+            const normalizedError = normalizePostgrestError(dbMaterialsError, { target: 'material_costs' });
+            if (normalizedError.isMissingSchema) {
+              materialCostsTableAvailable = false;
+              materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(dbMaterialsError);
+              console.warn('[Salarize] Table material_costs absente: validation matière première ignorée.');
+            } else {
+              console.error('[Salarize] Erreur lecture material_costs:', dbMaterialsError);
+            }
+          } else {
+            currentDbMaterials = dbMaterialsData || [];
+          }
+        }
+
         const dbState = {
           employeeCount: currentDbEmployees?.length || 0,
           periodCount: [...new Set((currentDbEmployees || []).map(e => e.period))].length,
-          periods: [...new Set((currentDbEmployees || []).map(e => e.period))].sort()
+          periods: [...new Set((currentDbEmployees || []).map(e => e.period))].sort(),
+          materialCount: currentDbMaterials?.length || 0
         };
 
         console.log(`[Salarize] État actuel DB: ${dbState.employeeCount} employés, ${dbState.periodCount} périodes`);
@@ -1854,12 +1901,23 @@ function AppContent() {
           });
 
           // Créer un backup de l'état actuel de la DB au cas où
-          if (dbState.employeeCount > 0) {
+          if (dbState.employeeCount > 0 || dbState.materialCount > 0) {
             const backupData = {
               employees: currentDbEmployees,
               periods: dbState.periods,
               mapping: latestCompanyData.mapping,
-              materialCosts: latestCompanyData.materialCosts || []
+              materialCosts: (currentDbMaterials || []).map((entry) => ({
+                period: entry.period || 'Unknown',
+                sku: entry.sku || '',
+                barcode: entry.barcode || '',
+                article: entry.article_name || '',
+                supplier: entry.supplier || 'Non renseigné',
+                category: entry.category || '',
+                unit: entry.unit || '',
+                quantity: parseLocaleNumber(entry.quantity),
+                unitCost: parseLocaleNumber(entry.unit_cost),
+                totalCost: parseLocaleNumber(entry.total_cost)
+              }))
             };
             createLocalBackup(companyName, backupData);
           }
@@ -1869,12 +1927,23 @@ function AppContent() {
         }
 
         // CRÉER UN BACKUP AVANT MODIFICATION
-        if (dbState.employeeCount > 0) {
+        if (dbState.employeeCount > 0 || dbState.materialCount > 0) {
           createLocalBackup(companyName, {
             employees: currentDbEmployees,
             periods: dbState.periods,
             mapping: latestCompanyData.mapping,
-            materialCosts: latestCompanyData.materialCosts || []
+            materialCosts: (currentDbMaterials || []).map((entry) => ({
+              period: entry.period || 'Unknown',
+              sku: entry.sku || '',
+              barcode: entry.barcode || '',
+              article: entry.article_name || '',
+              supplier: entry.supplier || 'Non renseigné',
+              category: entry.category || '',
+              unit: entry.unit || '',
+              quantity: parseLocaleNumber(entry.quantity),
+              unitCost: parseLocaleNumber(entry.unit_cost),
+              totalCost: parseLocaleNumber(entry.total_cost)
+            }))
           });
         }
 
@@ -2023,52 +2092,57 @@ function AppContent() {
         // SYNC COÛTS MATIÈRE PREMIÈRE (optionnel si table disponible)
         const materialEntries = latestCompanyData.materialCosts || [];
         if (materialCostsTableAvailable) {
-          const { error: materialDeleteError } = await supabase
-            .from('material_costs')
-            .delete()
-            .eq('company_id', companyId);
+          if (materialEntries.length === 0 && currentDbMaterials.length > 0) {
+            console.warn(`[Salarize] ⚠️ Protection active: sync material_costs ignorée pour ${companyName} (${currentDbMaterials.length} lignes en DB, 0 en local).`);
+            toast.warning(`Protection active: coûts matière non écrasés pour ${companyName}`);
+          } else {
+            const { error: materialDeleteError } = await supabase
+              .from('material_costs')
+              .delete()
+              .eq('company_id', companyId);
 
-          if (materialDeleteError) {
-            const normalizedError = normalizePostgrestError(materialDeleteError, { target: 'material_costs' });
-            if (normalizedError.isMissingSchema) {
-              materialCostsTableAvailable = false;
-              materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(materialDeleteError);
-              console.warn('[Salarize] Table material_costs absente: sync matière première ignorée.');
-            } else {
-              console.error('[Salarize] Erreur suppression material_costs:', materialDeleteError);
-            }
-          } else if (materialEntries.length > 0) {
-            const payload = materialEntries.map((entry) => ({
-              company_id: companyId,
-              period: entry.period || null,
-              sku: entry.sku || null,
-              barcode: entry.barcode || null,
-              article_name: entry.article || null,
-              supplier: entry.supplier || null,
-              category: entry.category || null,
-              unit: entry.unit || null,
-              quantity: parseLocaleNumber(entry.quantity),
-              unit_cost: parseLocaleNumber(entry.unitCost),
-              total_cost: parseLocaleNumber(entry.totalCost)
-            }));
+            if (materialDeleteError) {
+              const normalizedError = normalizePostgrestError(materialDeleteError, { target: 'material_costs' });
+              if (normalizedError.isMissingSchema) {
+                materialCostsTableAvailable = false;
+                materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(materialDeleteError);
+                console.warn('[Salarize] Table material_costs absente: sync matière première ignorée.');
+              } else {
+                console.error('[Salarize] Erreur suppression material_costs:', materialDeleteError);
+              }
+            } else if (materialEntries.length > 0) {
+              const payload = materialEntries.map((entry) => ({
+                company_id: companyId,
+                period: entry.period || null,
+                sku: entry.sku || null,
+                barcode: entry.barcode || null,
+                article_name: entry.article || null,
+                supplier: entry.supplier || null,
+                category: entry.category || null,
+                unit: entry.unit || null,
+                quantity: parseLocaleNumber(entry.quantity),
+                unit_cost: parseLocaleNumber(entry.unitCost),
+                total_cost: parseLocaleNumber(entry.totalCost)
+              }));
 
-            const batchSize = 500;
-            for (let i = 0; i < payload.length; i += batchSize) {
-              const batch = payload.slice(i, i + batchSize);
-              const { error: materialInsertError } = await supabase
-                .from('material_costs')
-                .insert(batch);
+              const batchSize = 500;
+              for (let i = 0; i < payload.length; i += batchSize) {
+                const batch = payload.slice(i, i + batchSize);
+                const { error: materialInsertError } = await supabase
+                  .from('material_costs')
+                  .insert(batch);
 
-              if (materialInsertError) {
-                const normalizedError = normalizePostgrestError(materialInsertError, { target: 'material_costs' });
-                if (normalizedError.isMissingSchema) {
-                  materialCostsTableAvailable = false;
-                  materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(materialInsertError);
-                  console.warn('[Salarize] Table material_costs absente: insertion ignorée.');
+                if (materialInsertError) {
+                  const normalizedError = normalizePostgrestError(materialInsertError, { target: 'material_costs' });
+                  if (normalizedError.isMissingSchema) {
+                    materialCostsTableAvailable = false;
+                    materialCostsSetupIssueNext = materialCostsSetupIssueNext || buildMaterialCostsSetupIssue(materialInsertError);
+                    console.warn('[Salarize] Table material_costs absente: insertion ignorée.');
+                    break;
+                  }
+                  console.error('[Salarize] Erreur insertion material_costs:', materialInsertError);
                   break;
                 }
-                console.error('[Salarize] Erreur insertion material_costs:', materialInsertError);
-                break;
               }
             }
           }
@@ -2139,6 +2213,233 @@ function AppContent() {
   const debouncedSaveAll = useDebouncedCallback((newCompanies, active) => {
     saveAll(newCompanies, active);
   }, 800);
+
+  const isImportAuditSchemaMissing = (error) => {
+    const message = String(error?.message || '').toLowerCase();
+    const hint = String(error?.hint || '').toLowerCase();
+    const details = String(error?.details || '').toLowerCase();
+    return (
+      error?.code === '42P01' ||
+      message.includes('import_batches') ||
+      message.includes('import_batch_files') ||
+      message.includes('data_snapshots') ||
+      hint.includes('import_batches') ||
+      details.includes('import_batches')
+    );
+  };
+
+  const onImportAuditError = (phase, error) => {
+    if (!error) return;
+    console.warn(`[Salarize] Import audit ${phase} error:`, error);
+    if (isImportAuditSchemaMissing(error)) {
+      importAuditDisabledRef.current = true;
+      if (!importAuditWarningShownRef.current) {
+        importAuditWarningShownRef.current = true;
+        toast.warning("Historique d'import indisponible: tables de backup absentes.");
+      }
+    }
+  };
+
+  const cloneSerializable = (value) => JSON.parse(JSON.stringify(value ?? null));
+
+  const buildImportSnapshot = (companyName, module, sourceCompanies = companiesRef.current) => {
+    const companyData = sourceCompanies?.[companyName];
+    if (!companyData) {
+      return { snapshotJson: {}, rowCount: 0 };
+    }
+
+    if (module === 'payroll') {
+      const employeesSnapshot = Array.isArray(companyData.employees) ? companyData.employees : [];
+      return {
+        snapshotJson: cloneSerializable({
+          companyName,
+          employees: employeesSnapshot,
+          mapping: companyData.mapping || {},
+          periods: companyData.periods || [],
+        }),
+        rowCount: employeesSnapshot.length,
+      };
+    }
+
+    if (module === 'suppliers') {
+      const materialSnapshot = Array.isArray(companyData.materialCosts) ? companyData.materialCosts : [];
+      return {
+        snapshotJson: cloneSerializable({
+          companyName,
+          materialCosts: materialSnapshot,
+        }),
+        rowCount: materialSnapshot.length,
+      };
+    }
+
+    return {
+      snapshotJson: cloneSerializable({ companyName }),
+      rowCount: 0,
+    };
+  };
+
+  const resolveCompanyIdForAudit = async (companyName) => {
+    const currentCompanyId = companiesRef.current?.[companyName]?.id;
+    if (currentCompanyId) return currentCompanyId;
+    if (!user?.id) return null;
+
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('name', companyName)
+      .limit(1);
+
+    if (error) {
+      onImportAuditError('resolve-company', error);
+      return null;
+    }
+
+    return data?.[0]?.id || null;
+  };
+
+  const startImportAudit = async ({ companyName, module, source = 'manual_import', fileNames = [], notes = null }) => {
+    if (!user?.id || importAuditDisabledRef.current) return null;
+
+    try {
+      const companyId = await resolveCompanyIdForAudit(companyName);
+      if (!companyId) return null;
+
+      const beforeSnapshot = buildImportSnapshot(companyName, module);
+      const normalizedFileNames = [...new Set((fileNames || []).filter(Boolean))];
+
+      const { data: batchData, error: batchError } = await supabase
+        .from('import_batches')
+        .insert({
+          company_id: companyId,
+          module,
+          source,
+          file_count: Math.max(1, normalizedFileNames.length || 1),
+          row_count: beforeSnapshot.rowCount || 0,
+          status: 'started',
+          notes: notes || null,
+          triggered_by: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (batchError || !batchData?.id) {
+        onImportAuditError('create-batch', batchError || new Error('Batch creation failed'));
+        return null;
+      }
+
+      const batchId = batchData.id;
+
+      if (normalizedFileNames.length > 0) {
+        const filesPayload = normalizedFileNames.map((fileName) => ({
+          batch_id: batchId,
+          file_name: String(fileName),
+        }));
+        const { error: filesError } = await supabase
+          .from('import_batch_files')
+          .insert(filesPayload);
+
+        if (filesError) {
+          onImportAuditError('insert-files', filesError);
+        }
+      }
+
+      const { error: snapshotError } = await supabase
+        .from('data_snapshots')
+        .insert({
+          batch_id: batchId,
+          company_id: companyId,
+          module,
+          snapshot_type: 'before',
+          snapshot_json: beforeSnapshot.snapshotJson,
+          row_count: beforeSnapshot.rowCount || 0,
+        });
+
+      if (snapshotError) {
+        onImportAuditError('snapshot-before', snapshotError);
+      }
+
+      return { batchId, companyId, module };
+    } catch (error) {
+      onImportAuditError('start', error);
+      return null;
+    }
+  };
+
+  const finalizeImportAudit = async (
+    auditContext,
+    { companyName, module, status = 'completed', rowCount = null, notes = null, includeAfterSnapshot = true }
+  ) => {
+    if (!auditContext?.batchId || importAuditDisabledRef.current) return;
+
+    try {
+      const afterSnapshot = buildImportSnapshot(companyName, module);
+
+      if (includeAfterSnapshot) {
+        const { error: afterSnapshotError } = await supabase
+          .from('data_snapshots')
+          .insert({
+            batch_id: auditContext.batchId,
+            company_id: auditContext.companyId,
+            module,
+            snapshot_type: 'after',
+            snapshot_json: afterSnapshot.snapshotJson,
+            row_count: afterSnapshot.rowCount || 0,
+          });
+
+        if (afterSnapshotError) {
+          onImportAuditError('snapshot-after', afterSnapshotError);
+        }
+      }
+
+      const finalCount = Number.isFinite(rowCount) ? rowCount : afterSnapshot.rowCount || 0;
+      const { error: updateBatchError } = await supabase
+        .from('import_batches')
+        .update({
+          status,
+          row_count: finalCount,
+          notes: notes ? String(notes).slice(0, 1000) : null,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', auditContext.batchId);
+
+      if (updateBatchError) {
+        onImportAuditError('update-batch', updateBatchError);
+      }
+    } catch (error) {
+      onImportAuditError('finalize', error);
+    }
+  };
+
+  const runImportWithAudit = async (
+    { companyName, module, source = 'manual_import', fileNames = [], expectedRowCount = null, notes = null },
+    importFn
+  ) => {
+    const auditContext = await startImportAudit({ companyName, module, source, fileNames, notes });
+
+    try {
+      const result = await importFn();
+      const resultCount = Number.isFinite(result?.rowCount) ? result.rowCount : expectedRowCount;
+      await finalizeImportAudit(auditContext, {
+        companyName,
+        module,
+        status: 'completed',
+        rowCount: resultCount,
+        notes,
+        includeAfterSnapshot: true,
+      });
+      return result;
+    } catch (error) {
+      await finalizeImportAudit(auditContext, {
+        companyName,
+        module,
+        status: 'failed',
+        rowCount: Number.isFinite(expectedRowCount) ? expectedRowCount : 0,
+        notes: error?.message || 'Import failed',
+        includeAfterSnapshot: false,
+      });
+      throw error;
+    }
+  };
 
   const getExportScope = (yearOverride = null) => {
     let scopedPeriods = [...periods];
@@ -3309,41 +3610,64 @@ function AppContent() {
 
     setMaterialImportBusy(true);
     try {
-      const XLSX = await loadXLSX();
-      let importedFiles = 0;
-      let importedRows = 0;
-      let skippedFiles = 0;
+      const fileNames = selectedFiles.map((file) => file.name).filter(Boolean);
+      const importSummary = await runImportWithAudit(
+        {
+          companyName: activeCompany,
+          module: 'suppliers',
+          source: 'suppliers_excel_import',
+          fileNames,
+          notes: `Import fournisseurs (${selectedFiles.length} fichier${selectedFiles.length > 1 ? 's' : ''})`,
+        },
+        async () => {
+          const XLSX = await loadXLSX();
+          let importedFiles = 0;
+          let importedRows = 0;
+          let skippedFiles = 0;
 
-      for (const file of selectedFiles) {
-        const data = await file.arrayBuffer();
-        const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
-        const sheetName = wb.SheetNames?.find((name) => {
-          const lower = String(name || '').toLowerCase();
-          return (
-            lower.includes('achat') ||
-            lower.includes('fournisseur') ||
-            lower.includes('supplier') ||
-            lower.includes('matiere') ||
-            lower.includes('material') ||
-            lower.includes('purchase') ||
-            lower.includes('data')
-          );
-        }) || wb.SheetNames?.[0];
-        if (!sheetName) {
-          skippedFiles++;
-          continue;
+          for (const file of selectedFiles) {
+            const data = await file.arrayBuffer();
+            const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+            const sheetName = wb.SheetNames?.find((name) => {
+              const lower = String(name || '').toLowerCase();
+              return (
+                lower.includes('achat') ||
+                lower.includes('fournisseur') ||
+                lower.includes('supplier') ||
+                lower.includes('matiere') ||
+                lower.includes('material') ||
+                lower.includes('purchase') ||
+                lower.includes('data')
+              );
+            }) || wb.SheetNames?.[0];
+            if (!sheetName) {
+              skippedFiles++;
+              continue;
+            }
+            const sheet = wb.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            const parsed = parseMaterialCosts(rows, file.name, XLSX);
+            if (!parsed || !parsed.rows?.length) {
+              skippedFiles++;
+              continue;
+            }
+            await importMaterialCostsToCompany(activeCompany, parsed.rows, file.name, false);
+            importedFiles++;
+            importedRows += parsed.rows.length;
+          }
+
+          return {
+            rowCount: importedRows,
+            importedFiles,
+            importedRows,
+            skippedFiles,
+          };
         }
-        const sheet = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        const parsed = parseMaterialCosts(rows, file.name, XLSX);
-        if (!parsed || !parsed.rows?.length) {
-          skippedFiles++;
-          continue;
-        }
-        await importMaterialCostsToCompany(activeCompany, parsed.rows, file.name, false);
-        importedFiles++;
-        importedRows += parsed.rows.length;
-      }
+      );
+
+      const importedFiles = importSummary?.importedFiles || 0;
+      const importedRows = importSummary?.importedRows || 0;
+      const skippedFiles = importSummary?.skippedFiles || 0;
 
       if (importedFiles > 0) {
         setShowMaterialImportModal(false);
@@ -3618,65 +3942,83 @@ function AppContent() {
 
     console.log(`[Salarize] 🚀 IMPORT RAPIDE: Démarrage pour ${currentQueue.length > 0 ? currentQueue.length - startIndex : 1} fichier(s)`);
 
-    // 1. Importer le fichier actuellement pending
-    const { employees, suggestedPeriod, periodConfidence } = currentPending;
-    const period = suggestedPeriod && suggestedPeriod !== 'Unknown'
-      ? suggestedPeriod
-      : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const auditFileNames = (currentQueue.length > 0
+      ? currentQueue.map((file) => file?.name).filter(Boolean)
+      : [currentPending.fileName || `import-payroll-${new Date().toISOString().slice(0, 10)}.xlsx`]
+    );
 
-    const updatedEmployees = employees.map(e => ({
-      ...e,
-      period,
-      department: e.department || null
-    }));
+    const trackedImport = await runImportWithAudit(
+      {
+        companyName: activeCompany,
+        module: 'payroll',
+        source: 'payroll_quick_import',
+        fileNames: auditFileNames,
+        notes: `Import RH rapide (${auditFileNames.length} fichier${auditFileNames.length > 1 ? 's' : ''})`,
+      },
+      async () => {
+        // 1. Importer le fichier actuellement pending
+        const { employees, suggestedPeriod } = currentPending;
+        const period = suggestedPeriod && suggestedPeriod !== 'Unknown'
+          ? suggestedPeriod
+          : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
-    importToCompanyDirect(activeCompany, { employees: updatedEmployees, periods: [period] }, true);
-    totalEmployees += employees.length;
-    totalFiles++;
-    importedPeriods.add(period);
-    console.log(`[Salarize] ✓ Fichier 1: ${employees.length} employés (${period})`);
+        const updatedEmployees = employees.map(e => ({
+          ...e,
+          period,
+          department: e.department || null
+        }));
 
-    // 2. Traiter tous les fichiers restants dans la queue
-    if (currentQueue.length > 0) {
-      for (let i = startIndex + 1; i < currentQueue.length; i++) {
-        const file = currentQueue[i];
-        console.log(`[Salarize] 📄 Traitement fichier ${i + 1}/${currentQueue.length}: ${file.name}`);
+        await importToCompanyDirect(activeCompany, { employees: updatedEmployees, periods: [period] }, true);
+        totalEmployees += employees.length;
+        totalFiles++;
+        importedPeriods.add(period);
+        console.log(`[Salarize] ✓ Fichier 1: ${employees.length} employés (${period})`);
 
-        const parsed = await parseAndImportFile(file);
-        if (parsed) {
-          const filePeriod = parsed.suggestedPeriod && parsed.suggestedPeriod !== 'Unknown'
-            ? parsed.suggestedPeriod
-            : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+        // 2. Traiter tous les fichiers restants dans la queue
+        if (currentQueue.length > 0) {
+          for (let i = startIndex + 1; i < currentQueue.length; i++) {
+            const file = currentQueue[i];
+            console.log(`[Salarize] 📄 Traitement fichier ${i + 1}/${currentQueue.length}: ${file.name}`);
 
-          const fileEmployees = parsed.employees.map(e => ({
-            ...e,
-            period: filePeriod,
-            department: e.department || null
-          }));
+            const parsed = await parseAndImportFile(file);
+            if (parsed) {
+              const filePeriod = parsed.suggestedPeriod && parsed.suggestedPeriod !== 'Unknown'
+                ? parsed.suggestedPeriod
+                : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
-          // Toujours skipSave sauf pour le dernier fichier
-          const isLast = i === currentQueue.length - 1;
-          importToCompanyDirect(activeCompany, { employees: fileEmployees, periods: [filePeriod] }, !isLast);
+              const fileEmployees = parsed.employees.map(e => ({
+                ...e,
+                period: filePeriod,
+                department: e.department || null
+              }));
 
-          totalEmployees += parsed.employees.length;
-          totalFiles++;
-          importedPeriods.add(filePeriod);
-          console.log(`[Salarize] ✓ Fichier ${i + 1}: ${parsed.employees.length} employés (${filePeriod})`);
+              await importToCompanyDirect(activeCompany, { employees: fileEmployees, periods: [filePeriod] }, true);
+
+              totalEmployees += parsed.employees.length;
+              totalFiles++;
+              importedPeriods.add(filePeriod);
+              console.log(`[Salarize] ✓ Fichier ${i + 1}: ${parsed.employees.length} employés (${filePeriod})`);
+            }
+          }
         }
-      }
-    }
 
-    // 3. Sauvegarder tout à la fin
-    console.log('[Salarize] 💾 Sauvegarde finale...');
-    await saveAll(companiesRef.current, activeCompany);
+        // 3. Sauvegarder tout à la fin
+        console.log('[Salarize] 💾 Sauvegarde finale...');
+        await saveAll(companiesRef.current, activeCompany);
+
+        return { rowCount: totalEmployees, totalFiles };
+      }
+    );
 
     // 4. Nettoyer et afficher le résumé
     setFileQueue([]);
     setCurrentFileIndex(0);
 
     const periodsStr = [...importedPeriods].map(p => formatPeriod(p)).join(', ');
-    toast.success(`⚡ Import rapide terminé: ${totalEmployees} employés (${totalFiles} fichier${totalFiles > 1 ? 's' : ''}) - ${periodsStr}`);
-    console.log(`[Salarize] 🎉 Import rapide terminé: ${totalEmployees} employés, ${totalFiles} fichiers, périodes: ${periodsStr}`);
+    const finalEmployees = trackedImport?.rowCount || totalEmployees;
+    const finalFiles = trackedImport?.totalFiles || totalFiles;
+    toast.success(`⚡ Import rapide terminé: ${finalEmployees} employés (${finalFiles} fichier${finalFiles > 1 ? 's' : ''}) - ${periodsStr}`);
+    console.log(`[Salarize] 🎉 Import rapide terminé: ${finalEmployees} employés, ${finalFiles} fichiers, périodes: ${periodsStr}`);
   };
 
   const parseAcerta = (rows) => {
@@ -3925,12 +4267,26 @@ function AppContent() {
     return emps.length > 0 ? { employees: emps, periods: [...periodsSet].sort() } : null;
   };
 
-  const importToCompany = (companyName) => {
+  const importToCompany = async (companyName) => {
     if (!pendingData || !companyName) return;
-    importToCompanyDirect(companyName, pendingData);
+    const fallbackFileName = pendingPeriodSelection?.fileName || `import-payroll-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    await runImportWithAudit(
+      {
+        companyName,
+        module: 'payroll',
+        source: 'payroll_modal_import',
+        fileNames: [fallbackFileName],
+        expectedRowCount: pendingData.employees?.length || 0,
+        notes: `Import RH modal (${pendingData.employees?.length || 0} lignes)`,
+      },
+      async () => {
+        await importToCompanyDirect(companyName, pendingData);
+        return { rowCount: pendingData.employees?.length || 0 };
+      }
+    );
   };
 
-  const importToCompanyDirect = (companyName, data, skipSave = false) => {
+  const importToCompanyDirect = async (companyName, data, skipSave = false) => {
     if (!data || !companyName) return;
 
     // ÉTAPE 1: Sauvegarder les données brutes en local IMMÉDIATEMENT avant tout traitement
@@ -3988,7 +4344,7 @@ function AppContent() {
     // Ne sauvegarder que si skipSave est false
     if (!skipSave) {
       console.log(`[Salarize] Saving immediately (skipSave=false)`);
-      saveAll(newCompanies, companyName);
+      await saveAll(newCompanies, companyName);
     } else {
       console.log(`[Salarize] Skipping save (will save at end of batch)`);
     }
@@ -4050,8 +4406,8 @@ function AppContent() {
     }
   };
 
-  const handleModalSelect = (name) => {
-    importToCompany(name);
+  const handleModalSelect = async (name) => {
+    await importToCompany(name);
   };
 
   const handleModalCancel = () => {
@@ -7090,15 +7446,34 @@ L'équipe Salarize`;
                     const isMultiFileImport = fileQueue.length > 1;
                     
                     if (activeCompany && view === 'dashboard') {
-                      // skipSave=true si on est en multi-fichier ET pas le dernier
-                      const skipSave = isMultiFileImport && !isLastFile;
-                      importToCompanyDirect(activeCompany, result, skipSave);
-                      
-                      // Si c'est le dernier fichier d'un batch, sauvegarder explicitement
-                      if (isMultiFileImport && isLastFile) {
-                        console.log('[Salarize] Last file of batch - saving all data now');
-                        saveAll(companiesRef.current, activeCompany);
-                      }
+                      const currentFileName =
+                        fileQueue[currentFileIndex]?.name ||
+                        pendingPeriodSelection.fileName ||
+                        `import-payroll-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+                      await runImportWithAudit(
+                        {
+                          companyName: activeCompany,
+                          module: 'payroll',
+                          source: isMultiFileImport ? 'payroll_manual_batch_import' : 'payroll_manual_import',
+                          fileNames: [currentFileName],
+                          expectedRowCount: result.employees?.length || 0,
+                          notes: `Import RH manuel (${result.employees?.length || 0} lignes)`,
+                        },
+                        async () => {
+                          // skipSave=true si on est en multi-fichier ET pas le dernier
+                          const skipSave = isMultiFileImport && !isLastFile;
+                          await importToCompanyDirect(activeCompany, result, skipSave);
+
+                          // Si c'est le dernier fichier d'un batch, sauvegarder explicitement
+                          if (isMultiFileImport && isLastFile) {
+                            console.log('[Salarize] Last file of batch - saving all data now');
+                            await saveAll(companiesRef.current, activeCompany);
+                          }
+
+                          return { rowCount: result.employees?.length || 0 };
+                        }
+                      );
                     } else {
                       setPendingData(result);
                       setShowModal(true);
