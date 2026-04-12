@@ -106,6 +106,7 @@ function OverviewPage({
   activeCompany,
   companies,
   companyOrder,
+  dashboardSkin = 'light',
   onSelectCompany,
   onOpenPayroll,
   onOpenSuppliers,
@@ -158,17 +159,26 @@ function OverviewPage({
     ? companyOrder.filter(n => companies?.[n])
     : Object.keys(companies || {});
   const otherCompanies = companyNames.filter(n => n !== activeCompany);
+  const isNeon = dashboardSkin === 'neon';
+  const isAurora = dashboardSkin === 'aurora';
+  const isDarkSkin = isNeon || isAurora;
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-12 bg-gradient-to-b from-white to-slate-50">
+    <div className={`min-h-[80vh] flex flex-col items-center justify-center px-4 py-12 rounded-2xl border ${
+      isNeon
+        ? 'bg-gradient-to-br from-slate-900/90 via-slate-900/85 to-indigo-950/70 border-violet-500/20 shadow-[0_0_80px_rgba(139,92,246,0.15)]'
+        : isAurora
+          ? 'bg-gradient-to-br from-indigo-900/85 via-violet-900/80 to-cyan-900/80 border-cyan-300/25 shadow-[0_0_90px_rgba(34,211,238,0.18)]'
+          : 'bg-gradient-to-br from-violet-100/70 via-fuchsia-50 to-indigo-50/70 border-violet-100'
+    }`}>
 
       {/* Header greeting */}
       <div
         className="text-center mb-10 transition-all duration-500"
         style={{ opacity: headerVisible ? 1 : 0, transform: headerVisible ? 'translateY(0)' : 'translateY(-8px)' }}
       >
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">{formatDate()}</p>
-        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-4">
+        <p className={`text-xs font-semibold uppercase tracking-widest mb-1 ${isDarkSkin ? 'text-slate-300' : 'text-slate-400'}`}>{formatDate()}</p>
+        <h1 className={`text-2xl sm:text-3xl font-bold mb-4 ${isDarkSkin ? 'text-white' : 'text-slate-800'}`}>
           {getGreeting(user)} 👋
         </h1>
 
@@ -177,7 +187,11 @@ function OverviewPage({
           <div className="relative inline-block">
             <button
               onClick={() => setSwitcherOpen(o => !o)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-slate-300 hover:shadow transition-all text-sm font-medium text-slate-700"
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm transition-all text-sm font-medium ${
+                isDarkSkin
+                  ? 'bg-slate-900/70 border border-slate-700 text-slate-100 hover:border-violet-400/40'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:shadow'
+              }`}
             >
               {company?.logo ? (
                 <img src={company.logo} alt="" className="w-5 h-5 rounded object-cover" />
@@ -191,7 +205,7 @@ function OverviewPage({
               )}
               {activeCompany}
               {otherCompanies.length > 0 && (
-                <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${switcherOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-3.5 h-3.5 transition-transform ${isDarkSkin ? 'text-slate-300' : 'text-slate-400'} ${switcherOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               )}
@@ -200,14 +214,18 @@ function OverviewPage({
             {switcherOpen && otherCompanies.length > 0 && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg py-1 min-w-[180px] z-20">
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 rounded-xl shadow-lg py-1 min-w-[180px] z-20 ${
+                  isDarkSkin ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'
+                }`}>
                   {otherCompanies.map(name => {
                     const c = companies[name];
                     return (
                       <button
                         key={name}
                         onClick={() => { onSelectCompany(name); setSwitcherOpen(false); }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors text-left ${
+                          isDarkSkin ? 'text-slate-200 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
                       >
                         {c?.logo ? (
                           <img src={c.logo} alt="" className="w-5 h-5 rounded object-cover" />
@@ -295,10 +313,10 @@ function OverviewPage({
       </div>
 
       {/* Keyboard hint */}
-      <p className="hidden sm:block mt-8 text-[11px] text-slate-300 text-center">
-        Raccourcis : <kbd className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-mono">H</kbd> RH &nbsp;
-        <kbd className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-mono">F</kbd> Fournisseur &nbsp;
-        <kbd className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-mono">C</kbd> CDR
+      <p className={`hidden sm:block mt-8 text-[11px] text-center ${isDarkSkin ? 'text-slate-400' : 'text-slate-300'}`}>
+        Raccourcis : <kbd className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isDarkSkin ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-500'}`}>H</kbd> RH &nbsp;
+        <kbd className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isDarkSkin ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-500'}`}>F</kbd> Fournisseur &nbsp;
+        <kbd className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isDarkSkin ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-500'}`}>C</kbd> CDR
       </p>
     </div>
   );

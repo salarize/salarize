@@ -227,6 +227,15 @@ function AppContent() {
   const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
   // 'overview' | 'payroll' | 'suppliers' | 'cdr'
   const [currentModule, setCurrentModule] = useState('overview');
+  // 'light' | 'neon' | 'aurora' (layout visuel du dashboard central)
+  const [dashboardSkin, setDashboardSkin] = useState(() => {
+    try {
+      const saved = localStorage.getItem('salarize_dashboard_skin_v1');
+      return saved === 'neon' || saved === 'aurora' ? saved : 'light';
+    } catch {
+      return 'light';
+    }
+  });
   const [materialCostsSetupIssue, setMaterialCostsSetupIssue] = useState(null);
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
   const isRecoveryModeRef = useRef(
@@ -253,6 +262,9 @@ function AppContent() {
   const [importReady, setImportReady] = useState(false); // Délai avant de pouvoir importer
 
   const switchModule = useCallback((nextModule) => {
+    // Navigation de module: fermer les modals d'import pour éviter une ouverture résiduelle.
+    setShowImportModal(false);
+    setShowMaterialImportModal(false);
     startTransition(() => {
       setCurrentModule(nextModule);
     });
@@ -320,6 +332,7 @@ function AppContent() {
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordError, setResetPasswordError] = useState('');
   const PAYROLL_AI_MODEL_STORAGE_KEY = 'salarize_payroll_ai_model_v1';
+  const DASHBOARD_SKIN_STORAGE_KEY = 'salarize_dashboard_skin_v1';
 
   // Fonction pour mettre à jour le mot de passe
   const handleUpdatePassword = async () => {
@@ -767,13 +780,17 @@ function AppContent() {
       // Cmd/Ctrl + I - Import
       if ((e.metaKey || e.ctrlKey) && e.key === 'i' && currentPage === 'dashboard') {
         e.preventDefault();
-        setShowImportModal(true);
+        if (currentModule === 'suppliers') {
+          setShowMaterialImportModal(true);
+        } else {
+          setShowImportModal(true);
+        }
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showOnboarding, showExportMenu, showActionsMenu, showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, activeCompany, employees.length]);
+  }, [showOnboarding, showExportMenu, showActionsMenu, showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showMaterialImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, currentModule, activeCompany, employees.length]);
 
   // Délai avant de pouvoir importer (évite les clics trop rapides)
   useEffect(() => {
@@ -809,6 +826,14 @@ function AppContent() {
       console.warn('[Salarize] Impossible de sauvegarder le modèle IA de mapping:', err);
     }
   }, [PAYROLL_AI_MODEL_STORAGE_KEY, payrollAiModel]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DASHBOARD_SKIN_STORAGE_KEY, dashboardSkin);
+    } catch (err) {
+      console.warn('[Salarize] Impossible de sauvegarder le thème dashboard:', err);
+    }
+  }, [DASHBOARD_SKIN_STORAGE_KEY, dashboardSkin]);
 
   // Synchroniser companiesRef avec companies state
   useEffect(() => {
@@ -3624,6 +3649,7 @@ function AppContent() {
           let importedFiles = 0;
           let importedRows = 0;
           let skippedFiles = 0;
+          const skippedFileNames = [];
 
           for (const file of selectedFiles) {
             const data = await file.arrayBuffer();
@@ -3649,6 +3675,7 @@ function AppContent() {
             const parsed = parseMaterialCosts(rows, file.name, XLSX);
             if (!parsed || !parsed.rows?.length) {
               skippedFiles++;
+              skippedFileNames.push(file.name);
               continue;
             }
             await importMaterialCostsToCompany(activeCompany, parsed.rows, file.name, false);
@@ -3661,6 +3688,7 @@ function AppContent() {
             importedFiles,
             importedRows,
             skippedFiles,
+            skippedFileNames,
           };
         }
       );
@@ -3668,13 +3696,17 @@ function AppContent() {
       const importedFiles = importSummary?.importedFiles || 0;
       const importedRows = importSummary?.importedRows || 0;
       const skippedFiles = importSummary?.skippedFiles || 0;
+      const skippedFileNames = importSummary?.skippedFileNames || [];
 
       if (importedFiles > 0) {
         setShowMaterialImportModal(false);
       }
 
       if (importedFiles === 0) {
-        toast.error('Aucun fichier valide. Vérifiez les colonnes SKU/article/fournisseur/coût.');
+        const skippedLabel = skippedFileNames.length > 0
+          ? ` (${skippedFileNames.slice(0, 2).join(', ')}${skippedFileNames.length > 2 ? ', ...' : ''})`
+          : '';
+        toast.error(`Aucun fichier valide${skippedLabel}. Colonnes attendues: article/SKU/code-barres + coût total (ou quantité + prix unitaire).`);
       } else if (skippedFiles > 0) {
         toast.warning(`Import partiel: ${importedFiles}/${selectedFiles.length} fichiers, ${importedRows} lignes importées.`);
       } else {
@@ -6828,6 +6860,8 @@ L'équipe Salarize`;
             departmentMapping={departmentMapping}
             employees={employees}
             currentModule={currentModule}
+            dashboardSkin={dashboardSkin}
+            onDashboardSkinChange={setDashboardSkin}
           onOverviewClick={() => { setView('dashboard'); switchModule('overview'); setSidebarOpen(false); }}
           onPayrollClick={() => { setView('dashboard'); switchModule('payroll'); setSidebarOpen(false); }}
           onSuppliersClick={() => { setView('dashboard'); switchModule('suppliers'); setSidebarOpen(false); }}
@@ -6929,13 +6963,20 @@ L'équipe Salarize`;
   // Dashboard
   return (
     <PageTransition key="dashboard">
-      <div className="min-h-screen flex bg-slate-50">
+      <div className={`min-h-screen flex ${
+        dashboardSkin === 'neon'
+          ? 'bg-slate-950'
+          : dashboardSkin === 'aurora'
+            ? 'bg-gradient-to-br from-indigo-950 via-violet-950 to-cyan-950'
+            : 'bg-gradient-to-br from-violet-100/60 via-fuchsia-50 to-slate-100'
+      }`}>
         <Sidebar
           companies={companies}
           activeCompany={activeCompany}
           onSelectCompany={(name) => { loadCompany(name); setSidebarOpen(false); }}
           onImportClick={() => {
             if (currentModule === 'suppliers') {
+              // Ouverture explicite uniquement via bouton Import (pas via onglet de navigation).
               setShowMaterialImportModal(true);
             } else {
               setShowImportModal(true);
@@ -6956,6 +6997,8 @@ L'équipe Salarize`;
           departmentMapping={departmentMapping}
           employees={employees}
           currentModule={currentModule}
+          dashboardSkin={dashboardSkin}
+          onDashboardSkinChange={setDashboardSkin}
           onOverviewClick={() => { switchModule('overview'); setSidebarOpen(false); }}
           onPayrollClick={() => { switchModule('payroll'); setSidebarOpen(false); }}
           onSuppliersClick={() => { switchModule('suppliers'); setSidebarOpen(false); }}
@@ -8415,7 +8458,79 @@ L'équipe Salarize`;
         </div>
       )}
 
-      <main className="lg:ml-72 pt-4 lg:pt-6 flex-1 p-4 lg:p-6">
+      <main className={`lg:ml-72 pt-4 lg:pt-6 flex-1 p-4 lg:p-6 relative overflow-hidden ${
+        dashboardSkin === 'neon'
+          ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950'
+          : dashboardSkin === 'aurora'
+            ? 'bg-gradient-to-br from-indigo-950/95 via-violet-900/90 to-cyan-900/85'
+            : 'bg-gradient-to-br from-violet-50/80 via-fuchsia-50/60 to-indigo-50/60'
+      }`}>
+        {dashboardSkin === 'neon' && (
+          <>
+            <div className="pointer-events-none absolute -top-24 -left-16 w-80 h-80 rounded-full bg-violet-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute top-10 right-8 w-72 h-72 rounded-full bg-sky-400/15 blur-3xl" />
+            <div className="pointer-events-none absolute bottom-0 left-1/3 w-96 h-64 rounded-full bg-fuchsia-500/10 blur-3xl" />
+          </>
+        )}
+        {dashboardSkin === 'aurora' && (
+          <>
+            <div className="pointer-events-none absolute -top-28 -left-24 w-96 h-96 rounded-full bg-cyan-300/20 blur-3xl" />
+            <div className="pointer-events-none absolute top-24 right-0 w-80 h-80 rounded-full bg-violet-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute bottom-0 left-1/4 w-[30rem] h-72 rounded-full bg-fuchsia-500/15 blur-3xl" />
+          </>
+        )}
+
+        <div className="fixed right-3 bottom-4 sm:bottom-auto sm:top-4 sm:right-4 lg:top-5 lg:right-6 z-[90] flex justify-end">
+          <div className={`inline-flex items-center gap-1 p-1.5 rounded-xl border shadow-lg backdrop-blur-sm ${
+            dashboardSkin === 'neon'
+              ? 'bg-slate-900/90 border-slate-600'
+              : dashboardSkin === 'aurora'
+                ? 'bg-slate-900/85 border-cyan-400/40'
+                : 'bg-white/95 border-violet-300'
+          }`}>
+            <span className={`hidden md:inline px-2 text-[10px] font-bold tracking-wide ${
+              dashboardSkin === 'light' ? 'text-violet-600' : 'text-slate-200'
+            }`}>
+              THEME
+            </span>
+            <button
+              onClick={() => setDashboardSkin('light')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                dashboardSkin === 'light'
+                  ? 'bg-white text-violet-700 shadow-sm'
+                  : dashboardSkin === 'aurora'
+                    ? 'text-slate-200 hover:text-white hover:bg-white/10'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              Light
+            </button>
+            <button
+              onClick={() => setDashboardSkin('neon')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                dashboardSkin === 'neon'
+                  ? 'bg-violet-500/25 text-violet-100 border border-violet-400/30'
+                  : dashboardSkin === 'light'
+                    ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                    : 'text-slate-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              Neon
+            </button>
+            <button
+              onClick={() => setDashboardSkin('aurora')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                dashboardSkin === 'aurora'
+                  ? 'bg-cyan-400/20 text-cyan-100 border border-cyan-300/35'
+                  : dashboardSkin === 'light'
+                    ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              Aurora
+            </button>
+          </div>
+        </div>
         {/* Loading overlay quand on recharge les données */}
         {isLoadingData && employees.length > 0 && (
           <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-40 flex items-center justify-center">
@@ -8437,12 +8552,13 @@ L'équipe Salarize`;
               activeCompany={activeCompany}
               companies={companies}
               companyOrder={companyOrder}
+              dashboardSkin={dashboardSkin}
               onSelectCompany={(name) => { loadCompany(name); }}
               onOpenPayroll={() => switchModule('payroll')}
               onOpenSuppliers={() => switchModule('suppliers')}
               onOpenCDR={() => switchModule('cdr')}
               onOpenPayrollWithImport={() => { switchModule('payroll'); setShowImportModal(true); }}
-              onOpenSuppliersWithImport={() => { switchModule('suppliers'); setShowMaterialImportModal(true); }}
+              onOpenSuppliersWithImport={() => { switchModule('suppliers'); }}
               onOpenCDRWithImport={() => switchModule('cdr')}
             />
           ) : currentModule === 'suppliers' ? (
@@ -8453,7 +8569,7 @@ L'équipe Salarize`;
               setupIssue={materialCostsSetupIssue}
               onBack={() => switchModule('overview')}
               onInvite={() => setShowInviteModal(true)}
-              onImportFile={handleMaterialFileChange}
+              onOpenImportModal={() => setShowMaterialImportModal(true)}
               onRetrySetup={() => {
                 if (!user?.id) return;
                 setIsLoadingData(true);

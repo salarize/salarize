@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SvgHBarChart } from '../layout/SvgBarChart';
 
 const MATERIAL_SETUP_SQL = `CREATE TABLE IF NOT EXISTS material_costs (
@@ -64,17 +64,18 @@ function SuppliersDashboardPage({
   onBack,
   setupIssue = null,
   onInvite,
-  onImportFile,
+  onOpenImportModal,
   onRetrySetup = () => {}
 }) {
   const [search, setSearch] = useState('');
   const [periodFilter, setPeriodFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
-  const importInputRef = useRef(null);
-
   const triggerImport = () => {
     if (isViewerOnly) return;
-    importInputRef.current?.click();
+    if (typeof onOpenImportModal === 'function') {
+      onOpenImportModal();
+      return;
+    }
   };
 
   const normalizedRows = useMemo(() => {
@@ -216,15 +217,6 @@ function SuppliersDashboardPage({
               </svg>
               Importer achats (multi-fichiers)
             </button>
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              multiple
-              onChange={onImportFile}
-              disabled={isViewerOnly}
-              className="sr-only"
-            />
             {!isViewerOnly && (
               <button
                 onClick={onInvite}
