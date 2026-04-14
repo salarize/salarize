@@ -46,7 +46,7 @@ function Sidebar({
       ).size
     : 0;
 
-  // Trier les sociétés selon l'ordre personnalisé
+  // Trier les sociÃ©tÃ©s selon l'ordre personnalisÃ©
   const getOrderedCompanies = (companiesList, isShared) => {
     if (!companiesList) return [];
     const filtered = Object.entries(companiesList).filter(([_, c]) => isShared ? c.isShared : !c.isShared);
@@ -172,7 +172,7 @@ function Sidebar({
               <button
                 onClick={onImportClick}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 border border-violet-500/20 hover:border-violet-500/40 rounded-xl transition-all group"
-                title={isSuppliersModule ? 'Importer des achats fournisseur' : isCDRModule ? 'Injecter des factures' : 'Importer des données salariales Excel'}
+                title={isSuppliersModule ? 'Importer des achats fournisseur' : isCDRModule ? 'Injecter des factures' : 'Importer des donnÃ©es salariales Excel'}
               >
                 <svg className="w-4 h-4 text-violet-400 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -180,11 +180,11 @@ function Sidebar({
                 <span className="text-xs font-medium text-slate-300">{isSuppliersModule ? 'Importer achats' : isCDRModule ? 'Injecter factures' : 'Importer Excel'}</span>
               </button>
 
-              {/* Nouvelle société - Bouton discret (juste icône) */}
+              {/* Nouvelle sociÃ©tÃ© - Bouton discret (juste icÃ´ne) */}
               <button
                 onClick={onAddCompany}
                 className="w-10 h-10 flex items-center justify-center bg-slate-800/30 hover:bg-slate-800 border border-slate-700/30 hover:border-slate-600 rounded-xl transition-all group"
-                title="Créer une société vide"
+                title="CrÃ©er une sociÃ©tÃ© vide"
               >
                 <svg className="w-4 h-4 text-slate-500 group-hover:text-violet-400 group-hover:scale-110 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -194,7 +194,7 @@ function Sidebar({
           </div>
         )}
 
-        {/* Alerte employés non assignés — uniquement en module RH */}
+        {/* Alerte employÃ©s non assignÃ©s â€” uniquement en module RH */}
         {unassignedCount > 0 && isPayrollModule && (
           <div className="px-4 py-2">
             <button
@@ -207,7 +207,7 @@ function Sidebar({
                 </svg>
               </div>
               <div className="text-left">
-                <p className="text-amber-400 text-sm font-semibold">{unassignedCount} sans département</p>
+                <p className="text-amber-400 text-sm font-semibold">{unassignedCount} sans dÃ©partement</p>
                 <p className="text-amber-400/60 text-xs">Cliquer pour assigner</p>
               </div>
             </button>
@@ -233,7 +233,7 @@ function Sidebar({
                 </svg>
                 Vue d'ensemble
               </button>
-              {/* Coûts salariaux */}
+              {/* CoÃ»ts salariaux */}
               <button
                 onClick={onPayrollClick}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
@@ -245,9 +245,9 @@ function Sidebar({
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Coûts salariaux
+                CoÃ»ts salariaux
               </button>
-              {/* Coûts fournisseurs */}
+              {/* CoÃ»ts fournisseurs */}
               <button
                 onClick={onSuppliersClick}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left ${
@@ -259,7 +259,7 @@ function Sidebar({
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
-                Coûts fournisseurs
+                CoÃ»ts fournisseurs
               </button>
               {/* CDR & Closers */}
               <button
@@ -279,12 +279,12 @@ function Sidebar({
           </div>
         )}
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {/* Mes sociétés */}
+          {/* Mes sociÃ©tÃ©s */}
           {myCompanies.length > 0 && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3 px-1">
                 <div className="w-1.5 h-5 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></div>
-                <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase">Mes Sociétés</p>
+                <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase">Mes SociÃ©tÃ©s</p>
                 <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent"></div>
               </div>
 
@@ -357,12 +357,12 @@ function Sidebar({
             </div>
           )}
 
-          {/* Sociétés partagées */}
+          {/* SociÃ©tÃ©s partagÃ©es */}
           {sharedCompanies.length > 0 && (
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3 px-1">
                 <div className="w-1.5 h-5 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full"></div>
-                <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase">Partagées avec moi</p>
+                <p className="text-slate-500 text-xs font-semibold tracking-wider uppercase">PartagÃ©es avec moi</p>
                 <div className="flex-1 h-px bg-gradient-to-r from-slate-800 to-transparent"></div>
                 <span className="text-[10px] font-bold text-emerald-500/70 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">{sharedCompanies.length}</span>
               </div>
@@ -439,7 +439,7 @@ function Sidebar({
             </div>
           )}
 
-          {/* État vide */}
+          {/* Ã‰tat vide */}
           {!hasCompanies && (
             <div className="text-center py-8">
               <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 rounded-2xl flex items-center justify-center border border-violet-500/20">
@@ -450,7 +450,7 @@ function Sidebar({
 
               <h3 className="text-white font-semibold mb-2">Bienvenue !</h3>
               <p className="text-slate-500 text-sm mb-6 px-4">
-                Commencez par importer vos données salariales
+                Commencez par importer vos donnÃ©es salariales
               </p>
 
               {!isViewerOnly && (
@@ -480,7 +480,7 @@ function Sidebar({
                       </svg>
                     </div>
                     <div>
-                      <p className="text-slate-300 text-sm font-medium">Créer une société</p>
+                      <p className="text-slate-300 text-sm font-medium">CrÃ©er une sociÃ©tÃ©</p>
                       <p className="text-slate-500 text-xs">Ajouter manuellement</p>
                     </div>
                   </button>
@@ -494,32 +494,32 @@ function Sidebar({
         {activeCompany && hasCompanies && (
           <div className="p-4 border-t border-slate-800/50 bg-slate-950/50">
             <div className="flex items-center gap-2">
-              {/* Équipes — uniquement en module RH */}
+              {/* Ã‰quipes â€” uniquement en module RH */}
               {isPayrollModule && (
                 <button
                   onClick={onManageDepts}
                   className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 hover:from-violet-500/20 hover:to-fuchsia-500/20 border border-violet-500/20 rounded-xl transition-all group"
-                  title="Gérer mes équipes"
+                  title="GÃ©rer mes Ã©quipes"
                 >
                   <svg className="w-4 h-4 text-violet-400 group-hover:text-violet-300 group-hover:scale-110 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  <span className="text-xs font-semibold text-violet-300 group-hover:text-violet-200">Équipes</span>
+                  <span className="text-xs font-semibold text-violet-300 group-hover:text-violet-200">Ã‰quipes</span>
                 </button>
               )}
 
-              {/* Paramètres société */}
+              {/* ParamÃ¨tres sociÃ©tÃ© */}
               {!isViewerOnly && (
                 <button
                   onClick={onManageData}
                   className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-800/70 hover:bg-slate-800 rounded-xl transition-all group"
-                  title="Paramètres de la société"
+                  title="ParamÃ¨tres de la sociÃ©tÃ©"
                 >
                   <svg className="w-4 h-4 text-slate-400 group-hover:text-white group-hover:scale-110 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="text-xs font-medium text-slate-400 group-hover:text-slate-300">Paramètres</span>
+                  <span className="text-xs font-medium text-slate-400 group-hover:text-slate-300">ParamÃ¨tres</span>
                 </button>
               )}
             </div>

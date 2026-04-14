@@ -1,4 +1,4 @@
-import{r as c,j as e,a as $,b as B}from"./index-DzA-ojpv.js";import{L as _}from"./LastUpdatedBadge-B4e39TsQ.js";import"./vendor-supabase-DfwcnzK-.js";const q=`CREATE TABLE IF NOT EXISTS material_costs (
+import{r as c,j as e,a as $,b as B}from"./index-JgytVurB.js";import{L as _}from"./LastUpdatedBadge-DRL2fTfT.js";import"./vendor-supabase-DfwcnzK-.js";const q=`CREATE TABLE IF NOT EXISTS material_costs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   period TEXT,
