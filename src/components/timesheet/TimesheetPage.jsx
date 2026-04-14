@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import MonthCalendar from './MonthCalendar';
 import DayEntryModal from './DayEntryModal';
 import ProjectsManager from './ProjectsManager';
 import { supabase } from '../../config/supabase';
+import { useDebouncedCallback } from '../../hooks';
+import { CloudSaveIndicator } from '../ui';
 
 function TimesheetPage({ user, onBack }) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -11,10 +13,56 @@ function TimesheetPage({ user, onBack }) {
   const [selectedDay, setSelectedDay] = useState(null);
   const [showProjectsManager, setShowProjectsManager] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState('idle');
   const [consultantSettings, setConsultantSettings] = useState({
     default_hourly_rate: 85,
     working_hours_per_day: 8
   });
+  const saveStatusTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveStatusTimeoutRef.current) {
+        clearTimeout(saveStatusTimeoutRef.current);
+        saveStatusTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const persistSettings = useDebouncedCallback(async (settings) => {
+    if (!user?.id) return;
+
+    setSaveStatus('saving');
+    try {
+      const { error } = await supabase
+        .from('consultant_settings')
+        .upsert(
+          {
+            user_id: user.id,
+            default_hourly_rate: settings.default_hourly_rate,
+            working_hours_per_day: settings.working_hours_per_day,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'user_id' }
+        );
+
+      if (error) throw error;
+      setSaveStatus('saved');
+      if (saveStatusTimeoutRef.current) {
+        clearTimeout(saveStatusTimeoutRef.current);
+        saveStatusTimeoutRef.current = null;
+      }
+      saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 2500);
+    } catch (err) {
+      console.error('Auto-save error:', err);
+      setSaveStatus('error');
+      if (saveStatusTimeoutRef.current) {
+        clearTimeout(saveStatusTimeoutRef.current);
+        saveStatusTimeoutRef.current = null;
+      }
+      saveStatusTimeoutRef.current = setTimeout(() => setSaveStatus('idle'), 3000);
+    }
+  }, 800);
 
   // Charger les donnees au montage
   useEffect(() => {
@@ -316,7 +364,10 @@ function TimesheetPage({ user, onBack }) {
 
             {/* Taux horaire */}
             <div className="bg-slate-900 rounded-xl p-4 border border-slate-800">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Configuration</h3>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Configuration</h3>
+                <CloudSaveIndicator status={saveStatus} />
+              </div>
               <div className="space-y-3">
                 <div>
                   <label className="text-slate-400 text-xs">Taux horaire par defaut</label>
@@ -324,7 +375,14 @@ function TimesheetPage({ user, onBack }) {
                     <input
                       type="number"
                       value={consultantSettings.default_hourly_rate}
-                      onChange={(e) => setConsultantSettings(prev => ({ ...prev, default_hourly_rate: parseFloat(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const newSettings = {
+                          ...consultantSettings,
+                          default_hourly_rate: parseFloat(e.target.value) || 0
+                        };
+                        setConsultantSettings(newSettings);
+                        persistSettings(newSettings);
+                      }}
                       className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-violet-500 focus:outline-none"
                     />
                     <span className="text-slate-400 text-sm">EUR/h</span>
@@ -335,7 +393,14 @@ function TimesheetPage({ user, onBack }) {
                   <input
                     type="number"
                     value={consultantSettings.working_hours_per_day}
-                    onChange={(e) => setConsultantSettings(prev => ({ ...prev, working_hours_per_day: parseFloat(e.target.value) || 8 }))}
+                    onChange={(e) => {
+                      const newSettings = {
+                        ...consultantSettings,
+                        working_hours_per_day: parseFloat(e.target.value) || 8
+                      };
+                      setConsultantSettings(newSettings);
+                      persistSettings(newSettings);
+                    }}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-violet-500 focus:outline-none mt-1"
                   />
                 </div>

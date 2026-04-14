@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ConfirmDialog } from '../ui';
 
 function DayEntryModal({ date, entries, projects, defaultHourlyRate, onSave, onDelete, onClose }) {
   const [newEntry, setNewEntry] = useState({
@@ -10,6 +11,7 @@ function DayEntryModal({ date, entries, projects, defaultHourlyRate, onSave, onD
   });
   const [editingId, setEditingId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
   const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   const monthNames = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin',
@@ -55,11 +57,29 @@ function DayEntryModal({ date, entries, projects, defaultHourlyRate, onSave, onD
     });
   };
 
-  const handleDelete = async (entryId) => {
-    if (window.confirm('Supprimer cette entree ?')) {
-      await onDelete(entryId);
-    }
+  const handleDelete = (entryId) => {
+    setPendingDeleteId(entryId);
   };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    await onDelete(pendingDeleteId);
+    setPendingDeleteId(null);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      if (pendingDeleteId) {
+        setPendingDeleteId(null);
+        return;
+      }
+      onClose();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose, pendingDeleteId]);
 
   const cancelEdit = () => {
     setEditingId(null);
@@ -275,6 +295,17 @@ function DayEntryModal({ date, entries, projects, defaultHourlyRate, onSave, onD
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingDeleteId)}
+        tone="danger"
+        title="Supprimer cette entree ?"
+        description="Cette action est definitive."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        onCancel={() => setPendingDeleteId(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

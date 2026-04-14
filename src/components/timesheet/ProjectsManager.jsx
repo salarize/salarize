@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../config/supabase';
+import { ConfirmDialog } from '../ui';
 
 function ProjectsManager({ userId, projects, onClose, onRefresh }) {
   const [newProject, setNewProject] = useState({
@@ -9,6 +10,7 @@ function ProjectsManager({ userId, projects, onClose, onRefresh }) {
   });
   const [editingId, setEditingId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingDeleteProject, setPendingDeleteProject] = useState(null);
 
   const handleSave = async () => {
     if (!newProject.name.trim() || !newProject.client_name.trim()) return;
@@ -59,20 +61,23 @@ function ProjectsManager({ userId, projects, onClose, onRefresh }) {
   };
 
   const handleDelete = async (projectId) => {
-    if (!window.confirm('Supprimer ce projet ? Les entrees de timesheet associees ne seront pas supprimees.')) {
-      return;
-    }
+    setPendingDeleteProject(projectId);
+  };
 
+  const confirmDelete = async () => {
+    if (!pendingDeleteProject) return;
     try {
       const { error } = await supabase
         .from('projects')
         .update({ is_active: false })
-        .eq('id', projectId);
+        .eq('id', pendingDeleteProject);
 
       if (error) throw error;
       onRefresh();
     } catch (error) {
       console.error('Erreur suppression projet:', error);
+    } finally {
+      setPendingDeleteProject(null);
     }
   };
 
@@ -247,6 +252,17 @@ function ProjectsManager({ userId, projects, onClose, onRefresh }) {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingDeleteProject)}
+        tone="danger"
+        title="Supprimer ce projet ?"
+        description="Les entrées de timesheet associées ne seront pas supprimées."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        onCancel={() => setPendingDeleteProject(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -72,9 +72,10 @@ import { useDebounce, useDebouncedCallback } from './hooks';
 
 // Context
 import { ToastProvider, useToast } from './context/ToastContext';
+import { DirtyProvider, useDirtyContext } from './context/DirtyContext';
 
 // Components - UI
-import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton } from './components/ui';
+import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton, SearchInput, CSVPreview, UnsavedWarningDialog } from './components/ui';
 import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
@@ -141,6 +142,7 @@ const loadXLSX = async () => {
 function AppContent() {
   // Toast notifications
   const toast = useToast();
+  const { hasDirty, clearAllDirty } = useDirtyContext();
   
   // Helper pour formater les périodes (2024-03 → Mars 2024)
   const formatPeriod = (period) => {
@@ -189,14 +191,19 @@ function AppContent() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showMaterialImportModal, setShowMaterialImportModal] = useState(false);
   const [materialImportBusy, setMaterialImportBusy] = useState(false);
+  const [pendingMaterialFiles, setPendingMaterialFiles] = useState([]);
+  const [materialPreviewRows, setMaterialPreviewRows] = useState(null);
+  const [materialPreviewFileName, setMaterialPreviewFileName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [pendingPeriodSelection, setPendingPeriodSelection] = useState(null); // { data, detectedPeriods }
   const [showQuickImportModal, setShowQuickImportModal] = useState(false); // Modal d'import rapide avec liste des fichiers
   const [showMaterialsPanel, setShowMaterialsPanel] = useState(false);
   const [materialCosts, setMaterialCosts] = useState([]);
+  const [materialCostsLastFetched, setMaterialCostsLastFetched] = useState(null);
   const [materialSearch, setMaterialSearch] = useState('');
   const [materialSupplierFilter, setMaterialSupplierFilter] = useState('all');
   const [materialPeriodFilter, setMaterialPeriodFilter] = useState('all');
+  const [payrollSearch, setPayrollSearch] = useState('');
   const [payrollAiModel, setPayrollAiModel] = useState({ aliases: {}, trainedSamples: 0, lastUpdated: null });
   const [showDeptManager, setShowDeptManager] = useState(false);
   const [deptSearchTerm, setDeptSearchTerm] = useState('');
@@ -227,15 +234,7 @@ function AppContent() {
   const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
   // 'overview' | 'payroll' | 'suppliers' | 'cdr'
   const [currentModule, setCurrentModule] = useState('overview');
-  // 'light' | 'neon' | 'aurora' (layout visuel du dashboard central)
-  const [dashboardSkin, setDashboardSkin] = useState(() => {
-    try {
-      const saved = localStorage.getItem('salarize_dashboard_skin_v1');
-      return saved === 'neon' || saved === 'aurora' ? saved : 'light';
-    } catch {
-      return 'light';
-    }
-  });
+  const [unsavedNavigationRequest, setUnsavedNavigationRequest] = useState(null); // { type: 'module'|'company', nextModule?: string, companyName?: string, comps?: object }
   const [materialCostsSetupIssue, setMaterialCostsSetupIssue] = useState(null);
   // Track si on est en mode reset password - initialisé IMMÉDIATEMENT au premier rendu
   const isRecoveryModeRef = useRef(
@@ -261,14 +260,25 @@ function AppContent() {
   const [currentFileIndex, setCurrentFileIndex] = useState(0); // Index du fichier en cours
   const [importReady, setImportReady] = useState(false); // Délai avant de pouvoir importer
 
-  const switchModule = useCallback((nextModule) => {
-    // Navigation de module: fermer les modals d'import pour éviter une ouverture résiduelle.
+  const hasBlockingUnsaved = showImportModal || showMaterialImportModal || Boolean(pendingPeriodSelection) || hasDirty;
+
+  const applyModuleSwitch = useCallback((nextModule) => {
     setShowImportModal(false);
     setShowMaterialImportModal(false);
     startTransition(() => {
       setCurrentModule(nextModule);
     });
   }, []);
+
+  const switchModule = useCallback((nextModule, options = {}) => {
+    const { force = false } = options;
+    if (!nextModule || nextModule === currentModule) return;
+    if (!force && hasBlockingUnsaved) {
+      setUnsavedNavigationRequest({ type: 'module', nextModule });
+      return;
+    }
+    applyModuleSwitch(nextModule);
+  }, [currentModule, hasBlockingUnsaved, applyModuleSwitch]);
 
   const buildMaterialCostsSetupIssue = useCallback((error) => {
     const normalized = normalizePostgrestError(error, { target: 'material_costs' });
@@ -332,7 +342,6 @@ function AppContent() {
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   const [resetPasswordError, setResetPasswordError] = useState('');
   const PAYROLL_AI_MODEL_STORAGE_KEY = 'salarize_payroll_ai_model_v1';
-  const DASHBOARD_SKIN_STORAGE_KEY = 'salarize_dashboard_skin_v1';
 
   // Fonction pour mettre à jour le mot de passe
   const handleUpdatePassword = async () => {
@@ -746,6 +755,11 @@ function AppContent() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const tagName = e.target?.tagName;
+      const isTypingTarget = tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || e.target?.isContentEditable;
+      const hasModifier = e.metaKey || e.ctrlKey || e.altKey;
+      const hasBlockingModal = showOnboarding || showExportMenu || showActionsMenu || showExportModal || showDataManager || showDeptManager || showCompanySettings || showImportModal || showMaterialImportModal || showModal || showNewCompanyModal || showCompareModal;
+
       // Escape - fermer les modals
       if (e.key === 'Escape') {
         if (showOnboarding) { setShowOnboarding(false); setOnboardingStep(0); }
@@ -756,9 +770,44 @@ function AppContent() {
         else if (showDeptManager) { setShowDeptManager(false); setSelectedEmployees(new Set()); }
         else if (showCompanySettings) setShowCompanySettings(false);
         else if (showImportModal) setShowImportModal(false);
+        else if (showMaterialImportModal) {
+          setShowMaterialImportModal(false);
+          setPendingMaterialFiles([]);
+          setMaterialPreviewRows(null);
+          setMaterialPreviewFileName('');
+        }
         else if (showModal) setShowModal(false);
         else if (showNewCompanyModal) setShowNewCompanyModal(false);
         else if (showCompareModal) { setShowCompareModal(false); setComparePeriod(null); setComparePeriod1(null); }
+      }
+
+      if (currentPage === 'dashboard' && !hasModifier && !isTypingTarget && !hasBlockingModal) {
+        const key = String(e.key || '').toLowerCase();
+        if (key === 'h') {
+          e.preventDefault();
+          switchModule('payroll');
+          return;
+        }
+        if (key === 'f') {
+          e.preventDefault();
+          switchModule('suppliers');
+          return;
+        }
+        if (key === 'c') {
+          e.preventDefault();
+          switchModule('cdr');
+          return;
+        }
+        if (key === 'o') {
+          e.preventDefault();
+          switchModule('overview');
+          return;
+        }
+        if (e.key === 'Backspace' && currentModule !== 'overview') {
+          e.preventDefault();
+          switchModule('overview');
+          return;
+        }
       }
       
       // Cmd/Ctrl + E - Export Excel
@@ -790,7 +839,7 @@ function AppContent() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showOnboarding, showExportMenu, showActionsMenu, showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showMaterialImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, currentModule, activeCompany, employees.length]);
+  }, [showOnboarding, showExportMenu, showActionsMenu, showExportModal, showDataManager, showDeptManager, showCompanySettings, showImportModal, showMaterialImportModal, showModal, showNewCompanyModal, showCompareModal, currentPage, currentModule, activeCompany, employees.length, switchModule]);
 
   // Délai avant de pouvoir importer (évite les clics trop rapides)
   useEffect(() => {
@@ -826,14 +875,6 @@ function AppContent() {
       console.warn('[Salarize] Impossible de sauvegarder le modèle IA de mapping:', err);
     }
   }, [PAYROLL_AI_MODEL_STORAGE_KEY, payrollAiModel]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(DASHBOARD_SKIN_STORAGE_KEY, dashboardSkin);
-    } catch (err) {
-      console.warn('[Salarize] Impossible de sauvegarder le thème dashboard:', err);
-    }
-  }, [DASHBOARD_SKIN_STORAGE_KEY, dashboardSkin]);
 
   // Synchroniser companiesRef avec companies state
   useEffect(() => {
@@ -1026,6 +1067,7 @@ function AppContent() {
         setActiveCompany(null);
         setEmployees([]);
         setMaterialCosts([]);
+        setMaterialCostsLastFetched(null);
         setMaterialCostsSetupIssue(null);
         switchModule('overview');
         setShowMaterialsPanel(false);
@@ -2805,29 +2847,82 @@ function AppContent() {
     setActiveCompany(null);
     setEmployees([]);
     setMaterialCosts([]);
+    setMaterialCostsLastFetched(null);
+    setPendingMaterialFiles([]);
+    setMaterialPreviewRows(null);
+    setMaterialPreviewFileName('');
     setMaterialCostsSetupIssue(null);
-    switchModule('overview');
+    setUnsavedNavigationRequest(null);
+    clearAllDirty();
+    applyModuleSwitch('overview');
     setShowMaterialsPanel(false);
     setView('upload');
   };
 
-  const loadCompany = (name, comps = companies) => {
-    const c = comps[name];
-    if (!c) return;
+  const applyCompanySelection = useCallback((name, comps = companies) => {
+    const company = comps[name];
+    if (!company) return;
+
     setActiveCompany(name);
-    setEmployees(c.employees || []);
-    setDepartmentMapping(c.mapping || {});
-    setPeriods(c.periods || []);
-    setMaterialCosts(c.materialCosts || []);
+    setEmployees(company.employees || []);
+    setDepartmentMapping(company.mapping || {});
+    setPeriods(company.periods || []);
+    setMaterialCosts(company.materialCosts || []);
+    setMaterialCostsLastFetched((company.materialCosts || []).length > 0 ? new Date() : null);
+    setPendingMaterialFiles([]);
+    setMaterialPreviewRows(null);
+    setMaterialPreviewFileName('');
     setMaterialSearch('');
+    setPayrollSearch('');
     setMaterialSupplierFilter('all');
     setMaterialPeriodFilter('all');
-    setShowMaterialsPanel((c.materialCosts || []).length > 0);
-    setCreatedDepartments(c.createdDepartments || []);
+    setShowMaterialsPanel((company.materialCosts || []).length > 0);
+    setCreatedDepartments(company.createdDepartments || []);
     setSelectedPeriods([]);
-    switchModule('overview');
+    applyModuleSwitch('overview');
     setView('dashboard');
-  };
+  }, [companies, applyModuleSwitch]);
+
+  const loadCompany = useCallback((name, comps = companies, options = {}) => {
+    const { force = false } = options;
+    const company = comps[name];
+    if (!company) return;
+    if (!force && hasBlockingUnsaved) {
+      setUnsavedNavigationRequest({ type: 'company', companyName: name, comps });
+      return;
+    }
+    applyCompanySelection(name, comps);
+  }, [companies, hasBlockingUnsaved, applyCompanySelection]);
+
+  const cancelUnsavedNavigation = useCallback(() => {
+    setUnsavedNavigationRequest(null);
+  }, []);
+
+  const confirmUnsavedNavigation = useCallback(() => {
+    const request = unsavedNavigationRequest;
+    if (!request) return;
+
+    setUnsavedNavigationRequest(null);
+    setShowImportModal(false);
+    setShowMaterialImportModal(false);
+    setPendingPeriodSelection(null);
+    setShowQuickImportModal(false);
+    setFileQueue([]);
+    setCurrentFileIndex(0);
+    setPendingMaterialFiles([]);
+    setMaterialPreviewRows(null);
+    setMaterialPreviewFileName('');
+    clearAllDirty();
+
+    if (request.type === 'module' && request.nextModule) {
+      applyModuleSwitch(request.nextModule);
+      return;
+    }
+
+    if (request.type === 'company' && request.companyName) {
+      applyCompanySelection(request.companyName, request.comps || companies);
+    }
+  }, [unsavedNavigationRequest, clearAllDirty, applyModuleSwitch, applyCompanySelection, companies]);
 
   // Handler pour réorganiser les sociétés dans la sidebar (drag & drop)
   const handleReorderCompanies = async (newOrder) => {
@@ -3616,6 +3711,7 @@ function AppContent() {
     setCompanies(newCompanies);
     companiesRef.current = newCompanies;
     setMaterialCosts(mergedRows);
+    setMaterialCostsLastFetched(new Date());
     setShowMaterialsPanel(true);
     setMaterialSearch('');
     setMaterialSupplierFilter('all');
@@ -3629,49 +3725,80 @@ function AppContent() {
     }
   };
 
+  const clearMaterialImportDraft = useCallback(() => {
+    setPendingMaterialFiles([]);
+    setMaterialPreviewRows(null);
+    setMaterialPreviewFileName('');
+  }, []);
+
+  const closeMaterialImportModal = useCallback(() => {
+    setShowMaterialImportModal(false);
+    clearMaterialImportDraft();
+  }, [clearMaterialImportDraft]);
+
+  const extractMaterialSheetRows = useCallback(async (file) => {
+    const XLSX = await loadXLSX();
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+    const sheetName = workbook.SheetNames?.find((name) => {
+      const lower = String(name || '').toLowerCase();
+      return (
+        lower.includes('achat') ||
+        lower.includes('fournisseur') ||
+        lower.includes('supplier') ||
+        lower.includes('matiere') ||
+        lower.includes('material') ||
+        lower.includes('purchase') ||
+        lower.includes('data')
+      );
+    }) || workbook.SheetNames?.[0];
+    if (!sheetName) return { rows: [], XLSX };
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    return { rows, XLSX };
+  }, []);
+
   const handleMaterialFileChange = async (event) => {
     const selectedFiles = Array.from(event?.target?.files || []).filter(Boolean);
-    if (!selectedFiles.length || !activeCompany) return;
+    if (!selectedFiles.length) return;
+
+    setPendingMaterialFiles(selectedFiles);
+    setMaterialPreviewFileName(selectedFiles[0]?.name || '');
+
+    try {
+      const { rows } = await extractMaterialSheetRows(selectedFiles[0]);
+      setMaterialPreviewRows(rows);
+    } catch (err) {
+      console.error('[Salarize] Preview matière première indisponible:', err);
+      setMaterialPreviewRows(null);
+      toast.warning('Preview indisponible pour ce fichier, mais l’import reste possible.');
+    } finally {
+      if (event?.target) event.target.value = '';
+    }
+  };
+
+  const handleMaterialImportConfirm = async () => {
+    if (!activeCompany || pendingMaterialFiles.length === 0) return;
 
     setMaterialImportBusy(true);
     try {
-      const fileNames = selectedFiles.map((file) => file.name).filter(Boolean);
+      const fileNames = pendingMaterialFiles.map((file) => file.name).filter(Boolean);
       const importSummary = await runImportWithAudit(
         {
           companyName: activeCompany,
           module: 'suppliers',
           source: 'suppliers_excel_import',
           fileNames,
-          notes: `Import fournisseurs (${selectedFiles.length} fichier${selectedFiles.length > 1 ? 's' : ''})`,
+          notes: `Import fournisseurs (${pendingMaterialFiles.length} fichier${pendingMaterialFiles.length > 1 ? 's' : ''})`,
         },
         async () => {
-          const XLSX = await loadXLSX();
           let importedFiles = 0;
           let importedRows = 0;
           let skippedFiles = 0;
           const skippedFileNames = [];
 
-          for (const file of selectedFiles) {
-            const data = await file.arrayBuffer();
-            const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
-            const sheetName = wb.SheetNames?.find((name) => {
-              const lower = String(name || '').toLowerCase();
-              return (
-                lower.includes('achat') ||
-                lower.includes('fournisseur') ||
-                lower.includes('supplier') ||
-                lower.includes('matiere') ||
-                lower.includes('material') ||
-                lower.includes('purchase') ||
-                lower.includes('data')
-              );
-            }) || wb.SheetNames?.[0];
-            if (!sheetName) {
-              skippedFiles++;
-              continue;
-            }
-            const sheet = wb.Sheets[sheetName];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          for (const file of pendingMaterialFiles) {
+            const { rows, XLSX } = await extractMaterialSheetRows(file);
             const parsed = parseMaterialCosts(rows, file.name, XLSX);
             if (!parsed || !parsed.rows?.length) {
               skippedFiles++;
@@ -3699,7 +3826,7 @@ function AppContent() {
       const skippedFileNames = importSummary?.skippedFileNames || [];
 
       if (importedFiles > 0) {
-        setShowMaterialImportModal(false);
+        closeMaterialImportModal();
       }
 
       if (importedFiles === 0) {
@@ -3708,7 +3835,7 @@ function AppContent() {
           : '';
         toast.error(`Aucun fichier valide${skippedLabel}. Colonnes attendues: article/SKU/code-barres + coût total (ou quantité + prix unitaire).`);
       } else if (skippedFiles > 0) {
-        toast.warning(`Import partiel: ${importedFiles}/${selectedFiles.length} fichiers, ${importedRows} lignes importées.`);
+        toast.warning(`Import partiel: ${importedFiles}/${pendingMaterialFiles.length} fichiers, ${importedRows} lignes importées.`);
       } else {
         toast.success(`Import terminé: ${importedFiles} fichier${importedFiles > 1 ? 's' : ''}, ${importedRows} lignes.`);
       }
@@ -3717,7 +3844,6 @@ function AppContent() {
       toast.error('Erreur pendant l’import matière première');
     } finally {
       setMaterialImportBusy(false);
-      if (event?.target) event.target.value = '';
     }
   };
 
@@ -4461,6 +4587,7 @@ function AppContent() {
     setActiveCompany(name);
     setEmployees([]);
     setMaterialCosts([]);
+    setMaterialCostsLastFetched(null);
     switchModule('overview');
     setShowMaterialsPanel(false);
     setDepartmentMapping({});
@@ -5339,6 +5466,7 @@ L'équipe Salarize`;
     companiesRef.current = newCompanies;
     setEmployees([]);
     setMaterialCosts([]);
+    setMaterialCostsLastFetched(null);
     switchModule('overview');
     setShowMaterialsPanel(false);
     setPeriods([]);
@@ -5413,6 +5541,7 @@ L'équipe Salarize`;
       setActiveCompany(null);
       setEmployees([]);
       setMaterialCosts([]);
+      setMaterialCostsLastFetched(null);
       switchModule('overview');
       setShowMaterialsPanel(false);
       setPeriods([]);
@@ -5456,6 +5585,7 @@ L'équipe Salarize`;
     companiesRef.current = newCompanies;
     setEmployees(newEmployees);
     setMaterialCosts(newMaterialCosts);
+    setMaterialCostsLastFetched(newMaterialCosts.length > 0 ? new Date() : null);
     setPeriods(newPeriods);
 
     // Suppression DIRECTE dans Supabase (action explicite)
@@ -5954,6 +6084,15 @@ L'équipe Salarize`;
     Object.values(empAgg).sort((a, b) => b.cost - a.cost),
     [empAgg]
   );
+
+  const filteredEmployees = useMemo(() => {
+    const query = normalizeLabelToken(payrollSearch);
+    if (!query) return empList;
+    return empList.filter((employee) => {
+      const haystack = normalizeLabelToken(`${employee.name} ${employee.dept}`);
+      return haystack.includes(query);
+    });
+  }, [empList, payrollSearch]);
 
   // === FILTRAGE PÉRIODES DYNAMIQUE ===
   const filteredPeriodsByRange = useMemo(() => {
@@ -6860,8 +6999,6 @@ L'équipe Salarize`;
             departmentMapping={departmentMapping}
             employees={employees}
             currentModule={currentModule}
-            dashboardSkin={dashboardSkin}
-            onDashboardSkinChange={setDashboardSkin}
           onOverviewClick={() => { setView('dashboard'); switchModule('overview'); setSidebarOpen(false); }}
           onPayrollClick={() => { setView('dashboard'); switchModule('payroll'); setSidebarOpen(false); }}
           onSuppliersClick={() => { setView('dashboard'); switchModule('suppliers'); setSidebarOpen(false); }}
@@ -6963,13 +7100,7 @@ L'équipe Salarize`;
   // Dashboard
   return (
     <PageTransition key="dashboard">
-      <div className={`min-h-screen flex ${
-        dashboardSkin === 'neon'
-          ? 'bg-slate-950'
-          : dashboardSkin === 'aurora'
-            ? 'bg-gradient-to-br from-indigo-950 via-violet-950 to-cyan-950'
-            : 'bg-gradient-to-br from-violet-100/60 via-fuchsia-50 to-slate-100'
-      }`}>
+      <div className="min-h-screen flex bg-gradient-to-br from-violet-100/60 via-fuchsia-50 to-slate-100">
         <Sidebar
           companies={companies}
           activeCompany={activeCompany}
@@ -6997,8 +7128,6 @@ L'équipe Salarize`;
           departmentMapping={departmentMapping}
           employees={employees}
           currentModule={currentModule}
-          dashboardSkin={dashboardSkin}
-          onDashboardSkinChange={setDashboardSkin}
           onOverviewClick={() => { switchModule('overview'); setSidebarOpen(false); }}
           onPayrollClick={() => { switchModule('payroll'); setSidebarOpen(false); }}
           onSuppliersClick={() => { switchModule('suppliers'); setSidebarOpen(false); }}
@@ -7210,7 +7339,7 @@ L'équipe Salarize`;
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">🥬 Import matière première</h2>
               <button
-                onClick={() => setShowMaterialImportModal(false)}
+                onClick={closeMaterialImportModal}
                 className="p-1 hover:bg-slate-100 rounded"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7242,6 +7371,24 @@ L'équipe Salarize`;
               />
             </label>
 
+            {pendingMaterialFiles.length > 0 && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                  {pendingMaterialFiles.length} fichier{pendingMaterialFiles.length > 1 ? 's' : ''} sélectionné{pendingMaterialFiles.length > 1 ? 's' : ''}
+                </p>
+                <p className="text-sm text-slate-700 truncate">{materialPreviewFileName}</p>
+              </div>
+            )}
+
+            {materialPreviewRows && (
+              <div className="mt-4">
+                <CSVPreview
+                  rows={materialPreviewRows}
+                  title="Preview import matière première"
+                />
+              </div>
+            )}
+
             {materialImportBusy && (
               <div className="mt-4 flex items-center justify-center gap-2 text-sm text-slate-500">
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -7251,9 +7398,33 @@ L'équipe Salarize`;
                 Analyse en cours...
               </div>
             )}
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={closeMaterialImportModal}
+                className="px-3 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                disabled={materialImportBusy}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleMaterialImportConfirm}
+                disabled={materialImportBusy || pendingMaterialFiles.length === 0}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Importer {pendingMaterialFiles.length > 0 ? `(${pendingMaterialFiles.length})` : ''}
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      <UnsavedWarningDialog
+        isOpen={Boolean(unsavedNavigationRequest)}
+        context={unsavedNavigationRequest?.type === 'company' ? 'company' : 'module'}
+        onCancel={cancelUnsavedNavigation}
+        onConfirm={confirmUnsavedNavigation}
+      />
       
       {/* Period Selection Modal - Redesigned */}
       {pendingPeriodSelection && (
@@ -8458,79 +8629,7 @@ L'équipe Salarize`;
         </div>
       )}
 
-      <main className={`lg:ml-72 pt-4 lg:pt-6 flex-1 p-4 lg:p-6 relative overflow-hidden ${
-        dashboardSkin === 'neon'
-          ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950'
-          : dashboardSkin === 'aurora'
-            ? 'bg-gradient-to-br from-indigo-950/95 via-violet-900/90 to-cyan-900/85'
-            : 'bg-gradient-to-br from-violet-50/80 via-fuchsia-50/60 to-indigo-50/60'
-      }`}>
-        {dashboardSkin === 'neon' && (
-          <>
-            <div className="pointer-events-none absolute -top-24 -left-16 w-80 h-80 rounded-full bg-violet-500/20 blur-3xl" />
-            <div className="pointer-events-none absolute top-10 right-8 w-72 h-72 rounded-full bg-sky-400/15 blur-3xl" />
-            <div className="pointer-events-none absolute bottom-0 left-1/3 w-96 h-64 rounded-full bg-fuchsia-500/10 blur-3xl" />
-          </>
-        )}
-        {dashboardSkin === 'aurora' && (
-          <>
-            <div className="pointer-events-none absolute -top-28 -left-24 w-96 h-96 rounded-full bg-cyan-300/20 blur-3xl" />
-            <div className="pointer-events-none absolute top-24 right-0 w-80 h-80 rounded-full bg-violet-400/20 blur-3xl" />
-            <div className="pointer-events-none absolute bottom-0 left-1/4 w-[30rem] h-72 rounded-full bg-fuchsia-500/15 blur-3xl" />
-          </>
-        )}
-
-        <div className="fixed right-3 bottom-4 sm:bottom-auto sm:top-4 sm:right-4 lg:top-5 lg:right-6 z-[90] flex justify-end">
-          <div className={`inline-flex items-center gap-1 p-1.5 rounded-xl border shadow-lg backdrop-blur-sm ${
-            dashboardSkin === 'neon'
-              ? 'bg-slate-900/90 border-slate-600'
-              : dashboardSkin === 'aurora'
-                ? 'bg-slate-900/85 border-cyan-400/40'
-                : 'bg-white/95 border-violet-300'
-          }`}>
-            <span className={`hidden md:inline px-2 text-[10px] font-bold tracking-wide ${
-              dashboardSkin === 'light' ? 'text-violet-600' : 'text-slate-200'
-            }`}>
-              THEME
-            </span>
-            <button
-              onClick={() => setDashboardSkin('light')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                dashboardSkin === 'light'
-                  ? 'bg-white text-violet-700 shadow-sm'
-                  : dashboardSkin === 'aurora'
-                    ? 'text-slate-200 hover:text-white hover:bg-white/10'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-              }`}
-            >
-              Light
-            </button>
-            <button
-              onClick={() => setDashboardSkin('neon')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                dashboardSkin === 'neon'
-                  ? 'bg-violet-500/25 text-violet-100 border border-violet-400/30'
-                  : dashboardSkin === 'light'
-                    ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                    : 'text-slate-200 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              Neon
-            </button>
-            <button
-              onClick={() => setDashboardSkin('aurora')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                dashboardSkin === 'aurora'
-                  ? 'bg-cyan-400/20 text-cyan-100 border border-cyan-300/35'
-                  : dashboardSkin === 'light'
-                    ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-              }`}
-            >
-              Aurora
-            </button>
-          </div>
-        </div>
+      <main className="lg:ml-72 pt-4 lg:pt-6 flex-1 p-4 lg:p-6 relative overflow-hidden bg-gradient-to-br from-violet-50/80 via-fuchsia-50/60 to-indigo-50/60">
         {/* Loading overlay quand on recharge les données */}
         {isLoadingData && employees.length > 0 && (
           <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-40 flex items-center justify-center">
@@ -8541,7 +8640,7 @@ L'équipe Salarize`;
         )}
         
         {/* Skeleton de chargement seulement si pas de données */}
-        {isLoadingData && employees.length === 0 ? (
+        {isLoadingData && employees.length === 0 && currentModule !== 'payroll' ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh]">
             <LoadingSpinner size="lg" text="Chargement des données" subtext="Veuillez patienter..." />
           </div>
@@ -8552,7 +8651,6 @@ L'équipe Salarize`;
               activeCompany={activeCompany}
               companies={companies}
               companyOrder={companyOrder}
-              dashboardSkin={dashboardSkin}
               onSelectCompany={(name) => { loadCompany(name); }}
               onOpenPayroll={() => switchModule('payroll')}
               onOpenSuppliers={() => switchModule('suppliers')}
@@ -8565,11 +8663,14 @@ L'équipe Salarize`;
             <SuppliersDashboardPage
               activeCompany={activeCompany}
               materialCosts={materialCosts}
+              isLoading={isLoadingData}
+              lastFetchedAt={materialCostsLastFetched}
               isViewerOnly={isViewerOnly}
               setupIssue={materialCostsSetupIssue}
               onBack={() => switchModule('overview')}
               onInvite={() => setShowInviteModal(true)}
               onOpenImportModal={() => setShowMaterialImportModal(true)}
+              onImportBlocked={() => toast.error('Mode lecture seule: impossible d’importer sur cette société. Sélectionnez une société OWNER ou demandez le rôle éditeur.')}
               onRetrySetup={() => {
                 if (!user?.id) return;
                 setIsLoadingData(true);
@@ -8584,7 +8685,8 @@ L'équipe Salarize`;
               isViewerOnly={isViewerOnly}
               onBack={() => switchModule('overview')}
             />
-          ) : (
+          ) : currentModule === 'payroll' ? (
+            isLoadingData ? <DashboardSkeleton /> : (
         <>
         {/* Company Header Card */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden">
@@ -9227,6 +9329,7 @@ L'équipe Salarize`;
                                   companiesRef.current = newCompanies;
                                   setEmployees(restoredEmployees);
                                   setMaterialCosts(restoredMaterialCosts);
+                                  setMaterialCostsLastFetched(restoredMaterialCosts.length > 0 ? new Date() : null);
                                   setShowMaterialsPanel(restoredMaterialCosts.length > 0);
                                   setPeriods(restoredPeriods);
                                   setDepartmentMapping(backup.mapping || {});
@@ -9897,6 +10000,51 @@ L'équipe Salarize`;
             Comparer périodes
           </button>
         )}
+
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base">Top employes (cumul)</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                {filteredEmployees.length} resultat{filteredEmployees.length > 1 ? 's' : ''} sur {empList.length}
+              </p>
+            </div>
+          </div>
+
+          <SearchInput
+            value={payrollSearch}
+            onChange={setPayrollSearch}
+            placeholder="Rechercher un employe ou departement"
+            className="mb-4"
+            inputClassName="focus:border-violet-500"
+          />
+
+          {filteredEmployees.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
+              <p className="text-sm font-medium text-slate-600">Aucun employe trouve</p>
+              <p className="text-xs text-slate-400 mt-1">Ajustez la recherche ou effacez les filtres.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filteredEmployees.slice(0, 12).map((employee) => (
+                <button
+                  key={employee.name}
+                  type="button"
+                  onClick={() => setSelectedEmployee(employee.name)}
+                  className="w-full py-2.5 flex items-center justify-between text-left hover:bg-slate-50 rounded-lg px-2 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{employee.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{employee.dept || 'Non assigne'}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-700 flex-shrink-0">
+                    EUR {employee.cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         
         {/* Modal de comparaison */}
         {showCompareModal && (
@@ -11364,7 +11512,8 @@ L'équipe Salarize`;
         </section>
         )}
         </>
-          ),
+            )
+          ) : null,
           true
         )}
       </main>
@@ -11378,7 +11527,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <AppContent />
+        <DirtyProvider>
+          <AppContent />
+        </DirtyProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

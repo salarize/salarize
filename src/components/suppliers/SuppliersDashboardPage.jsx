@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { SvgHBarChart } from '../layout/SvgBarChart';
+import { LastUpdatedBadge, SuppliersSkeleton } from '../ui';
 
 const MATERIAL_SETUP_SQL = `CREATE TABLE IF NOT EXISTS material_costs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,18 +61,24 @@ const toSafeText = (value, fallback = '') => {
 function SuppliersDashboardPage({
   activeCompany,
   materialCosts = [],
+  isLoading = false,
+  lastFetchedAt = null,
   isViewerOnly,
   onBack,
   setupIssue = null,
   onInvite,
   onOpenImportModal,
+  onImportBlocked = () => {},
   onRetrySetup = () => {}
 }) {
   const [search, setSearch] = useState('');
   const [periodFilter, setPeriodFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const triggerImport = () => {
-    if (isViewerOnly) return;
+    if (isViewerOnly) {
+      onImportBlocked();
+      return;
+    }
     if (typeof onOpenImportModal === 'function') {
       onOpenImportModal();
       return;
@@ -179,6 +186,8 @@ function SuppliersDashboardPage({
       .sort((a, b) => b.totalCost - a.totalCost);
   }, [filteredRows]);
 
+  if (isLoading) return <SuppliersSkeleton />;
+
   return (
     <div>
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 mb-6">
@@ -186,6 +195,7 @@ function SuppliersDashboardPage({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Suite Interne</p>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">Module Achats Fournisseurs</h1>
+            <LastUpdatedBadge date={lastFetchedAt} className="mt-1" />
             <p className="text-sm text-slate-600 mt-1">
               Pilotage des achats matiere premiere par fournisseur et par article.
             </p>
@@ -209,13 +219,13 @@ function SuppliersDashboardPage({
             <button
               type="button"
               onClick={triggerImport}
-              disabled={isViewerOnly}
-              className={`px-3 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 ${isViewerOnly ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'} transition-colors`}
+              className={`px-3 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 ${isViewerOnly ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'} transition-colors`}
+              title={isViewerOnly ? 'Mode lecture seule: import indisponible sur cette société partagée.' : 'Importer un ou plusieurs fichiers achats'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              Importer achats (multi-fichiers)
+              {isViewerOnly ? 'Importer indisponible (lecture seule)' : 'Importer achats (multi-fichiers)'}
             </button>
             {!isViewerOnly && (
               <button

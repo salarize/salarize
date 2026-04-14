@@ -19,8 +19,6 @@ function Sidebar({
   departmentMapping,
   employees,
   currentModule = 'overview',
-  dashboardSkin = 'light',
-  onDashboardSkinChange,
   onOverviewClick,
   onSuppliersClick,
   onPayrollClick,
@@ -277,42 +275,6 @@ function Sidebar({
                 </svg>
                 CDR & Closers
               </button>
-            </div>
-
-            <div className="mt-3 pt-3 border-t border-slate-800/50">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 mb-2">Theme</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  onClick={() => onDashboardSkinChange && onDashboardSkinChange('light')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                    dashboardSkin === 'light'
-                      ? 'bg-white text-violet-700'
-                      : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  Light
-                </button>
-                <button
-                  onClick={() => onDashboardSkinChange && onDashboardSkinChange('neon')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                    dashboardSkin === 'neon'
-                      ? 'bg-violet-500/25 border border-violet-400/35 text-violet-200'
-                      : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  Neon
-                </button>
-                <button
-                  onClick={() => onDashboardSkinChange && onDashboardSkinChange('aurora')}
-                  className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                    dashboardSkin === 'aurora'
-                      ? 'bg-cyan-500/20 border border-cyan-300/35 text-cyan-200'
-                      : 'bg-slate-800/70 text-slate-300 hover:bg-slate-700'
-                  }`}
-                >
-                  Aurora
-                </button>
-              </div>
             </div>
           </div>
         )}

@@ -35,6 +35,7 @@ export function useCDRData(companyId) {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState(null);
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -67,6 +68,7 @@ export function useCDRData(companyId) {
       setEntries(entRes.data || []);
       setBudget(budRes.data || []);
       setInvoices(invRes.data || []);
+      setLastFetchedAt(new Date());
     } catch (e) {
       setError(toCDRStructuredError(e, e?.target || 'cdr'));
     } finally {
@@ -115,6 +117,16 @@ export function useCDRData(companyId) {
     return error;
   }, []);
 
+  const deleteCategory = useCallback(async (categoryId) => {
+    const { error } = await supabase.from('cdr_categories').delete().eq('id', categoryId);
+    if (!error) {
+      setCategories((prev) => prev.filter((category) => category.id !== categoryId));
+      setEntries((prev) => prev.filter((entry) => entry.category_id !== categoryId));
+      setBudget((prev) => prev.filter((row) => row.category_id !== categoryId));
+    }
+    return error;
+  }, []);
+
   // Upsert budget
   const upsertBudget = useCallback(async (companyId, categoryId, month, year, budgetAmount) => {
     const { error } = await supabase.from('cdr_budget').upsert({
@@ -139,5 +151,18 @@ export function useCDRData(companyId) {
     return error;
   }, []);
 
-  return { categories, entries, budget, invoices, loading, error, reload: load, upsertEntry, upsertBudget, updateCategoryStatus };
+  return {
+    categories,
+    entries,
+    budget,
+    invoices,
+    loading,
+    error,
+    reload: load,
+    upsertEntry,
+    upsertBudget,
+    updateCategoryStatus,
+    deleteCategory,
+    lastFetchedAt
+  };
 }

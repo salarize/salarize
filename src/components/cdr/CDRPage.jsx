@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../../config/supabase';
 import { normalizePostgrestError } from '../../utils';
 import { useCDRData } from './hooks/useCDRData';
@@ -7,6 +7,7 @@ import CDRImportModal from './CDRImportModal';
 import CDRInvoiceInjector from './CDRInvoiceInjector';
 import InvoiceReviewPanel from './InvoiceReviewPanel';
 import ClosersDashboard from './closers/ClosersDashboard';
+import { CDRTableSkeleton, LastUpdatedBadge } from '../ui';
 
 const CDR_SETUP_SQL = `-- Executer le script:
 -- supabase_cdr_migration.sql
@@ -40,7 +41,20 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
   const [showImport, setShowImport] = useState(false);
   const [reviewingInvoice, setReviewingInvoice] = useState(null); // invoice row being manually validated
 
-  const { categories, entries, budget, invoices, loading, error, reload, upsertEntry, upsertBudget, updateCategoryStatus } = useCDRData(companyId);
+  const {
+    categories,
+    entries,
+    budget,
+    invoices,
+    loading,
+    error,
+    reload,
+    upsertEntry,
+    upsertBudget,
+    updateCategoryStatus,
+    deleteCategory,
+    lastFetchedAt
+  } = useCDRData(companyId);
 
   // Closing records from invoices (validated closer invoices)
   const [closingRecords, setClosingRecords] = useState([]);
@@ -98,6 +112,49 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
     }).length;
   }, [entries, budget, year]);
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      const tagName = event.target?.tagName;
+      const isTypingTarget = tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || event.target?.isContentEditable;
+      if (isTypingTarget) return;
+
+      if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+        if (event.key === '1') {
+          event.preventDefault();
+          setTab('cdr');
+          return;
+        }
+        if (event.key === '2') {
+          event.preventDefault();
+          setTab('closers');
+          return;
+        }
+        if (event.key === '3') {
+          event.preventDefault();
+          setTab('factures');
+          return;
+        }
+        if ((event.key === 'i' || event.key === 'I') && !isViewerOnly) {
+          event.preventDefault();
+          setShowImport(true);
+          return;
+        }
+      }
+
+      if (event.altKey && event.key === 'ArrowLeft') {
+        event.preventDefault();
+        setYear((current) => current - 1);
+      }
+      if (event.altKey && event.key === 'ArrowRight') {
+        event.preventDefault();
+        setYear((current) => current + 1);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isViewerOnly]);
+
   if (!companyId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-slate-400 gap-3">
@@ -122,7 +179,10 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
             </button>
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">CDR & Closers</p>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">{activeCompany}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800">{activeCompany}</h1>
+            <LastUpdatedBadge date={lastFetchedAt} />
+          </div>
           {overBudgetCount > 0 && (
             <p className="text-xs text-red-600 font-medium mt-1">
               ⚠ {overBudgetCount} catégorie{overBudgetCount > 1 ? 's dépassent' : ' dépasse'} le budget
@@ -195,12 +255,7 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center min-h-[40vh]">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-slate-400">Chargement du CDR...</p>
-          </div>
-        </div>
+        <CDRTableSkeleton />
       ) : setupIssue ? (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-sm text-amber-800">
           <p className="font-semibold text-amber-900">Configuration CDR requise</p>
@@ -236,6 +291,7 @@ export default function CDRPage({ activeCompany, companies, user, isViewerOnly, 
               onUpsertEntry={upsertEntry}
               onUpsertBudget={upsertBudget}
               onUpdateCategoryStatus={updateCategoryStatus}
+              onDeleteCategory={deleteCategory}
               isViewerOnly={isViewerOnly}
             />
           )}
