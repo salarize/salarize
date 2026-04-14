@@ -75,7 +75,7 @@ import { ToastProvider, useToast } from './context/ToastContext';
 import { DirtyProvider, useDirtyContext } from './context/DirtyContext';
 
 // Components - UI
-import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton, SearchInput, CSVPreview, UnsavedWarningDialog } from './components/ui';
+import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton, CSVPreview, UnsavedWarningDialog } from './components/ui';
 import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
@@ -203,7 +203,6 @@ function AppContent() {
   const [materialSearch, setMaterialSearch] = useState('');
   const [materialSupplierFilter, setMaterialSupplierFilter] = useState('all');
   const [materialPeriodFilter, setMaterialPeriodFilter] = useState('all');
-  const [payrollSearch, setPayrollSearch] = useState('');
   const [payrollAiModel, setPayrollAiModel] = useState({ aliases: {}, trainedSamples: 0, lastUpdated: null });
   const [showDeptManager, setShowDeptManager] = useState(false);
   const [deptSearchTerm, setDeptSearchTerm] = useState('');
@@ -6085,15 +6084,6 @@ L'équipe Salarize`;
     [empAgg]
   );
 
-  const filteredEmployees = useMemo(() => {
-    const query = normalizeLabelToken(payrollSearch);
-    if (!query) return empList;
-    return empList.filter((employee) => {
-      const haystack = normalizeLabelToken(`${employee.name} ${employee.dept}`);
-      return haystack.includes(query);
-    });
-  }, [empList, payrollSearch]);
-
   // === FILTRAGE PÉRIODES DYNAMIQUE ===
   const filteredPeriodsByRange = useMemo(() => {
     if (periodFilter === 'all' || periods.length === 0) return periods;
@@ -6455,7 +6445,7 @@ L'équipe Salarize`;
   // Cette vue s'affiche AVANT tout le reste si on est en mode reset password
   if (showResetPasswordModal) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
           <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 p-6 text-white text-center">
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -6532,7 +6522,7 @@ L'équipe Salarize`;
   const renderLazyContent = (content, light = false) => (
     <Suspense
       fallback={
-        <div className={`py-16 flex items-center justify-center ${light ? 'bg-white' : 'bg-slate-950'}`}>
+        <div className="py-16 flex items-center justify-center bg-white">
           <LoadingSpinner size="md" text="Chargement..." light={light} />
         </div>
       }
@@ -6554,7 +6544,7 @@ L'équipe Salarize`;
   // Landing page (home)
   if (currentPage === 'home') {
     return (
-      <PageTransition key="home" dark>
+      <PageTransition key="home">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6584,7 +6574,7 @@ L'équipe Salarize`;
   // Features page
   if (currentPage === 'features') {
     return (
-      <PageTransition key="features" dark>
+      <PageTransition key="features">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6613,7 +6603,7 @@ L'équipe Salarize`;
   // Pricing page (accessible à tous)
   if (currentPage === 'pricing') {
     return (
-      <PageTransition key="pricing" dark>
+      <PageTransition key="pricing">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6642,7 +6632,7 @@ L'équipe Salarize`;
   // Demo page (accessible à tous)
   if (currentPage === 'demo') {
     return (
-      <PageTransition key="demo" dark>
+      <PageTransition key="demo">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6671,7 +6661,7 @@ L'équipe Salarize`;
   // Legal pages (accessibles à tous)
   if (currentPage === 'legal') {
     return (
-      <PageTransition key="legal" dark>
+      <PageTransition key="legal">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6686,7 +6676,7 @@ L'équipe Salarize`;
 
   if (currentPage === 'privacy') {
     return (
-      <PageTransition key="privacy" dark>
+      <PageTransition key="privacy">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6701,7 +6691,7 @@ L'équipe Salarize`;
 
   if (currentPage === 'terms') {
     return (
-      <PageTransition key="terms" dark>
+      <PageTransition key="terms">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6716,7 +6706,7 @@ L'équipe Salarize`;
 
   if (currentPage === 'cookies') {
     return (
-      <PageTransition key="cookies" dark>
+      <PageTransition key="cookies">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6738,7 +6728,7 @@ L'équipe Salarize`;
   // Profile page (connecté uniquement)
   if (currentPage === 'profile') {
     return (
-      <PageTransition key="profile" dark>
+      <PageTransition key="profile">
         <LandingHeader 
           user={user} 
           onLogin={handleLogin} 
@@ -6762,7 +6752,7 @@ L'équipe Salarize`;
   if (Object.keys(companies).length === 0 && view === 'upload' && !isLoadingData) {
     return (
       <PageTransition key="upload">
-        <div className="min-h-screen bg-slate-950">
+        <div className="min-h-screen bg-white">
           <LandingHeader 
             user={user} 
             onLogin={handleLogin} 
@@ -6779,10 +6769,10 @@ L'équipe Salarize`;
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h1 className="text-3xl font-bold text-white mb-2">
+                <h1 className="text-3xl font-bold text-slate-800 mb-2">
                   Bienvenue, {user?.name?.split(' ')[0]} ! 👋
                 </h1>
-                <p className="text-slate-400 text-lg">
+                <p className="text-slate-600 text-lg">
                   Commençons par analyser vos coûts salariaux
                 </p>
               </div>
@@ -6791,35 +6781,35 @@ L'équipe Salarize`;
               <div className="flex items-center justify-center gap-2 mb-6">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-violet-500/20 border border-violet-500/30 rounded-full">
                   <span className="w-5 h-5 bg-violet-500 text-white text-xs font-bold rounded-full flex items-center justify-center">1</span>
-                  <span className="text-violet-300 text-sm font-medium">Importer</span>
+                  <span className="text-violet-700 text-sm font-medium">Importer</span>
                 </div>
                 <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-full opacity-50">
-                  <span className="w-5 h-5 bg-slate-600 text-slate-400 text-xs font-bold rounded-full flex items-center justify-center">2</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-full opacity-70">
+                  <span className="w-5 h-5 bg-slate-100 text-slate-500 text-xs font-bold rounded-full flex items-center justify-center">2</span>
                   <span className="text-slate-500 text-sm">Analyser</span>
                 </div>
                 <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-full opacity-50">
-                  <span className="w-5 h-5 bg-slate-600 text-slate-400 text-xs font-bold rounded-full flex items-center justify-center">3</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-full opacity-70">
+                  <span className="w-5 h-5 bg-slate-100 text-slate-500 text-xs font-bold rounded-full flex items-center justify-center">3</span>
                   <span className="text-slate-500 text-sm">Optimiser</span>
                 </div>
               </div>
             
               {/* Zone d'upload */}
-              <div className="bg-slate-900/50 backdrop-blur rounded-2xl border border-slate-800 p-8">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
                 <label className="block cursor-pointer">
-                  <div className="border-2 border-dashed border-slate-700 hover:border-violet-500 hover:bg-violet-500/5 rounded-xl p-10 text-center transition-all duration-200 group">
-                    <div className="w-20 h-20 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:shadow-lg group-hover:shadow-violet-500/20 transition-all duration-200">
+                  <div className="border-2 border-dashed border-slate-300 hover:border-violet-500 hover:bg-violet-50 rounded-xl p-10 text-center transition-all duration-200 group">
+                    <div className="w-20 h-20 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-all duration-200">
                       <svg className="w-10 h-10 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
                     </div>
-                    <p className="text-white font-semibold text-lg mb-2">Importer un fichier Excel</p>
-                    <p className="text-slate-400 text-sm mb-4">Glissez-déposez ou cliquez pour sélectionner</p>
+                    <p className="text-slate-800 font-semibold text-lg mb-2">Importer un fichier Excel</p>
+                    <p className="text-slate-500 text-sm mb-4">Glissez-déposez ou cliquez pour sélectionner</p>
                     <p className="text-slate-600 text-xs">Formats acceptés : .xlsx, .xls</p>
                   </div>
                   <input 
@@ -6834,16 +6824,16 @@ L'équipe Salarize`;
                 </label>
                 
                 {debugMsg && (
-                  <p className="mt-4 text-sm text-slate-400 text-center">{debugMsg}</p>
+                  <p className="mt-4 text-sm text-slate-500 text-center">{debugMsg}</p>
                 )}
               </div>
               
               {/* Fournisseurs supportés */}
-              <div className="mt-6 p-4 bg-slate-900/30 rounded-xl border border-slate-800">
+              <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <p className="text-slate-500 text-xs font-medium uppercase tracking-wide mb-3 text-center">Secrétariats sociaux compatibles</p>
                 <div className="flex flex-wrap justify-center gap-3">
                   {['Acerta', 'SD Worx', 'Securex', 'Partena', 'Liantis'].map(provider => (
-                    <span key={provider} className="px-3 py-1 bg-slate-800 text-slate-400 text-xs rounded-full">
+                    <span key={provider} className="px-3 py-1 bg-white border border-slate-200 text-slate-600 text-xs rounded-full">
                       {provider}
                     </span>
                   ))}
@@ -6854,7 +6844,7 @@ L'équipe Salarize`;
               <div className="mt-6 text-center">
                 <button
                   onClick={() => setCurrentPage('demo')}
-                  className="inline-flex items-center gap-2 text-slate-400 hover:text-violet-400 text-sm transition-colors"
+                  className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -7100,7 +7090,7 @@ L'équipe Salarize`;
   // Dashboard
   return (
     <PageTransition key="dashboard">
-      <div className="min-h-screen flex bg-gradient-to-br from-violet-100/60 via-fuchsia-50 to-slate-100">
+      <div className="min-h-screen flex bg-white">
         <Sidebar
           companies={companies}
           activeCompany={activeCompany}
@@ -8629,7 +8619,7 @@ L'équipe Salarize`;
         </div>
       )}
 
-      <main className="lg:ml-72 pt-4 lg:pt-6 flex-1 p-4 lg:p-6 relative overflow-hidden bg-gradient-to-br from-violet-50/80 via-fuchsia-50/60 to-indigo-50/60">
+      <main className="lg:ml-72 pt-4 lg:pt-6 flex-1 p-4 lg:p-6 relative overflow-hidden bg-white">
         {/* Loading overlay quand on recharge les données */}
         {isLoadingData && employees.length > 0 && (
           <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-40 flex items-center justify-center">
@@ -8689,19 +8679,19 @@ L'équipe Salarize`;
             isLoadingData ? <DashboardSkeleton /> : (
         <>
         {/* Company Header Card */}
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 mb-6 relative overflow-hidden border border-slate-200">
           {/* Background decoration */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-slate-100 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-slate-50 rounded-full blur-2xl pointer-events-none"></div>
           
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
             {/* Company Logo */}
             <div className="relative group flex-shrink-0">
               {companies[activeCompany]?.logo ? (
-                <img src={companies[activeCompany].logo} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-4 ring-white/10" />
+                <img src={companies[activeCompany].logo} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover ring-2 ring-slate-200" />
               ) : (
                 <div 
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white text-2xl sm:text-3xl font-bold ring-4 ring-white/10"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white text-2xl sm:text-3xl font-bold ring-2 ring-slate-200"
                   style={{ background: `linear-gradient(135deg, rgb(${getBrandColor()}), rgb(${getBrandColor().split(',').map((c, i) => Math.max(0, parseInt(c) - 40)).join(',')}))` }}
                 >
                   {activeCompany?.charAt(0)?.toUpperCase()}
@@ -8754,25 +8744,25 @@ L'équipe Salarize`;
             {/* Company Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-white truncate">{activeCompany}</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-800 truncate">{activeCompany}</h1>
                 {/* Badge propriétaire ou partagé */}
                 {companies[activeCompany]?.isShared ? (
                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                     companies[activeCompany]?.sharedRole === 'editor'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      : 'bg-amber-100 text-amber-700 border border-amber-200'
                   }`}>
                     {companies[activeCompany]?.sharedRole === 'editor' ? 'Editeur' : 'Lecture seule'}
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-violet-100 text-violet-700 border border-violet-200">
                     Proprietaire
                   </span>
                 )}
                 {!isViewerOnly && (
                   <button
                     onClick={() => setShowCompanySettings(true)}
-                    className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+                    className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
                     title="Parametres societe"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8782,21 +8772,21 @@ L'équipe Salarize`;
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm text-white/60">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm text-slate-500">
                 {companies[activeCompany]?.website && (
                   <>
                     <a 
                       href={companies[activeCompany].website.startsWith('http') ? companies[activeCompany].website : `https://${companies[activeCompany].website}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-white transition-colors flex items-center gap-1"
+                      className="hover:text-slate-700 transition-colors flex items-center gap-1"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                       </svg>
                       <span className="truncate max-w-[150px]">{companies[activeCompany].website.replace(/^https?:\/\//, '')}</span>
                     </a>
-                    <span className="text-white/30">•</span>
+                    <span className="text-slate-300">•</span>
                   </>
                 )}
                 <span className="flex items-center gap-1">
@@ -8808,7 +8798,7 @@ L'équipe Salarize`;
                 {/* Indicateur de synchronisation */}
                 {(isSyncing || saveStatus !== 'saved') && (
                   <>
-                    <span className="text-white/30">•</span>
+                    <span className="text-slate-300">•</span>
                     {saveStatus === 'pending' && (
                       <span className="flex items-center gap-1.5 text-amber-400" title="Données en attente de synchronisation">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8859,7 +8849,7 @@ L'équipe Salarize`;
                     setShowExportMenu((prev) => !prev);
                     setShowActionsMenu(false);
                   }}
-                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-sm font-medium text-white border border-white/10"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white hover:bg-slate-50 rounded-xl transition-colors text-sm font-medium text-slate-700 border border-slate-200"
                   aria-expanded={showExportMenu}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -8936,7 +8926,7 @@ L'équipe Salarize`;
                     setShowActionsMenu(false);
                     setShowShareModal(true);
                   }}
-                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-all text-sm font-medium text-white border border-white/20"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-white hover:bg-slate-50 rounded-xl transition-all text-sm font-medium text-slate-700 border border-slate-200"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -8953,7 +8943,7 @@ L'équipe Salarize`;
                     setShowActionsMenu(false);
                     setShowInviteModal(true);
                   }}
-                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 rounded-xl transition-all text-sm font-medium text-white shadow-lg shadow-violet-500/25"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-slate-900 hover:bg-slate-800 rounded-xl transition-all text-sm font-medium text-white"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -8969,7 +8959,7 @@ L'équipe Salarize`;
                     setShowActionsMenu((prev) => !prev);
                     setShowExportMenu(false);
                   }}
-                  className="flex items-center justify-center w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur rounded-xl transition-colors text-white border border-white/10"
+                  className="flex items-center justify-center w-10 h-10 bg-white hover:bg-slate-50 rounded-xl transition-colors text-slate-700 border border-slate-200"
                   aria-expanded={showActionsMenu}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -10005,28 +9995,18 @@ L'équipe Salarize`;
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
               <h2 className="font-bold text-slate-800 text-sm sm:text-base">Top employes (cumul)</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                {filteredEmployees.length} resultat{filteredEmployees.length > 1 ? 's' : ''} sur {empList.length}
-              </p>
+              <p className="text-xs text-slate-500 mt-1">{empList.length} employe{empList.length > 1 ? 's' : ''}</p>
             </div>
           </div>
 
-          <SearchInput
-            value={payrollSearch}
-            onChange={setPayrollSearch}
-            placeholder="Rechercher un employe ou departement"
-            className="mb-4"
-            inputClassName="focus:border-violet-500"
-          />
-
-          {filteredEmployees.length === 0 ? (
+          {empList.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
               <p className="text-sm font-medium text-slate-600">Aucun employe trouve</p>
-              <p className="text-xs text-slate-400 mt-1">Ajustez la recherche ou effacez les filtres.</p>
+              <p className="text-xs text-slate-400 mt-1">Importez des donnees payroll pour voir le classement.</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {filteredEmployees.slice(0, 12).map((employee) => (
+              {empList.slice(0, 12).map((employee) => (
                 <button
                   key={employee.name}
                   type="button"

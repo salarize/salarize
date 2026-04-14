@@ -148,7 +148,7 @@ function OverviewPage({
   const otherCompanies = companyNames.filter(n => n !== activeCompany);
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-12 rounded-2xl border bg-gradient-to-br from-violet-100/70 via-fuchsia-50 to-indigo-50/70 border-violet-100">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-12 rounded-2xl border border-slate-200 bg-white">
 
       {/* Header greeting */}
       <div
@@ -170,10 +170,7 @@ function OverviewPage({
               {company?.logo ? (
                 <img src={company.logo} alt="" className="w-5 h-5 rounded object-cover" />
               ) : (
-                <div
-                  className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold"
-                  style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-                >
+                <div className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold bg-slate-500">
                   {activeCompany.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -200,10 +197,7 @@ function OverviewPage({
                         {c?.logo ? (
                           <img src={c.logo} alt="" className="w-5 h-5 rounded object-cover" />
                         ) : (
-                          <div
-                            className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold"
-                            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
-                          >
+                          <div className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold bg-slate-500">
                             {name.charAt(0).toUpperCase()}
                           </div>
                         )}

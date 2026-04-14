@@ -16,6 +16,5 @@ export { LastUpdatedBadge } from './LastUpdatedBadge';
 export { CloudSaveIndicator } from './CloudSaveIndicator';
 export { CSVProgressSteps } from './CSVProgressSteps';
 export { ConfirmDialog } from './ConfirmDialog';
-export { SearchInput } from './SearchInput';
 export { CSVPreview } from './CSVPreview';
 export { UnsavedWarningDialog } from './UnsavedWarningDialog';
