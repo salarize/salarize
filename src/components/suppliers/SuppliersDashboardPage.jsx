@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { SvgHBarChart } from '../layout/SvgBarChart';
-import { LastUpdatedBadge, SuppliersSkeleton } from '../ui';
+import { LastUpdatedBadge, SearchInput, SuppliersSkeleton } from '../ui';
 
 const MATERIAL_SETUP_SQL = `CREATE TABLE IF NOT EXISTS material_costs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -291,12 +291,10 @@ function SuppliersDashboardPage({
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
-          <input
-            type="text"
+          <SearchInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher article / SKU / fournisseur"
-            className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-emerald-500"
           />
           <select
             value={periodFilter}

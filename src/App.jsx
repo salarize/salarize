@@ -37,6 +37,7 @@
  */
 
 import React, { lazy, Suspense, startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // ============================================
 // IMPORTS FROM MODULAR STRUCTURE
@@ -63,7 +64,9 @@ import {
   getSelectionState,
   normalizeEmail,
   normalizePostgrestError,
+  filterPayrollEmployees,
   paginateItems,
+  shouldBlockNavigation,
   toggleSelectionForNames,
 } from './utils';
 
@@ -75,7 +78,7 @@ import { ToastProvider, useToast } from './context/ToastContext';
 import { DirtyProvider, useDirtyContext } from './context/DirtyContext';
 
 // Components - UI
-import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton, CSVPreview, UnsavedWarningDialog } from './components/ui';
+import { Button, Modal, EmptyState, LoadingSpinner, Skeleton, CardSkeleton, ChartSkeleton, DeptListSkeleton, TableSkeleton, DashboardSkeleton, CSVPreview, ConfirmDialog, SearchInput, UnsavedWarningDialog } from './components/ui';
 import CustomSelect from './components/ui/CustomSelect';
 
 // Components - Layout
@@ -110,6 +113,29 @@ const TimesheetPage = lazy(() => import('./components/timesheet/TimesheetPage'))
 const SuppliersDashboardPage = lazy(() => import('./components/suppliers/SuppliersDashboardPage'));
 const OverviewPage = lazy(() => import('./components/dashboard/OverviewPage'));
 const CDRPage = lazy(() => import('./components/cdr/CDRPage'));
+
+const PAGE_TO_ROUTE = {
+  home: '/',
+  features: '/features',
+  pricing: '/pricing',
+  demo: '/demo',
+  legal: '/legal',
+  privacy: '/privacy',
+  terms: '/terms',
+  cookies: '/cookies',
+  profile: '/profile',
+};
+
+const ROUTE_TO_PAGE = {
+  '/features': 'features',
+  '/pricing': 'pricing',
+  '/demo': 'demo',
+  '/legal': 'legal',
+  '/privacy': 'privacy',
+  '/terms': 'terms',
+  '/cookies': 'cookies',
+  '/profile': 'profile',
+};
 
 const MATERIAL_COSTS_SETUP_SQL = `CREATE TABLE IF NOT EXISTS material_costs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -180,7 +206,7 @@ function AppContent() {
   const [newCompanyName, setNewCompanyName] = useState('');
   const [debugMsg, setDebugMsg] = useState('');
   const [user, setUser] = useState(null);
-  const [selectedYear, setSelectedYear] = useState('2025');
+  const [selectedYear, setSelectedYear] = useState('all');
   const [deptPeriodFilter, setDeptPeriodFilter] = useState('all'); // 'all' ou une période spécifique
   const [showDataManager, setShowDataManager] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'clear' | 'delete' | 'deletePeriod', period?: string }
@@ -201,6 +227,7 @@ function AppContent() {
   const [materialCosts, setMaterialCosts] = useState([]);
   const [materialCostsLastFetched, setMaterialCostsLastFetched] = useState(null);
   const [materialSearch, setMaterialSearch] = useState('');
+  const [payrollSearch, setPayrollSearch] = useState('');
   const [materialSupplierFilter, setMaterialSupplierFilter] = useState('all');
   const [materialPeriodFilter, setMaterialPeriodFilter] = useState('all');
   const [payrollAiModel, setPayrollAiModel] = useState({ aliases: {}, trainedSamples: 0, lastUpdated: null });
@@ -219,6 +246,10 @@ function AppContent() {
   const [selectedEmployees, setSelectedEmployees] = useState(new Set()); // For bulk assign
   const [bulkAssignDept, setBulkAssignDept] = useState(''); // Target department for bulk assign
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'features', 'profile', 'dashboard'
+  const navigate = useNavigate();
+  const location = useLocation();
+  const skipRouteToPageSyncRef = useRef(false);
+  const skipPageToRouteSyncRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingData, setIsLoadingData] = useState(false); // Chargement des données Supabase
   const [isSyncing, setIsSyncing] = useState(false);
@@ -272,7 +303,7 @@ function AppContent() {
   const switchModule = useCallback((nextModule, options = {}) => {
     const { force = false } = options;
     if (!nextModule || nextModule === currentModule) return;
-    if (!force && hasBlockingUnsaved) {
+    if (shouldBlockNavigation({ force, hasBlockingUnsaved })) {
       setUnsavedNavigationRequest({ type: 'module', nextModule });
       return;
     }
@@ -327,6 +358,8 @@ function AppContent() {
   const [pendingRoleChanges, setPendingRoleChanges] = useState({}); // { invitationId: newRole } changements en attente
   const [editingInviteName, setEditingInviteName] = useState(null); // ID de l'invitation en cours d'édition du nom
   const [inviteDisplayNames, setInviteDisplayNames] = useState({}); // { invitationId: displayName } noms personnalisés
+  const [pendingRevokeInvitation, setPendingRevokeInvitation] = useState(null); // { invitationId, email }
+  const [pendingBackupRestore, setPendingBackupRestore] = useState(null); // { key, backup }
   
   // Détecter si on arrive d'un lien de reset password IMMÉDIATEMENT
   const [showResetPasswordModal, setShowResetPasswordModal] = useState(() => {
@@ -655,8 +688,14 @@ function AppContent() {
   const hasPendingChanges = Object.keys(pendingRoleChanges).length > 0 || Object.keys(inviteDisplayNames).length > 0;
 
   // Révoquer l'accès d'un invité
-  const revokeInvitation = async (invitationId, email) => {
-    if (!confirm(`Voulez-vous vraiment révoquer l'accès de ${email} ?`)) return;
+  const revokeInvitation = (invitationId, email) => {
+    setPendingRevokeInvitation({ invitationId, email });
+  };
+
+  const confirmRevokeInvitation = async () => {
+    if (!pendingRevokeInvitation) return;
+    const { invitationId, email } = pendingRevokeInvitation;
+    setPendingRevokeInvitation(null);
 
     try {
       const { error } = await supabase
@@ -674,6 +713,138 @@ function AppContent() {
     } catch (e) {
       console.error('[Salarize] Error:', e);
     }
+  };
+
+  const restoreBackup = async (backup) => {
+    if (!backup || !activeCompany) return;
+
+    const companyId = companies[activeCompany]?.id;
+
+    const restoredEmployees = (backup.employees || []).map((e) => ({
+      name: e.name,
+      department: e.department,
+      function: e.function,
+      totalCost: parseFloat(e.total_cost || e.totalCost) || 0,
+      paidHours: parseFloat(e.paid_hours || e.paidHours) || 0,
+      period: e.period
+    }));
+
+    const restoredMaterialCosts = (backup.materialCosts || []).map((entry) => ({
+      article: entry.article || '',
+      sku: entry.sku || '',
+      barcode: entry.barcode || '',
+      supplier: entry.supplier || 'Non renseigné',
+      category: entry.category || '',
+      unit: entry.unit || '',
+      quantity: parseLocaleNumber(entry.quantity),
+      unitCost: parseLocaleNumber(entry.unitCost),
+      totalCost: parseLocaleNumber(entry.totalCost),
+      period: entry.period || 'Unknown'
+    }));
+
+    const restoredPeriods = [...new Set(restoredEmployees.map((e) => e.period).filter(Boolean))].sort();
+
+    const newCompanies = {
+      ...companies,
+      [activeCompany]: {
+        ...companies[activeCompany],
+        employees: restoredEmployees,
+        materialCosts: restoredMaterialCosts,
+        periods: restoredPeriods,
+        mapping: backup.mapping || {}
+      }
+    };
+
+    setCompanies(newCompanies);
+    companiesRef.current = newCompanies;
+    setEmployees(restoredEmployees);
+    setMaterialCosts(restoredMaterialCosts);
+    setMaterialCostsLastFetched(restoredMaterialCosts.length > 0 ? new Date() : null);
+    setShowMaterialsPanel(restoredMaterialCosts.length > 0);
+    setPeriods(restoredPeriods);
+    setDepartmentMapping(backup.mapping || {});
+
+    if (user?.id && companyId) {
+      try {
+        await supabase.from('employees').delete().eq('company_id', companyId);
+
+        if (restoredEmployees.length > 0) {
+          const employeesToInsert = restoredEmployees.map((e) => ({
+            company_id: companyId,
+            name: e.name,
+            department: e.department,
+            function: e.function,
+            total_cost: e.totalCost,
+            paid_hours: parseFloat(e.paidHours || e.paid_hours) || 0,
+            period: e.period
+          }));
+
+          const batchSize = 500;
+          for (let i = 0; i < employeesToInsert.length; i += batchSize) {
+            const batch = employeesToInsert.slice(i, i + batchSize);
+            let { error: restoreInsertError } = await supabase.from('employees').insert(batch);
+
+            if (restoreInsertError && String(restoreInsertError.message || '').toLowerCase().includes('paid_hours')) {
+              console.warn('[Salarize] Colonne paid_hours absente en DB pendant restauration, fallback sans heures.');
+              const fallbackBatch = batch.map(({ paid_hours, ...rest }) => rest);
+              const { error: fallbackRestoreError } = await supabase.from('employees').insert(fallbackBatch);
+              restoreInsertError = fallbackRestoreError;
+            }
+
+            if (restoreInsertError) throw restoreInsertError;
+          }
+        }
+
+        await supabase.from('material_costs').delete().eq('company_id', companyId);
+        if (restoredMaterialCosts.length > 0) {
+          const materialToInsert = restoredMaterialCosts.map((entry) => ({
+            company_id: companyId,
+            period: entry.period || null,
+            sku: entry.sku || null,
+            barcode: entry.barcode || null,
+            article_name: entry.article || null,
+            supplier: entry.supplier || null,
+            category: entry.category || null,
+            unit: entry.unit || null,
+            quantity: parseLocaleNumber(entry.quantity),
+            unit_cost: parseLocaleNumber(entry.unitCost),
+            total_cost: parseLocaleNumber(entry.totalCost)
+          }));
+
+          const batchSize = 500;
+          for (let i = 0; i < materialToInsert.length; i += batchSize) {
+            const batch = materialToInsert.slice(i, i + batchSize);
+            const { error: materialRestoreError } = await supabase.from('material_costs').insert(batch);
+            if (materialRestoreError) {
+              const msg = String(materialRestoreError.message || '').toLowerCase();
+              if (msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation'))) {
+                console.warn('[Salarize] Table material_costs absente pendant restauration, restauration locale uniquement.');
+              } else {
+                throw materialRestoreError;
+              }
+              break;
+            }
+          }
+        }
+
+        toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés, ${restoredMaterialCosts.length} lignes matières`);
+      } catch (e) {
+        console.error('[Salarize] Erreur restauration:', e);
+        toast.error('Erreur lors de la restauration');
+      }
+    } else {
+      saveToLocalStorage(newCompanies, activeCompany);
+      toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés, ${restoredMaterialCosts.length} lignes matières`);
+    }
+
+    setShowDataManager(false);
+  };
+
+  const confirmBackupRestore = async () => {
+    if (!pendingBackupRestore?.backup) return;
+    const backupToRestore = pendingBackupRestore.backup;
+    setPendingBackupRestore(null);
+    await restoreBackup(backupToRestore);
   };
 
   // Ouvrir le modal de gestion des accès
@@ -695,6 +866,76 @@ function AppContent() {
   // Debounced search terms for performance
   const debouncedEmpSearch = useDebounce(empSearchTerm, 300);
   const debouncedDeptSearch = useDebounce(deptSearchTerm, 300);
+  const debouncedPayrollSearch = useDebounce(payrollSearch, 300);
+
+  useEffect(() => {
+    const pathname = location.pathname || '/';
+
+    if (pathname === '/') {
+      if (skipRouteToPageSyncRef.current) {
+        skipRouteToPageSyncRef.current = false;
+        return;
+      }
+
+      const rootTargetPage = user ? 'dashboard' : 'home';
+      if (currentPage !== rootTargetPage) {
+        skipPageToRouteSyncRef.current = true;
+        setCurrentPage(rootTargetPage);
+      }
+      return;
+    }
+
+    const mappedPage = ROUTE_TO_PAGE[pathname];
+
+    if (!mappedPage) {
+      const fallbackPage = user ? 'dashboard' : 'home';
+
+      if (pathname !== '/') {
+        skipRouteToPageSyncRef.current = true;
+        navigate('/', { replace: true });
+      }
+
+      if (currentPage !== fallbackPage) {
+        skipPageToRouteSyncRef.current = true;
+        setCurrentPage(fallbackPage);
+      }
+      return;
+    }
+
+    if (skipRouteToPageSyncRef.current) {
+      skipRouteToPageSyncRef.current = false;
+      return;
+    }
+
+    const targetPage = mappedPage === 'profile' && !user ? 'home' : mappedPage;
+    if (currentPage !== targetPage) {
+      skipPageToRouteSyncRef.current = true;
+      setCurrentPage(targetPage);
+    }
+  }, [currentPage, location.pathname, navigate, user]);
+
+  useEffect(() => {
+    if (skipPageToRouteSyncRef.current) {
+      skipPageToRouteSyncRef.current = false;
+      return;
+    }
+
+    if (currentPage === 'dashboard') {
+      if (location.pathname !== '/') {
+        skipRouteToPageSyncRef.current = true;
+        navigate('/');
+      }
+      return;
+    }
+
+    const targetRoute = PAGE_TO_ROUTE[currentPage];
+    if (!targetRoute) return;
+
+    if (location.pathname !== targetRoute) {
+      skipRouteToPageSyncRef.current = true;
+      navigate(targetRoute);
+    }
+  }, [currentPage, location.pathname, navigate]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -2875,6 +3116,8 @@ function AppContent() {
     setPayrollSearch('');
     setMaterialSupplierFilter('all');
     setMaterialPeriodFilter('all');
+    setPeriodFilter('all');
+    setSelectedYear('all');
     setShowMaterialsPanel((company.materialCosts || []).length > 0);
     setCreatedDepartments(company.createdDepartments || []);
     setSelectedPeriods([]);
@@ -2886,7 +3129,7 @@ function AppContent() {
     const { force = false } = options;
     const company = comps[name];
     if (!company) return;
-    if (!force && hasBlockingUnsaved) {
+    if (shouldBlockNavigation({ force, hasBlockingUnsaved })) {
       setUnsavedNavigationRequest({ type: 'company', companyName: name, comps });
       return;
     }
@@ -2962,10 +3205,10 @@ function AppContent() {
     // Détecter la période depuis le nom du fichier
     // Patterns: 2024-01, 01-2024, janvier_2024, jan2024, 202401, etc.
     const patterns = [
-      /(\d{4})[-_]?(\d{2})/, // 2024-01 ou 202401
-      /(\d{2})[-_](\d{4})/, // 01-2024
-      /(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)[-_\s]?(\d{4})/i,
-      /(jan|fev|feb|mar|avr|apr|mai|may|jun|jul|aou|aug|sep|oct|nov|dec)[-_\s]?(\d{4})/i,
+      /(?:^|[^0-9])(20\d{2})[-_.\s]?(0?[1-9]|1[0-2])(?:[^0-9]|$)/, // 2024-01 / 202401 / 2024_1
+      /(?:^|[^0-9])(0?[1-9]|1[0-2])[-_.\s](20\d{2})(?:[^0-9]|$)/, // 01-2024 / 1_2024
+      /(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)[-_\s]?(20\d{2})/i,
+      /(jan|fev|feb|mar|avr|apr|mai|may|jun|jul|aou|aug|sep|oct|nov|dec)[-_\s]?(20\d{2})/i,
     ];
     
     const monthNames = {
@@ -2982,7 +3225,7 @@ function AppContent() {
         if (match[1].length === 4) {
           // Format YYYY-MM
           const year = match[1];
-          const month = match[2].length === 2 ? match[2] : monthNames[match[2].toLowerCase()];
+          const month = match[2].length <= 2 ? String(match[2]).padStart(2, '0') : monthNames[match[2].toLowerCase()];
           if (month) {
             suggestedPeriod = `${year}-${month}`;
             break;
@@ -2990,7 +3233,7 @@ function AppContent() {
         } else if (match[2].length === 4) {
           // Format MM-YYYY ou mois-YYYY
           const year = match[2];
-          const month = match[1].length === 2 ? match[1] : monthNames[match[1].toLowerCase()];
+          const month = match[1].length <= 2 ? String(match[1]).padStart(2, '0') : monthNames[match[1].toLowerCase()];
           if (month) {
             suggestedPeriod = `${year}-${month}`;
             break;
@@ -4037,6 +4280,46 @@ function AppContent() {
     let totalEmployees = 0;
     let totalFiles = 0;
     const importedPeriods = new Set();
+    const skippedFiles = [];
+
+    const normalizeQuickImportPayload = (source, fallbackPeriod = null) => {
+      const sourceEmployees = Array.isArray(source?.employees) ? source.employees : [];
+      let normalizedEmployees = sourceEmployees.map((emp) => ({ ...emp }));
+      const candidatePeriods = new Set();
+
+      (Array.isArray(source?.periods) ? source.periods : []).forEach((period) => {
+        if (period && period !== 'Unknown') candidatePeriods.add(period);
+      });
+
+      normalizedEmployees.forEach((emp) => {
+        if (emp?.period && emp.period !== 'Unknown') {
+          candidatePeriods.add(emp.period);
+        }
+      });
+
+      const safeFallback = fallbackPeriod && fallbackPeriod !== 'Unknown' ? fallbackPeriod : null;
+
+      if (candidatePeriods.size === 0 && safeFallback) {
+        normalizedEmployees = normalizedEmployees.map((emp) => ({ ...emp, period: safeFallback }));
+        candidatePeriods.add(safeFallback);
+      } else if (safeFallback) {
+        let usedFallback = false;
+        normalizedEmployees = normalizedEmployees.map((emp) => {
+          if (emp?.period && emp.period !== 'Unknown') return emp;
+          usedFallback = true;
+          return { ...emp, period: safeFallback };
+        });
+        if (usedFallback) {
+          candidatePeriods.add(safeFallback);
+        }
+      }
+
+      return {
+        employees: normalizedEmployees,
+        periods: [...candidatePeriods].sort(),
+        hasKnownPeriods: candidatePeriods.size > 0,
+      };
+    };
 
     // Fonction helper pour parser et importer un fichier
     const parseAndImportFile = (file) => {
@@ -4082,7 +4365,7 @@ function AppContent() {
 
             resolve({
               employees: result.employees,
-              periods: result.periods,
+              periods: result.periods || [],
               suggestedPeriod: result.periods[0] !== 'Unknown' ? result.periods[0] : suggestedPeriod,
               periodConfidence: periodAnalysis.confidence,
               fileName: file.name
@@ -4114,22 +4397,32 @@ function AppContent() {
       },
       async () => {
         // 1. Importer le fichier actuellement pending
-        const { employees, suggestedPeriod } = currentPending;
-        const period = suggestedPeriod && suggestedPeriod !== 'Unknown'
-          ? suggestedPeriod
-          : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+        const currentFallback =
+          currentPending.periodConfidence >= 0.8 ? currentPending.suggestedPeriod : null;
+        const currentPayload = normalizeQuickImportPayload(currentPending, currentFallback);
 
-        const updatedEmployees = employees.map(e => ({
-          ...e,
-          period,
-          department: e.department || null
-        }));
+        if (!currentPayload.hasKnownPeriods) {
+          skippedFiles.push(currentPending.fileName || 'fichier courant');
+          console.warn(`[Salarize] ⚠️ Fichier ignoré (période introuvable): ${currentPending.fileName || 'fichier courant'}`);
+        } else {
+          const updatedEmployees = currentPayload.employees.map((e) => ({
+            ...e,
+            department: e.department || null,
+          }));
 
-        await importToCompanyDirect(activeCompany, { employees: updatedEmployees, periods: [period] }, true);
-        totalEmployees += employees.length;
-        totalFiles++;
-        importedPeriods.add(period);
-        console.log(`[Salarize] ✓ Fichier 1: ${employees.length} employés (${period})`);
+          await importToCompanyDirect(
+            activeCompany,
+            { employees: updatedEmployees, periods: currentPayload.periods },
+            true
+          );
+
+          totalEmployees += updatedEmployees.length;
+          totalFiles++;
+          currentPayload.periods.forEach((period) => importedPeriods.add(period));
+          console.log(
+            `[Salarize] ✓ Fichier 1: ${updatedEmployees.length} employés (${currentPayload.periods.join(', ')})`
+          );
+        }
 
         // 2. Traiter tous les fichiers restants dans la queue
         if (currentQueue.length > 0) {
@@ -4139,29 +4432,43 @@ function AppContent() {
 
             const parsed = await parseAndImportFile(file);
             if (parsed) {
-              const filePeriod = parsed.suggestedPeriod && parsed.suggestedPeriod !== 'Unknown'
-                ? parsed.suggestedPeriod
-                : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+              const parsedFallback = parsed.periodConfidence >= 0.8 ? parsed.suggestedPeriod : null;
+              const parsedPayload = normalizeQuickImportPayload(parsed, parsedFallback);
 
-              const fileEmployees = parsed.employees.map(e => ({
+              if (!parsedPayload.hasKnownPeriods) {
+                skippedFiles.push(file.name);
+                console.warn(`[Salarize] ⚠️ Fichier ignoré (période introuvable): ${file.name}`);
+                continue;
+              }
+
+              const fileEmployees = parsedPayload.employees.map((e) => ({
                 ...e,
-                period: filePeriod,
-                department: e.department || null
+                department: e.department || null,
               }));
 
-              await importToCompanyDirect(activeCompany, { employees: fileEmployees, periods: [filePeriod] }, true);
+              await importToCompanyDirect(
+                activeCompany,
+                { employees: fileEmployees, periods: parsedPayload.periods },
+                true
+              );
 
-              totalEmployees += parsed.employees.length;
+              totalEmployees += fileEmployees.length;
               totalFiles++;
-              importedPeriods.add(filePeriod);
-              console.log(`[Salarize] ✓ Fichier ${i + 1}: ${parsed.employees.length} employés (${filePeriod})`);
+              parsedPayload.periods.forEach((period) => importedPeriods.add(period));
+              console.log(
+                `[Salarize] ✓ Fichier ${i + 1}: ${fileEmployees.length} employés (${parsedPayload.periods.join(', ')})`
+              );
+            } else {
+              skippedFiles.push(file.name);
             }
           }
         }
 
         // 3. Sauvegarder tout à la fin
-        console.log('[Salarize] 💾 Sauvegarde finale...');
-        await saveAll(companiesRef.current, activeCompany);
+        if (totalFiles > 0) {
+          console.log('[Salarize] 💾 Sauvegarde finale...');
+          await saveAll(companiesRef.current, activeCompany);
+        }
 
         return { rowCount: totalEmployees, totalFiles };
       }
@@ -4174,8 +4481,23 @@ function AppContent() {
     const periodsStr = [...importedPeriods].map(p => formatPeriod(p)).join(', ');
     const finalEmployees = trackedImport?.rowCount || totalEmployees;
     const finalFiles = trackedImport?.totalFiles || totalFiles;
-    toast.success(`⚡ Import rapide terminé: ${finalEmployees} employés (${finalFiles} fichier${finalFiles > 1 ? 's' : ''}) - ${periodsStr}`);
-    console.log(`[Salarize] 🎉 Import rapide terminé: ${finalEmployees} employés, ${finalFiles} fichiers, périodes: ${periodsStr}`);
+
+    if (finalFiles === 0) {
+      toast.error('Aucun fichier importé: période non détectée automatiquement.');
+      return;
+    }
+
+    if (skippedFiles.length > 0) {
+      toast.warning(
+        `Import partiel: ${finalFiles} fichier${finalFiles > 1 ? 's' : ''} importé${finalFiles > 1 ? 's' : ''}, ${skippedFiles.length} ignoré${skippedFiles.length > 1 ? 's' : ''} (période introuvable).`
+      );
+    } else {
+      toast.success(`⚡ Import rapide terminé: ${finalEmployees} employés (${finalFiles} fichier${finalFiles > 1 ? 's' : ''}) - ${periodsStr}`);
+    }
+
+    console.log(
+      `[Salarize] 🎉 Import rapide terminé: ${finalEmployees} employés, ${finalFiles} fichiers, périodes: ${periodsStr}, ignorés: ${skippedFiles.length}`
+    );
   };
 
   const parseAcerta = (rows) => {
@@ -6072,9 +6394,25 @@ L'équipe Salarize`;
 
   const empAgg = useMemo(() => {
     const agg = {};
-    filtered.forEach(e => {
-      if (!agg[e.name]) agg[e.name] = { name: e.name, dept: e.department || departmentMapping[e.name] || 'Non assigné', cost: 0 };
-      agg[e.name].cost += e.totalCost;
+    filtered.forEach((e) => {
+      const name = String(e.name || '').trim();
+      if (!name) return;
+
+      const dept = e.department || departmentMapping[name] || 'Non assigne';
+      const employeeFunction = String(e.function || '').trim();
+
+      if (!agg[name]) {
+        agg[name] = {
+          name,
+          dept,
+          function: employeeFunction,
+          cost: 0
+        };
+      }
+
+      agg[name].cost += e.totalCost;
+      if (dept && dept !== 'Non assigne') agg[name].dept = dept;
+      if (employeeFunction) agg[name].function = employeeFunction;
     });
     return agg;
   }, [filtered, departmentMapping]);
@@ -6082,6 +6420,11 @@ L'équipe Salarize`;
   const empList = useMemo(() => 
     Object.values(empAgg).sort((a, b) => b.cost - a.cost),
     [empAgg]
+  );
+
+  const filteredEmployees = useMemo(
+    () => filterPayrollEmployees(empList, debouncedPayrollSearch),
+    [empList, debouncedPayrollSearch]
   );
 
   // === FILTRAGE PÉRIODES DYNAMIQUE ===
@@ -7415,6 +7758,28 @@ L'équipe Salarize`;
         onCancel={cancelUnsavedNavigation}
         onConfirm={confirmUnsavedNavigation}
       />
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingRevokeInvitation)}
+        tone="danger"
+        title="Revoquer cet acces ?"
+        description={pendingRevokeInvitation ? `L'utilisateur ${pendingRevokeInvitation.email} perdra immediatement l'acces.` : ''}
+        confirmLabel="Revoquer"
+        cancelLabel="Annuler"
+        onCancel={() => setPendingRevokeInvitation(null)}
+        onConfirm={confirmRevokeInvitation}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingBackupRestore)}
+        tone="warning"
+        title="Restaurer cette sauvegarde ?"
+        description="Les donnees actuelles seront remplacees par le snapshot selectionne."
+        confirmLabel="Restaurer"
+        cancelLabel="Annuler"
+        onCancel={() => setPendingBackupRestore(null)}
+        onConfirm={confirmBackupRestore}
+      />
       
       {/* Period Selection Modal - Redesigned */}
       {pendingPeriodSelection && (
@@ -7736,7 +8101,7 @@ L'équipe Salarize`;
               </div>
               
               {/* Bouton Import Rapide en bas - affiché quand confiance haute */}
-              {pendingPeriodSelection.periodConfidence >= 0.8 && !pendingPeriodSelection.multiPeriods && activeCompany && view === 'dashboard' && (
+              {(activeCompany && view === 'dashboard' && (fileQueue.length > 1 || (pendingPeriodSelection.periodConfidence >= 0.8 && !pendingPeriodSelection.multiPeriods))) && (
                 <div className="mt-4 pt-4 border-t border-slate-100">
                   <button
                     onClick={() => setShowQuickImportModal(true)}
@@ -7745,7 +8110,7 @@ L'équipe Salarize`;
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Import Rapide
+                    {fileQueue.length > 1 ? 'Importer tous les fichiers' : 'Import Rapide'}
                     {fileQueue.length > 1 && (
                       <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">
                         {fileQueue.length} fichiers
@@ -7753,7 +8118,9 @@ L'équipe Salarize`;
                     )}
                   </button>
                   <p className="text-center text-slate-400 text-xs mt-2">
-                    Importe tous les fichiers automatiquement
+                    {fileQueue.length > 1
+                      ? 'Import batch en un clic (périodes détectées automatiquement)'
+                      : 'Import automatique basé sur la période détectée'}
                   </p>
                 </div>
               )}
@@ -9275,135 +9642,7 @@ L'équipe Salarize`;
                                 </p>
                               </div>
                               <button
-                                onClick={async () => {
-                                  if (!confirm(`Restaurer cette sauvegarde ? Les données actuelles seront remplacées.`)) return;
-
-                                  const companyId = companies[activeCompany]?.id;
-
-                                  // Restaurer les données
-                                  const restoredEmployees = backup.employees.map(e => ({
-                                    name: e.name,
-                                    department: e.department,
-                                    function: e.function,
-                                    totalCost: parseFloat(e.total_cost || e.totalCost) || 0,
-                                    paidHours: parseFloat(e.paid_hours || e.paidHours) || 0,
-                                    period: e.period
-                                  }));
-                                  const restoredMaterialCosts = (backup.materialCosts || []).map((entry) => ({
-                                    article: entry.article || '',
-                                    sku: entry.sku || '',
-                                    barcode: entry.barcode || '',
-                                    supplier: entry.supplier || 'Non renseigné',
-                                    category: entry.category || '',
-                                    unit: entry.unit || '',
-                                    quantity: parseLocaleNumber(entry.quantity),
-                                    unitCost: parseLocaleNumber(entry.unitCost),
-                                    totalCost: parseLocaleNumber(entry.totalCost),
-                                    period: entry.period || 'Unknown'
-                                  }));
-
-                                  const restoredPeriods = [...new Set(restoredEmployees.map(e => e.period).filter(Boolean))].sort();
-
-                                  const newCompanies = {
-                                    ...companies,
-                                    [activeCompany]: {
-                                      ...companies[activeCompany],
-                                      employees: restoredEmployees,
-                                      materialCosts: restoredMaterialCosts,
-                                      periods: restoredPeriods,
-                                      mapping: backup.mapping || {}
-                                    }
-                                  };
-
-                                  setCompanies(newCompanies);
-                                  companiesRef.current = newCompanies;
-                                  setEmployees(restoredEmployees);
-                                  setMaterialCosts(restoredMaterialCosts);
-                                  setMaterialCostsLastFetched(restoredMaterialCosts.length > 0 ? new Date() : null);
-                                  setShowMaterialsPanel(restoredMaterialCosts.length > 0);
-                                  setPeriods(restoredPeriods);
-                                  setDepartmentMapping(backup.mapping || {});
-
-                                  // Sauvegarder dans Supabase
-                                  if (user?.id && companyId) {
-                                    try {
-                                      // Supprimer les anciens employés
-                                      await supabase.from('employees').delete().eq('company_id', companyId);
-
-                                      // Insérer les employés restaurés
-                                      if (restoredEmployees.length > 0) {
-                                        const employeesToInsert = restoredEmployees.map(e => ({
-                                          company_id: companyId,
-                                          name: e.name,
-                                          department: e.department,
-                                          function: e.function,
-                                          total_cost: e.totalCost,
-                                          paid_hours: parseFloat(e.paidHours || e.paid_hours) || 0,
-                                          period: e.period
-                                        }));
-
-                                        const batchSize = 500;
-                                        for (let i = 0; i < employeesToInsert.length; i += batchSize) {
-                                          const batch = employeesToInsert.slice(i, i + batchSize);
-                                          let { error: restoreInsertError } = await supabase.from('employees').insert(batch);
-
-                                          if (restoreInsertError && String(restoreInsertError.message || '').toLowerCase().includes('paid_hours')) {
-                                            console.warn('[Salarize] Colonne paid_hours absente en DB pendant restauration, fallback sans heures.');
-                                            const fallbackBatch = batch.map(({ paid_hours, ...rest }) => rest);
-                                            const { error: fallbackRestoreError } = await supabase.from('employees').insert(fallbackBatch);
-                                            restoreInsertError = fallbackRestoreError;
-                                          }
-
-                                          if (restoreInsertError) {
-                                            throw restoreInsertError;
-                                          }
-                                        }
-                                      }
-
-                                      // Restaurer les coûts matière première (table optionnelle)
-                                      await supabase.from('material_costs').delete().eq('company_id', companyId);
-                                      if (restoredMaterialCosts.length > 0) {
-                                        const materialToInsert = restoredMaterialCosts.map((entry) => ({
-                                          company_id: companyId,
-                                          period: entry.period || null,
-                                          sku: entry.sku || null,
-                                          barcode: entry.barcode || null,
-                                          article_name: entry.article || null,
-                                          supplier: entry.supplier || null,
-                                          category: entry.category || null,
-                                          unit: entry.unit || null,
-                                          quantity: parseLocaleNumber(entry.quantity),
-                                          unit_cost: parseLocaleNumber(entry.unitCost),
-                                          total_cost: parseLocaleNumber(entry.totalCost)
-                                        }));
-                                        const batchSize = 500;
-                                        for (let i = 0; i < materialToInsert.length; i += batchSize) {
-                                          const batch = materialToInsert.slice(i, i + batchSize);
-                                          const { error: materialRestoreError } = await supabase.from('material_costs').insert(batch);
-                                          if (materialRestoreError) {
-                                            const msg = String(materialRestoreError.message || '').toLowerCase();
-                                            if (msg.includes('material_costs') && (msg.includes('does not exist') || msg.includes('relation'))) {
-                                              console.warn('[Salarize] Table material_costs absente pendant restauration, restauration locale uniquement.');
-                                            } else {
-                                              throw materialRestoreError;
-                                            }
-                                            break;
-                                          }
-                                        }
-                                      }
-
-                                      toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés, ${restoredMaterialCosts.length} lignes matières`);
-                                    } catch (e) {
-                                      console.error('[Salarize] Erreur restauration:', e);
-                                      toast.error('Erreur lors de la restauration');
-                                    }
-                                  } else {
-                                    saveToLocalStorage(newCompanies, activeCompany);
-                                    toast.success(`Sauvegarde restaurée: ${restoredEmployees.length} employés, ${restoredMaterialCosts.length} lignes matières`);
-                                  }
-
-                                  setShowDataManager(false);
-                                }}
+                                onClick={() => setPendingBackupRestore({ key, backup })}
                                 className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg transition-colors"
                               >
                                 Restaurer
@@ -9995,18 +10234,27 @@ L'équipe Salarize`;
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
               <h2 className="font-bold text-slate-800 text-sm sm:text-base">Top employes (cumul)</h2>
-              <p className="text-xs text-slate-500 mt-1">{empList.length} employe{empList.length > 1 ? 's' : ''}</p>
+              <p className="text-xs text-slate-500 mt-1">{filteredEmployees.length} employe{filteredEmployees.length > 1 ? 's' : ''}</p>
+            </div>
+            <div className="w-full sm:w-80">
+              <SearchInput
+                value={payrollSearch}
+                onChange={(event) => setPayrollSearch(event.target.value)}
+                placeholder="Rechercher employe / departement / fonction"
+              />
             </div>
           </div>
 
-          {empList.length === 0 ? (
+          {filteredEmployees.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center">
               <p className="text-sm font-medium text-slate-600">Aucun employe trouve</p>
-              <p className="text-xs text-slate-400 mt-1">Importez des donnees payroll pour voir le classement.</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {debouncedPayrollSearch ? 'Essayez un autre mot-cle.' : 'Importez des donnees payroll pour voir le classement.'}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {empList.slice(0, 12).map((employee) => (
+              {filteredEmployees.slice(0, 12).map((employee) => (
                 <button
                   key={employee.name}
                   type="button"
@@ -10015,7 +10263,9 @@ L'équipe Salarize`;
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">{employee.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{employee.dept || 'Non assigne'}</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {employee.dept || 'Non assigne'}{employee.function ? ` • ${employee.function}` : ''}
+                    </p>
                   </div>
                   <p className="text-sm font-semibold text-slate-700 flex-shrink-0">
                     EUR {employee.cost.toLocaleString('fr-BE', { maximumFractionDigits: 0 })}

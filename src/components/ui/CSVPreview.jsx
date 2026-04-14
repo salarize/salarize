@@ -36,7 +36,7 @@ export function CSVPreview({ rows, maxRows = 3, maxColumns = 8, title = 'Apercu 
       <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{title}</p>
         <p className="text-[11px] text-slate-500">
-          {preview.totalRows} lignes • {preview.totalColumns} colonnes
+          {preview.totalRows} lignes | {preview.totalColumns} colonnes
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export function CSVPreview({ rows, maxRows = 3, maxColumns = 8, title = 'Apercu 
               <tr key={rowIndex} className="border-b border-slate-100 last:border-0">
                 {row.map((cell, cellIndex) => (
                   <td key={cellIndex} className="px-2 py-1.5 text-slate-700 whitespace-nowrap max-w-[180px] truncate">
-                    {cell || '—'}
+                    {cell || '-'}
                   </td>
                 ))}
               </tr>
@@ -68,7 +68,7 @@ export function CSVPreview({ rows, maxRows = 3, maxColumns = 8, title = 'Apercu 
       {(preview.hasMoreRows || preview.hasMoreCols) && (
         <div className="px-3 py-2 border-t border-slate-200 text-[11px] text-slate-500">
           {preview.hasMoreRows ? `+${preview.totalRows - (1 + maxRows)} lignes` : null}
-          {preview.hasMoreRows && preview.hasMoreCols ? ' • ' : null}
+          {preview.hasMoreRows && preview.hasMoreCols ? ' | ' : null}
           {preview.hasMoreCols ? `+${preview.totalColumns - Math.min(maxColumns, preview.totalColumns)} colonnes` : null}
           {' '}non affichees
         </div>

@@ -18,3 +18,4 @@ export { CSVProgressSteps } from './CSVProgressSteps';
 export { ConfirmDialog } from './ConfirmDialog';
 export { CSVPreview } from './CSVPreview';
 export { UnsavedWarningDialog } from './UnsavedWarningDialog';
+export { SearchInput } from './SearchInput';
