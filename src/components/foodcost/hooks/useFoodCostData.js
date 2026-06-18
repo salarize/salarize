@@ -9,49 +9,90 @@ export function useFoodCostData(companyId, { confirmedOnly = true } = {}) {
   const [reviewLines, setReviewLines] = useState([]);
   const [anomalies, setAnomalies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchAll = useCallback(async () => {
-    if (!companyId) return;
+    if (!companyId) { setLoading(false); return; }
     setLoading(true);
+    setError(null);
 
-    let priceQuery = supabase
-      .from('food_price_history')
-      .select('*, food_articles(canonical_name, default_unit), food_suppliers(name)')
-      .eq('company_id', companyId)
-      .order('date', { ascending: false });
+    try {
+      const [
+        { data: sup, error: supErr },
+        { data: art, error: artErr },
+        { data: inv, error: invErr },
+        { data: hist, error: histErr },
+        { data: review, error: reviewErr },
+        { data: anom, error: anomErr },
+      ] = await Promise.all([
+        supabase.from('food_suppliers').select('*').eq('company_id', companyId).order('name'),
+        supabase.from('food_articles').select('*, food_article_aliases(*)').eq('company_id', companyId).order('canonical_name'),
+        supabase.from('food_invoices').select('*, food_suppliers(name)').eq('company_id', companyId).order('invoice_date', { ascending: false }),
+        supabase.from('food_price_history')
+          .select('*, food_articles(canonical_name, default_unit), food_suppliers(name)')
+          .eq('company_id', companyId)
+          .order('date', { ascending: false }),
+        // All unconfirmed lines (review queue shows everything not yet validated)
+        supabase.from('food_invoice_lines')
+          .select('*, food_invoices(invoice_number, invoice_date, supplier_id, food_suppliers(name)), food_articles(canonical_name)')
+          .eq('company_id', companyId)
+          .eq('is_confirmed', false)
+          .order('created_at', { ascending: false }),
+        supabase.from('food_anomalies')
+          .select('*, food_articles(canonical_name), food_suppliers(name)')
+          .eq('company_id', companyId)
+          .eq('status', 'open')
+          .order('created_at', { ascending: false }),
+      ]);
 
-    let linesQuery = supabase
-      .from('food_invoice_lines')
-      .select('*, food_invoices(invoice_number, invoice_date, supplier_id, food_suppliers(name)), food_articles(canonical_name)')
-      .eq('company_id', companyId);
+      const firstErr = supErr || artErr || invErr || histErr || reviewErr || anomErr;
+      if (firstErr) {
+        setError(firstErr.message);
+        setLoading(false);
+        return;
+      }
 
-    // If confirmedOnly, only show confirmed lines in price history
-    if (confirmedOnly) {
-      // Join through invoice_lines to filter confirmed
+      setSuppliers(sup ?? []);
+      setArticles(art ?? []);
+      setInvoices(inv ?? []);
+      setReviewLines(review ?? []);
+      setAnomalies(anom ?? []);
+
+      // When confirmedOnly=false, merge unconfirmed lines' price data into history
+      // so the dashboard analytics include all extracted data, not just validated ones
+      if (confirmedOnly) {
+        setPriceHistory(hist ?? []);
+      } else {
+        // Fetch unconfirmed lines with price data for analytics
+        const { data: unconfLines } = await supabase
+          .from('food_invoice_lines')
+          .select('*, food_invoices(invoice_date, supplier_id, food_suppliers(name)), food_articles(canonical_name, default_unit)')
+          .eq('company_id', companyId)
+          .eq('is_confirmed', false)
+          .not('unit_price_normalized', 'is', null)
+          .not('quantity_normalized', 'is', null)
+          .not('article_id', 'is', null);
+
+        const unconfAsHistory = (unconfLines ?? []).map(l => ({
+          id: `_unc_${l.id}`,
+          company_id: l.company_id,
+          article_id: l.article_id,
+          supplier_id: l.food_invoices?.supplier_id ?? null,
+          invoice_line_id: l.id,
+          date: l.food_invoices?.invoice_date ?? null,
+          quantity_normalized: l.quantity_normalized,
+          price_per_normalized_unit: l.unit_price_normalized,
+          food_articles: l.food_articles,
+          food_suppliers: l.food_invoices?.food_suppliers ?? null,
+          _unconfirmed: true,
+        }));
+
+        setPriceHistory([...(hist ?? []), ...unconfAsHistory]);
+      }
+    } catch (e) {
+      setError(e.message ?? 'Erreur inconnue');
     }
 
-    const [
-      { data: sup },
-      { data: art },
-      { data: inv },
-      { data: hist },
-      { data: review },
-      { data: anom },
-    ] = await Promise.all([
-      supabase.from('food_suppliers').select('*').eq('company_id', companyId).order('name'),
-      supabase.from('food_articles').select('*, food_article_aliases(*)').eq('company_id', companyId).order('canonical_name'),
-      supabase.from('food_invoices').select('*, food_suppliers(name)').eq('company_id', companyId).order('invoice_date', { ascending: false }),
-      priceQuery,
-      linesQuery.eq('needs_review', true).order('created_at', { ascending: false }),
-      supabase.from('food_anomalies').select('*, food_articles(canonical_name), food_suppliers(name)').eq('company_id', companyId).eq('status', 'open').order('created_at', { ascending: false }),
-    ]);
-
-    setSuppliers(sup ?? []);
-    setArticles(art ?? []);
-    setInvoices(inv ?? []);
-    setPriceHistory(hist ?? []);
-    setReviewLines(review ?? []);
-    setAnomalies(anom ?? []);
     setLoading(false);
   }, [companyId, confirmedOnly]);
 
@@ -160,7 +201,7 @@ export function useFoodCostData(companyId, { confirmedOnly = true } = {}) {
 
   return {
     suppliers, articles, invoices, priceHistory, reviewLines, anomalies,
-    loading, refetch: fetchAll,
+    loading, error, refetch: fetchAll,
     getVwap, topArticlesBySpend,
     validateLine, bulkApprove, createArticleAndLink,
     resolveAnomaly,

@@ -191,7 +191,7 @@ function ReviewTable({ lines, articles, onValidate, onBulkApprove, onCreateAndLi
   );
 }
 
-function FoodCostReviewQueue({ reviewLines, articles, onValidate, onBulkApprove, onCreateAndLink, companyId, userEmail }) {
+function FoodCostReviewQueue({ reviewLines, articles, onValidate, onBulkApprove, onCreateAndLink, onRefetch, companyId, userEmail }) {
   const [activeTab, setActiveTab] = useState('review');
   const [panelLine, setPanelLine] = useState(null);
 
@@ -227,7 +227,7 @@ function FoodCostReviewQueue({ reviewLines, articles, onValidate, onBulkApprove,
           onClose={() => setPanelLine(null)}
           onSaved={() => {
             setPanelLine(null);
-            onBulkApprove?.();
+            onRefetch?.();
           }}
         />
       )}

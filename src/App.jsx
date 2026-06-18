@@ -7445,7 +7445,7 @@ L'équipe Salarize`;
               // Ouverture explicite uniquement via bouton Import (pas via onglet de navigation).
               setShowMaterialImportModal(true);
             } else if (currentModule === 'foodcost') {
-              switchModule('foodcost');
+              // Food Cost has its own import button in its page header
             } else {
               setShowImportModal(true);
             }

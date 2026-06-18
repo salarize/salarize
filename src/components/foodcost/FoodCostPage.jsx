@@ -24,11 +24,11 @@ function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack }) 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showImport, setShowImport] = useState(false);
   const [confirmedOnly, setConfirmedOnly] = useState(true);
-  const dbCompanyId = companyId || activeCompany;
+  const dbCompanyId = companyId;
 
   const {
     suppliers, articles, invoices, priceHistory, reviewLines,
-    anomalies, loading, refetch,
+    anomalies, loading, error, refetch,
     getVwap, topArticlesBySpend,
     validateLine, bulkApprove, createArticleAndLink, resolveAnomaly,
   } = useFoodCostData(dbCompanyId, { confirmedOnly });
@@ -37,7 +37,7 @@ function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack }) 
 
   const openAnomaly = anomalies?.length ?? 0;
 
-  if (!activeCompany) {
+  if (!activeCompany || !companyId) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-slate-400">Sélectionnez une société pour accéder au Food Cost.</p>
@@ -106,6 +106,14 @@ function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack }) 
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
+        {error && (
+          <div className="mb-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-sm flex items-center gap-2">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Erreur Supabase : {error}
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center h-48">
             <div className="w-8 h-8 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
@@ -138,6 +146,7 @@ function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack }) 
                 onValidate={validateLine}
                 onBulkApprove={bulkApprove}
                 onCreateAndLink={createArticleAndLink}
+                onRefetch={refetch}
                 companyId={dbCompanyId}
                 userEmail={user?.email}
               />

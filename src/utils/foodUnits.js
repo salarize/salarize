@@ -70,6 +70,8 @@ export function normalizeUnit(unitRaw, quantity = 1) {
 
   if (WEIGHT_TO_KG[u]) return { unit: 'kg', factor: WEIGHT_TO_KG[u], ambiguous: false };
   if (VOLUME_TO_L[u]) return { unit: 'L', factor: VOLUME_TO_L[u], ambiguous: false };
+  // AMBIGUOUS must be checked before COUNT_UNITS — some units appear in both (box, carton, boite)
+  if (AMBIGUOUS_UNITS.has(u)) return { unit: null, factor: 1, ambiguous: true };
   if (COUNT_UNITS.has(u)) return { unit: 'unit', factor: 1, ambiguous: false };
 
   // Embedded weight: "portion 150g", "pot 200ml"
