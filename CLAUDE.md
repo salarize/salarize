@@ -46,7 +46,17 @@
 - `is_closer_invoice` dans invoices - si true, alimenter closing_records depuis invoice_lines
 - `source` dans cdr_entries - 'manual' | 'invoice' | 'import'
 
-### 3. Points de vigilance frequents
+### 3. Securite des cles API — REGLE ABSOLUE
+
+**JAMAIS exposer une cle API dans le code frontend. Sans exception.**
+
+- Les cles API (Claude, Supabase service role, etc.) ne doivent JAMAIS apparaitre dans `src/`, dans le bundle JS, ni dans aucun fichier commite
+- Stocker toutes les cles sensibles dans Supabase Secrets ou des variables d'environnement serveur
+- Tout appel a une API tierce (Claude Vision, etc.) DOIT passer par une Supabase Edge Function — jamais directement depuis le navigateur
+- Si l'utilisateur propose de mettre une cle API cote frontend, refuser et expliquer pourquoi. Ce n'est pas une option negociable.
+- Ne jamais suggerer `import.meta.env.VITE_CLAUDE_API_KEY` ou equivalent pour des cles qui donnent acces a des services factures
+
+### 4. Points de vigilance frequents
 
 - **Invitations:** Toujours inserer dans `invitations` table, pas seulement en memoire
 - **Departements:** Les mappings doivent etre sauvegardes dans `department_mappings`

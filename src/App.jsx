@@ -113,6 +113,7 @@ const TimesheetPage = lazy(() => import('./components/timesheet/TimesheetPage'))
 const SuppliersDashboardPage = lazy(() => import('./components/suppliers/SuppliersDashboardPage'));
 const OverviewPage = lazy(() => import('./components/dashboard/OverviewPage'));
 const CDRPage = lazy(() => import('./components/cdr/CDRPage'));
+const FoodCostPage = lazy(() => import('./components/foodcost/FoodCostPage'));
 
 const PAGE_TO_ROUTE = {
   home: '/',
@@ -262,7 +263,7 @@ function AppContent() {
   const actionsMenuRef = useRef(null);
   const [companyOrder, setCompanyOrder] = useState([]); // Ordre des sociétés dans la sidebar (drag & drop)
   const [showTimesheet, setShowTimesheet] = useState(false); // Afficher la page timesheet
-  // 'overview' | 'payroll' | 'suppliers' | 'cdr'
+  // 'overview' | 'payroll' | 'suppliers' | 'cdr' | 'foodcost'
   const [currentModule, setCurrentModule] = useState('overview');
   const [unsavedNavigationRequest, setUnsavedNavigationRequest] = useState(null); // { type: 'module'|'company', nextModule?: string, companyName?: string, comps?: object }
   const [materialCostsSetupIssue, setMaterialCostsSetupIssue] = useState(null);
@@ -7336,6 +7337,7 @@ L'équipe Salarize`;
           onPayrollClick={() => { setView('dashboard'); switchModule('payroll'); setSidebarOpen(false); }}
           onSuppliersClick={() => { setView('dashboard'); switchModule('suppliers'); setSidebarOpen(false); }}
           onCDRClick={() => { setView('dashboard'); switchModule('cdr'); setSidebarOpen(false); }}
+          onFoodCostClick={() => { setView('dashboard'); switchModule('foodcost'); setSidebarOpen(false); }}
           />
           {showModal && (
             <SelectCompanyModal 
@@ -9015,6 +9017,8 @@ L'équipe Salarize`;
               onOpenPayrollWithImport={() => { switchModule('payroll'); setShowImportModal(true); }}
               onOpenSuppliersWithImport={() => { switchModule('suppliers'); }}
               onOpenCDRWithImport={() => switchModule('cdr')}
+              onOpenFoodCost={() => switchModule('foodcost')}
+              onOpenFoodCostWithImport={() => switchModule('foodcost')}
             />
           ) : currentModule === 'suppliers' ? (
             <SuppliersDashboardPage
@@ -9033,6 +9037,12 @@ L'équipe Salarize`;
                 setIsLoadingData(true);
                 loadFromSupabase(user.id, user.email);
               }}
+            />
+          ) : currentModule === 'foodcost' ? (
+            <FoodCostPage
+              activeCompany={activeCompany}
+              isViewerOnly={isViewerOnly}
+              onBack={() => switchModule('overview')}
             />
           ) : currentModule === 'cdr' ? (
             <CDRPage

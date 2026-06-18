@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DEMO_COMPANY, DEMO_EMPLOYEES } from '../constants';
 import Footer from '../components/layout/Footer';
 import { SvgBarChart } from '../components/layout/SvgBarChart';
@@ -6,6 +6,35 @@ import { SvgBarChart } from '../components/layout/SvgBarChart';
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aout', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function DemoPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
+  useEffect(() => {
+    const title = 'Demo | Voir Salarize en action - Dashboard RH belge';
+    const description =
+      "Decouvrez Salarize avec des donnees reelles. Visualisez l'analyse de masse salariale, les departements et le compte de resultat.";
+
+    document.title = title;
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute('content', description);
+    document
+      .querySelector('link[rel="canonical"]')
+      ?.setAttribute('href', 'https://www.salarize.co/demo');
+    document
+      .querySelector('meta[property="og:url"]')
+      ?.setAttribute('content', 'https://www.salarize.co/demo');
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.setAttribute('content', title);
+    document
+      .querySelector('meta[property="og:description"]')
+      ?.setAttribute('content', description);
+    document
+      .querySelector('meta[name="twitter:title"]')
+      ?.setAttribute('content', title);
+    document
+      .querySelector('meta[name="twitter:description"]')
+      ?.setAttribute('content', description);
+  }, []);
+
   const demoTotalCost = DEMO_EMPLOYEES.filter(e => e.period === '2024-04').reduce((sum, e) => sum + e.totalCost, 0);
   const demoEmployeeCount = new Set(DEMO_EMPLOYEES.filter(e => e.period === '2024-04').map(e => e.name)).size;
   const demoDepts = [...new Set(DEMO_EMPLOYEES.map(e => e.department))];

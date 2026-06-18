@@ -1,7 +1,36 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Footer from '../components/layout/Footer';
 
 function FeaturesPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
+  useEffect(() => {
+    const title = 'Salarize | Fonctionnalites - Dashboard RH pour PME belge';
+    const description =
+      'Importez Acerta, Securex, SD Worx. Analysez votre masse salariale par departement, generez votre P&L et pilotez vos closers.';
+
+    document.title = title;
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute('content', description);
+    document
+      .querySelector('link[rel="canonical"]')
+      ?.setAttribute('href', 'https://www.salarize.co/features');
+    document
+      .querySelector('meta[property="og:url"]')
+      ?.setAttribute('content', 'https://www.salarize.co/features');
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.setAttribute('content', title);
+    document
+      .querySelector('meta[property="og:description"]')
+      ?.setAttribute('content', description);
+    document
+      .querySelector('meta[name="twitter:title"]')
+      ?.setAttribute('content', title);
+    document
+      .querySelector('meta[name="twitter:description"]')
+      ?.setAttribute('content', description);
+  }, []);
+
   const features = [
     {
       icon: (

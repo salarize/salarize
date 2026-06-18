@@ -17,7 +17,9 @@
       "Bash(nslookup:*)",
       "Bash(npm install:*)",
       "Bash(npm i:*)",
-      "Bash(codex)"
+      "Bash(codex)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ]
   }
 }

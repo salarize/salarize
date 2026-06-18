@@ -1,9 +1,38 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PRICING_PLANS } from '../constants';
 import Footer from '../components/layout/Footer';
 
 function PricingPage({ onLogin, user, onGoToDashboard, setCurrentPage }) {
   const [annual, setAnnual] = useState(true);
+
+  useEffect(() => {
+    const title = 'Tarifs | Logiciel RH gratuit pour PME belge - Salarize';
+    const description =
+      'Salarize est gratuit pour demarrer. Analysez votre masse salariale, importez vos fichiers Acerta et Securex sans abonnement.';
+
+    document.title = title;
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute('content', description);
+    document
+      .querySelector('link[rel="canonical"]')
+      ?.setAttribute('href', 'https://www.salarize.co/pricing');
+    document
+      .querySelector('meta[property="og:url"]')
+      ?.setAttribute('content', 'https://www.salarize.co/pricing');
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.setAttribute('content', title);
+    document
+      .querySelector('meta[property="og:description"]')
+      ?.setAttribute('content', description);
+    document
+      .querySelector('meta[name="twitter:title"]')
+      ?.setAttribute('content', title);
+    document
+      .querySelector('meta[name="twitter:description"]')
+      ?.setAttribute('content', description);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950">
