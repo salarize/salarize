@@ -8,6 +8,20 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CLAUDE_API_KEY = Deno.env.get('CLAUDE_API_KEY')!;
 const MAX_CONCURRENT = 3;
+const MAX_PDF_BYTES = 5 * 1024 * 1024;
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -212,7 +226,14 @@ Deno.serve(async (req) => {
     }
 
     const pdfBuffer = await fileData.arrayBuffer();
-    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
+
+    if (pdfBuffer.byteLength > MAX_PDF_BYTES) {
+      throw new Error(
+        `PDF trop volumineux: ${(pdfBuffer.byteLength / 1024 / 1024).toFixed(1)} MB. Limite: 5 MB.`
+      );
+    }
+
+    const pdfBase64 = arrayBufferToBase64(pdfBuffer);
 
     // ── 2. Extract with Claude ─────────────────────────────────────────────
     const extracted = await extractInvoiceWithClaude(pdfBase64);
