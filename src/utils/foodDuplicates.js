@@ -49,8 +49,9 @@ export function buildLineDuplicateKey(line) {
   const qty = parseFloat(line.quantity_normalized ?? line.quantity ?? 0).toFixed(4);
   const price = parseFloat(line.unit_price_normalized ?? line.unit_price_raw ?? 0).toFixed(4);
   const supplier = (line.food_invoices?.supplier_id ?? line.supplier_id ?? '').toString();
+  const invoiceNum = (line.food_invoices?.invoice_number ?? line.invoice_number ?? '').toString().toLowerCase().trim();
   const date = (line.food_invoices?.invoice_date ?? '').toString().slice(0, 10);
-  return `${desc}::${qty}::${price}::${supplier}::${date}`;
+  return `${desc}::${qty}::${price}::${supplier}::${invoiceNum}::${date}`;
 }
 
 /**

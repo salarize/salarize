@@ -20,18 +20,15 @@ const TABS = [
   { id: 'history', label: 'Historique' },
 ];
 
-function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack, forceOpenImport, onImportOpened }) {
+function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack, forceOpenImport }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showImport, setShowImport] = useState(false);
   const [confirmedOnly, setConfirmedOnly] = useState(true);
   const dbCompanyId = companyId;
 
-  // Trigger import modal from parent (e.g. sidebar import button)
+  // forceOpenImport is a counter — any increment opens the modal
   React.useEffect(() => {
-    if (forceOpenImport) {
-      setShowImport(true);
-      onImportOpened?.();
-    }
+    if (forceOpenImport > 0) setShowImport(true);
   }, [forceOpenImport]);
 
   const {
