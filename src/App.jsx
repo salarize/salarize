@@ -7444,6 +7444,8 @@ L'équipe Salarize`;
             if (currentModule === 'suppliers') {
               // Ouverture explicite uniquement via bouton Import (pas via onglet de navigation).
               setShowMaterialImportModal(true);
+            } else if (currentModule === 'foodcost') {
+              switchModule('foodcost');
             } else {
               setShowImportModal(true);
             }
@@ -7467,6 +7469,7 @@ L'équipe Salarize`;
           onPayrollClick={() => { switchModule('payroll'); setSidebarOpen(false); }}
           onSuppliersClick={() => { switchModule('suppliers'); setSidebarOpen(false); }}
           onCDRClick={() => { switchModule('cdr'); setSidebarOpen(false); }}
+          onFoodCostClick={() => { switchModule('foodcost'); setSidebarOpen(false); }}
         />
         <DashboardHeader 
           user={user} 
@@ -9041,6 +9044,8 @@ L'équipe Salarize`;
           ) : currentModule === 'foodcost' ? (
             <FoodCostPage
               activeCompany={activeCompany}
+              companyId={companies[activeCompany]?.id}
+              user={user}
               isViewerOnly={isViewerOnly}
               onBack={() => switchModule('overview')}
             />

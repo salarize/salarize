@@ -20,19 +20,20 @@ const TABS = [
   { id: 'history', label: 'Historique' },
 ];
 
-function FoodCostPage({ activeCompany, user, isViewerOnly, onBack }) {
+function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showImport, setShowImport] = useState(false);
   const [confirmedOnly, setConfirmedOnly] = useState(true);
+  const dbCompanyId = companyId || activeCompany;
 
   const {
     suppliers, articles, invoices, priceHistory, reviewLines,
     anomalies, loading, refetch,
     getVwap, topArticlesBySpend,
     validateLine, bulkApprove, createArticleAndLink, resolveAnomaly,
-  } = useFoodCostData(activeCompany, { confirmedOnly });
+  } = useFoodCostData(dbCompanyId, { confirmedOnly });
 
-  const { jobs, uploadFiles, retryJob, forceReimport, clearCompleted, summary } = useImportQueue(activeCompany);
+  const { jobs, uploadFiles, retryJob, forceReimport, clearCompleted, summary } = useImportQueue(dbCompanyId);
 
   const openAnomaly = anomalies?.length ?? 0;
 
@@ -137,14 +138,14 @@ function FoodCostPage({ activeCompany, user, isViewerOnly, onBack }) {
                 onValidate={validateLine}
                 onBulkApprove={bulkApprove}
                 onCreateAndLink={createArticleAndLink}
-                companyId={activeCompany}
+                companyId={dbCompanyId}
                 userEmail={user?.email}
               />
             )}
             {activeTab === 'articles' && (
               <ArticleCatalog
                 articles={articles}
-                companyId={activeCompany}
+                companyId={dbCompanyId}
                 onRefetch={refetch}
               />
             )}
@@ -155,11 +156,11 @@ function FoodCostPage({ activeCompany, user, isViewerOnly, onBack }) {
               />
             )}
             {activeTab === 'duplicates' && (
-              <FoodDuplicateResolver companyId={activeCompany} />
+              <FoodDuplicateResolver companyId={dbCompanyId} />
             )}
             {activeTab === 'history' && (
               <FoodImportHistory
-                companyId={activeCompany}
+                companyId={dbCompanyId}
                 onRetry={retryJob}
               />
             )}

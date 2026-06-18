@@ -110,9 +110,11 @@ function OverviewPage({
   onOpenPayroll,
   onOpenSuppliers,
   onOpenCDR,
+  onOpenFoodCost,
   onOpenPayrollWithImport,
   onOpenSuppliersWithImport,
   onOpenCDRWithImport,
+  onOpenFoodCostWithImport,
 }) {
   const [headerVisible, setHeaderVisible] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -213,7 +215,7 @@ function OverviewPage({
       </div>
 
       {/* Module Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full max-w-4xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 w-full max-w-6xl">
 
         {/* Module RH */}
         <ModuleCard
@@ -274,13 +276,34 @@ function OverviewPage({
           shortcut="C"
           delay={210}
         />
+
+        {/* Module Food Cost */}
+        <ModuleCard
+          title="Food Cost"
+          description="Analyse des factures fournisseurs alimentaires, prix au kg/litre et comparaison fournisseurs."
+          icon={
+            <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          }
+          accentClass="bg-orange-100 text-orange-600"
+          borderActiveClass="border-orange-300"
+          bgActiveClass="bg-gradient-to-br from-orange-50 to-amber-50"
+          badgeText="Nouveau"
+          hasData={true}
+          onOpen={onOpenFoodCost}
+          onStart={onOpenFoodCostWithImport}
+          shortcut="A"
+          delay={290}
+        />
       </div>
 
       {/* Keyboard hint */}
       <p className="hidden sm:block mt-8 text-[11px] text-center text-slate-300">
         Raccourcis : <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-500">H</kbd> RH &nbsp;
         <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-500">F</kbd> Fournisseur &nbsp;
-        <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-500">C</kbd> CDR
+        <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-500">C</kbd> CDR &nbsp;
+        <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-500">A</kbd> Food Cost
       </p>
     </div>
   );
