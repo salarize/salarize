@@ -17,14 +17,7 @@ export function useFoodCostData(companyId, { confirmedOnly = true } = {}) {
     setError(null);
 
     try {
-      const [
-        { data: sup, error: supErr },
-        { data: art, error: artErr },
-        { data: inv, error: invErr },
-        { data: hist, error: histErr },
-        { data: review, error: reviewErr },
-        { data: anom, error: anomErr },
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         supabase.from('food_suppliers').select('*').eq('company_id', companyId).order('name'),
         supabase.from('food_articles').select('*, food_article_aliases(*)').eq('company_id', companyId).order('canonical_name'),
         supabase.from('food_invoices').select('*, food_suppliers(name)').eq('company_id', companyId).order('invoice_date', { ascending: false }),
@@ -45,18 +38,35 @@ export function useFoodCostData(companyId, { confirmedOnly = true } = {}) {
           .order('created_at', { ascending: false }),
       ]);
 
-      const firstErr = supErr || artErr || invErr || histErr || reviewErr || anomErr;
-      if (firstErr) {
-        setError(firstErr.message);
+      const [supRes, artRes, invRes, histRes, reviewRes, anomRes] = results;
+
+      const extractData = (r) => (r.status === 'fulfilled' && !r.value?.error) ? (r.value?.data ?? []) : null;
+      const extractErr = (r) => r.status === 'rejected' ? (r.reason?.message ?? 'Erreur réseau') : (r.value?.error?.message ?? null);
+
+      // Critical tables — abort if any fail
+      const sup = extractData(supRes);
+      const art = extractData(artRes);
+      const review = extractData(reviewRes);
+
+      const criticalError = extractErr(supRes) || extractErr(artRes) || extractErr(reviewRes);
+      if (criticalError || sup === null || art === null || review === null) {
+        setError(criticalError ?? 'Erreur lors du chargement des données Food Cost');
         setLoading(false);
         return;
       }
 
-      setSuppliers(sup ?? []);
-      setArticles(art ?? []);
-      setInvoices(inv ?? []);
-      setReviewLines(review ?? []);
-      setAnomalies(anom ?? []);
+      // Non-critical tables — degrade gracefully
+      const inv = extractData(invRes) ?? [];
+      const hist = extractData(histRes) ?? [];
+      const anom = extractData(anomRes) ?? [];
+
+      if (extractErr(histRes)) setError(`Historique des prix indisponible (${extractErr(histRes)})`);
+
+      setSuppliers(sup);
+      setArticles(art);
+      setInvoices(inv);
+      setReviewLines(review);
+      setAnomalies(anom);
 
       // When confirmedOnly=false, merge unconfirmed lines' price data into history
       // so the dashboard analytics include all extracted data, not just validated ones

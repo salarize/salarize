@@ -217,6 +217,7 @@ function AppContent() {
   const [showCompanySettings, setShowCompanySettings] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showMaterialImportModal, setShowMaterialImportModal] = useState(false);
+  const [foodImportTrigger, setFoodImportTrigger] = useState(false);
   const [materialImportBusy, setMaterialImportBusy] = useState(false);
   const [pendingMaterialFiles, setPendingMaterialFiles] = useState([]);
   const [materialPreviewRows, setMaterialPreviewRows] = useState(null);
@@ -7445,7 +7446,7 @@ L'équipe Salarize`;
               // Ouverture explicite uniquement via bouton Import (pas via onglet de navigation).
               setShowMaterialImportModal(true);
             } else if (currentModule === 'foodcost') {
-              // Food Cost has its own import button in its page header
+              setFoodImportTrigger(true);
             } else {
               setShowImportModal(true);
             }
@@ -9021,7 +9022,7 @@ L'équipe Salarize`;
               onOpenSuppliersWithImport={() => { switchModule('suppliers'); }}
               onOpenCDRWithImport={() => switchModule('cdr')}
               onOpenFoodCost={() => switchModule('foodcost')}
-              onOpenFoodCostWithImport={() => switchModule('foodcost')}
+              onOpenFoodCostWithImport={() => { switchModule('foodcost'); setFoodImportTrigger(true); }}
             />
           ) : currentModule === 'suppliers' ? (
             <SuppliersDashboardPage
@@ -9048,6 +9049,8 @@ L'équipe Salarize`;
               user={user}
               isViewerOnly={isViewerOnly}
               onBack={() => switchModule('overview')}
+              forceOpenImport={foodImportTrigger}
+              onImportOpened={() => setFoodImportTrigger(false)}
             />
           ) : currentModule === 'cdr' ? (
             <CDRPage

@@ -87,6 +87,22 @@ function FoodCostDashboard({ articles, priceHistory, suppliers, getVwap, topArti
         </button>
       </div>
 
+      {/* Warning: unconfirmed data included */}
+      {!confirmedOnly && (() => {
+        const unconfirmedCount = priceHistory.filter(h => h._unconfirmed).length;
+        return unconfirmedCount > 0 ? (
+          <div className="flex items-start gap-3 px-4 py-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-sm">
+            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <span>
+              <strong>{unconfirmedCount} ligne{unconfirmedCount > 1 ? 's' : ''} non confirmée{unconfirmedCount > 1 ? 's' : ''}</strong> incluse{unconfirmedCount > 1 ? 's' : ''} dans les calculs.
+              Ces données n'ont pas encore été vérifiées et peuvent contenir des erreurs d'extraction.
+            </span>
+          </div>
+        ) : null;
+      })()}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard

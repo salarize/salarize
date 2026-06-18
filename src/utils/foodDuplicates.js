@@ -41,13 +41,16 @@ export function buildInvoiceDuplicateKey(invoice) {
 
 /**
  * Build a string key for an invoice line.
- * Used for detecting duplicate lines within or across invoices.
+ * Includes supplier + date so repeated legitimate purchases on different days
+ * are NOT flagged as duplicates. Only same-supplier same-day exact matches are.
  */
 export function buildLineDuplicateKey(line) {
   const desc = (line.raw_description ?? '').toLowerCase().trim();
   const qty = parseFloat(line.quantity_normalized ?? line.quantity ?? 0).toFixed(4);
   const price = parseFloat(line.unit_price_normalized ?? line.unit_price_raw ?? 0).toFixed(4);
-  return `${desc}::${qty}::${price}`;
+  const supplier = (line.food_invoices?.supplier_id ?? line.supplier_id ?? '').toString();
+  const date = (line.food_invoices?.invoice_date ?? '').toString().slice(0, 10);
+  return `${desc}::${qty}::${price}::${supplier}::${date}`;
 }
 
 /**

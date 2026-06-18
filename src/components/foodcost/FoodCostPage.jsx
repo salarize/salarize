@@ -20,11 +20,19 @@ const TABS = [
   { id: 'history', label: 'Historique' },
 ];
 
-function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack }) {
+function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack, forceOpenImport, onImportOpened }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showImport, setShowImport] = useState(false);
   const [confirmedOnly, setConfirmedOnly] = useState(true);
   const dbCompanyId = companyId;
+
+  // Trigger import modal from parent (e.g. sidebar import button)
+  React.useEffect(() => {
+    if (forceOpenImport) {
+      setShowImport(true);
+      onImportOpened?.();
+    }
+  }, [forceOpenImport]);
 
   const {
     suppliers, articles, invoices, priceHistory, reviewLines,
@@ -37,10 +45,21 @@ function FoodCostPage({ activeCompany, companyId, user, isViewerOnly, onBack }) 
 
   const openAnomaly = anomalies?.length ?? 0;
 
-  if (!activeCompany || !companyId) {
+  if (!activeCompany) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-slate-400">Sélectionnez une société pour accéder au Food Cost.</p>
+      </div>
+    );
+  }
+
+  if (!companyId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-2">
+        <p className="text-slate-300 font-semibold">Identifiant Supabase manquant</p>
+        <p className="text-slate-500 text-sm text-center max-w-sm">
+          Cette société n'a pas encore d'identifiant Supabase. Rechargez la page ou resélectionnez la société.
+        </p>
       </div>
     );
   }

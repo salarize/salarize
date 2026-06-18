@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import FoodInvoiceReviewPanel from './FoodInvoiceReviewPanel';
 
 const CATEGORIES = ['meat', 'fish', 'dairy', 'produce', 'dry', 'beverage', 'other'];
@@ -195,10 +195,17 @@ function FoodCostReviewQueue({ reviewLines, articles, onValidate, onBulkApprove,
   const [activeTab, setActiveTab] = useState('review');
   const [panelLine, setPanelLine] = useState(null);
 
-  const ready = reviewLines.filter(l => (l.confidence ?? 0) >= 0.85 && l.article_id && !l.is_confirmed);
-  const needsReview = reviewLines.filter(l => !l.is_confirmed && !((l.confidence ?? 0) >= 0.85 && l.article_id));
-  const duplicates = reviewLines.filter(l => l.duplicate_group_id);
-  const failed = reviewLines.filter(l => l.extraction_failed);
+  const handleApprove = useCallback(async (line) => {
+    if (!line?.article_id) return;
+    await onValidate(line.id, line.article_id);
+    setPanelLine(null);
+  }, [onValidate]);
+
+  // Mutually exclusive classification — each line belongs to exactly one tab
+  const failed = reviewLines.filter(l => l.extraction_failed === true);
+  const duplicates = reviewLines.filter(l => l.duplicate_group_id && !l.extraction_failed);
+  const ready = reviewLines.filter(l => !l.extraction_failed && !l.duplicate_group_id && (l.confidence ?? 0) >= 0.85 && l.article_id);
+  const needsReview = reviewLines.filter(l => !l.extraction_failed && !l.duplicate_group_id && !((l.confidence ?? 0) >= 0.85 && l.article_id));
 
   const counts = { ready: ready.length, review: needsReview.length, duplicates: duplicates.length, failed: failed.length };
   const currentLines = { ready, review: needsReview, duplicates, failed }[activeTab] ?? [];
@@ -229,6 +236,7 @@ function FoodCostReviewQueue({ reviewLines, articles, onValidate, onBulkApprove,
             setPanelLine(null);
             onRefetch?.();
           }}
+          onApprove={() => handleApprove(panelLine)}
         />
       )}
 

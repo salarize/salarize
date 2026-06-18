@@ -49,7 +49,7 @@ function FieldRow({ field, value, editing, onChange, onStartEdit, onCancelEdit, 
   );
 }
 
-function FoodInvoiceReviewPanel({ line, companyId, userEmail, onClose, onSaved }) {
+function FoodInvoiceReviewPanel({ line, companyId, userEmail, onClose, onSaved, onApprove }) {
   const [draft, setDraft] = useState({});
   const [editingField, setEditingField] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -135,7 +135,7 @@ function FoodInvoiceReviewPanel({ line, companyId, userEmail, onClose, onSaved }
     const handler = (e) => {
       if (!line) return;
       if (e.key === 'Escape') { setEditingField(null); setDraft({}); }
-      if (e.key === 'a' && !editingField) { onSaved?.(); onClose?.(); }
+      if (e.key === 'a' && !editingField) { onApprove?.(); }
       if (e.key === 'i' && !editingField) { onClose?.(); }
     };
     window.addEventListener('keydown', handler);
